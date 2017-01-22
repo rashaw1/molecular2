@@ -89,7 +89,7 @@ public:
   void compute_forces(const std::vector<Atom> &atoms, int nocc); 
   void compute_hessian(const std::vector<Atom> &atoms, int nocc);
   
-  template<unsigned deriv_order>
+  template <unsigned deriv_order>
   std::vector<EMatrix> compute_2body_fock_deriv(const std::vector<Atom> &atoms, const EMatrix& D);
 };
 #endif

@@ -2607,12 +2607,12 @@ Matrix IntegralEngine::compute_schwarz_ints( const std::vector<libint2::Shell> &
 	 return result;
  }
  
- template <libint2::Operator obtype>
- std::vector<EMatrix> IntegralEngine::compute_1body_ints_deriv(unsigned deriv_order, const std::vector<libint2::Shell>& obs, const std::vector<Atom> &atoms) 
+ std::vector<EMatrix> IntegralEngine::compute_1body_ints_deriv(libint2::Operator obtype, unsigned deriv_order, 
+ 	const std::vector<libint2::Shell>& obs, const std::vector<Atom> &atoms) 
  {
 	 const auto n = nbasis(obs);
 	 const auto nshells = obs.size();
-	 constexpr auto nopers = libint2::operator_traits<obtype>::nopers;
+	 constexpr auto nopers = 1u;
 	 const auto nresults = nopers * libint2::num_geometrical_derivatives(atoms.size(), deriv_order);
 	 typedef std::vector<EMatrix> result_type;
 	 result_type result(nresults);

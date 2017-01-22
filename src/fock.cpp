@@ -424,8 +424,8 @@ void Fock::compute_forces(const std::vector<Atom> &atoms, int nocc) {
 	Matrix F_Pulay(atoms.size(), 3, 0.0);
 	
 	// One-body contributions to forces
-	auto T1 = integrals.compute_1body_ints_deriv<Operator::kinetic>(1, shells, atoms);
-	auto V1 = integrals.compute_1body_ints_deriv<Operator::nuclear>(1, shells, atoms);
+	auto T1 = integrals.compute_1body_ints_deriv(Operator::kinetic, 1, shells, atoms);
+	auto V1 = integrals.compute_1body_ints_deriv(Operator::nuclear, 1, shells, atoms);
 	for (auto atom = 0, i = 0; atom != atoms.size(); ++atom) {
 		for (auto xyz = 0; xyz != 3; ++xyz, ++i) {
 			auto force = 2 * (T1[i] + V1[i]).cwiseProduct(D).sum();
@@ -441,7 +441,7 @@ void Fock::compute_forces(const std::vector<Atom> &atoms, int nocc) {
 		for (int j = 0; j < nocc; ++j) C_occ(i, j) = CP(i, j);
 	}
 	EMatrix W = C_occ * evals_occ * C_occ.transpose();
-	auto S1 = integrals.compute_1body_ints_deriv<Operator::overlap>(1, shells, atoms);
+	auto S1 = integrals.compute_1body_ints_deriv(Operator::overlap, 1, shells, atoms);
 	for (auto atom = 0, i = 0; atom != atoms.size(); ++atom) {
 		for (auto xyz = 0; xyz != 3; ++xyz, ++i) {
 			auto force = 2 * S1[i].cwiseProduct(W).sum();
@@ -510,8 +510,8 @@ void Fock::compute_hessian(const std::vector<Atom> &atoms, int nocc) {
 	Matrix H_Pulay(ncoords, ncoords, 0.0);
 	
 	// One-body contributions to the hessian
-	auto T2 = integrals.compute_1body_ints_deriv<Operator::kinetic>(2, shells, atoms);
-	auto V2 = integrals.compute_1body_ints_deriv<Operator::nuclear>(2, shells, atoms);
+	auto T2 = integrals.compute_1body_ints_deriv(Operator::kinetic, 2, shells, atoms);
+	auto V2 = integrals.compute_1body_ints_deriv(Operator::nuclear, 2, shells, atoms);
 	for (auto row = 0, i = 0; row != ncoords; ++row) {
 		for (auto col = row; col != ncoords; ++col, ++i) {
 			auto hess = 2 * (T2[i] + V2[i]).cwiseProduct(D).sum();
@@ -527,7 +527,7 @@ void Fock::compute_hessian(const std::vector<Atom> &atoms, int nocc) {
 		for (int j = 0; j < nocc; ++j) C_occ(i, j) = CP(i, j);
 	}
 	EMatrix W = C_occ * evals_occ * C_occ.transpose();
-	auto S2 = integrals.compute_1body_ints_deriv<Operator::overlap>(2, shells, atoms);
+	auto S2 = integrals.compute_1body_ints_deriv(Operator::overlap, 2, shells, atoms);
 	for (auto row = 0, i = 0; row != ncoords; ++row) {
 		for (auto col = row; col != ncoords; ++col, ++i) {
 			auto hess = 2 * S2[i].cwiseProduct(W).sum();
@@ -596,7 +596,7 @@ void Fock::compute_hessian(const std::vector<Atom> &atoms, int nocc) {
 	std::cout << "\n\n";
 }
 
-template<unsigned deriv_order>
+template <unsigned deriv_order>
 std::vector<EMatrix> Fock::compute_2body_fock_deriv(const std::vector<Atom> &atoms, const EMatrix& D)
 {
 	using libint2::Shell;	

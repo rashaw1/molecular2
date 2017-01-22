@@ -8,7 +8,7 @@ COMMANDLINE_OPTIONS =
 
 # Compiler options
 DEBUG = -g -Wall -O0 -std=c++11 -D_GLIBCXX_DEBUG 
-OPTIM = -O3 -Wall -Wno-unused-variable -std=c++11 -omp 
+OPTIM = -O3 -Wall -Wno-unused-variable -std=c++11 -omp  -DLIBINT2_MAX_DERIV_ORDER=2
 COMPILE_OPTIONS = $(OPTIM)
 
 # Header include directories

@@ -150,9 +150,7 @@ public:
 
   Tensor4 compute_eris(const std::vector<libint2::Shell>& shells);
   
-  template <libint2::Operator obtype>
-  std::vector<EMatrix> compute_1body_ints_deriv(unsigned deriv_order, const std::vector<libint2::Shell>& obs,
-  	const std::vector<Atom> &atoms);
+  std::vector<EMatrix> compute_1body_ints_deriv(libint2::Operator obtype, unsigned deriv_order, const std::vector<libint2::Shell>& obs, const std::vector<Atom> &atoms);
 
 };
 
