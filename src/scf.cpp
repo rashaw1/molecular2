@@ -135,6 +135,11 @@ void SCF::rhf()
     }
 	focker.diagonalise();
 	
+	std::vector<Atom> atoms;
+	for (int i = 0; i < molecule.getNAtoms(); ++i) atoms.push_back(molecule.getAtom(i));
+	focker.compute_forces(atoms, nel/2);
+	focker.compute_hessian(atoms, nel/2);
+	
     if (!converged) { 
       molecule.getLog().result("SCF failed to converge.");
     } else {

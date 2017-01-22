@@ -35,13 +35,7 @@
 #include <iostream>
 #include <iomanip>
 #include <string>
-#include <thread>
-#include <array>
-
-typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-	EMatrix;  // import dense, dynamically sized Matrix type from Eigen;
-// this is a matrix with row-major storage (http://en.wikipedia.org/wiki/Row-major_order)
-// to meet the layout of the integrals returned by the Libint integral library      
+#include <thread>   
 
 // Constructor
 IntegralEngine::IntegralEngine(Molecule& m) : molecule(m)
@@ -88,6 +82,14 @@ IntegralEngine::IntegralEngine(Molecule& m) : molecule(m)
 		Error e("MEMERR", "Not enough memory for ERIs.");
 		molecule.getLog().error(e);
 		molecule.getLog().setDirect(true);
+	}
+	
+	prescreen = compute_schwarz_ints<>(shells);
+	if (prescreen.nrows() < 10) { 
+		molecule.getLog().print("Forming the two electron repulsion integrals.\n");
+		molecule.getLog().print("PRESCREENING MATRIX:\n");
+		molecule.getLog().print(prescreen);
+		molecule.getLog().print("\n\n");
 	}
 		
 	if ( molecule.getLog().direct() ){
@@ -2345,6 +2347,16 @@ std::vector<size_t> IntegralEngine::map_shell_to_basis_function(const std::vecto
 	return result;
 }
 
+std::vector<long> IntegralEngine::map_shell_to_atom(const std::vector<Atom>& atoms, const std::vector<libint2::Shell>& shells) {
+	std::vector<long> result;
+	result.reserve(shells.size());
+	for(const auto& s: shells) {
+		auto a = std::find_if(atoms.begin(), atoms.end(), [&s](const Atom& a){ return s.O[0] == a.getX() && s.O[1] == a.getY() && s.O[2] == a.getZ(); } );
+		result.push_back( a != atoms.end() ? a - atoms.begin() : -1);
+	}
+	return result;
+}
+
 Matrix IntegralEngine::compute_1body_ints(const std::vector<libint2::Shell>& shells,
 libint2::Operator obtype,
 const std::vector<Atom>& atoms)
@@ -2473,4 +2485,306 @@ Tensor4 IntegralEngine::compute_eris(const std::vector<libint2::Shell>& shells) 
 		}
 	}
 	return eris;
+}
+
+EMatrix IntegralEngine::compute_shellblock_norm(const std::vector<libint2::Shell> &shells, const Matrix& A) {
+	const auto nsh = shells.size();
+	EMatrix Ash(nsh, nsh);
+	EMatrix EA(A.nrows(), A.ncols()); 
+	for (int i = 0; i < A.nrows(); ++i) {
+		for (int j = 0; j < A.ncols(); ++j) EA(i, j) = A(i, j);
+	}
+	
+	auto shell2bf = map_shell_to_basis_function(shells);
+	for (size_t s1 = 0; s1 != nsh; ++s1) {
+		const auto& s1_first = shell2bf[s1];
+		const auto& s1_size = shells[s1].size();
+		for (size_t s2 = 0; s2 != nsh; ++s2) {
+			const auto& s2_first = shell2bf[s2];
+			const auto& s2_size = shells[s2].size();
+
+			Ash(s1, s2) = EA.block(s1_first, s2_first, s1_size, s2_size).lpNorm<Eigen::Infinity>();
+		}
+	}
+
+	return Ash;
+}
+
+template <libint2::Operator Kernel>
+Matrix IntegralEngine::compute_schwarz_ints( const std::vector<libint2::Shell> &bs1, const std::vector<libint2::Shell> _bs2, 
+ bool use_2norm, typename libint2::operator_traits<Kernel>::oper_params_type params) {
+     const std::vector<libint2::Shell>& bs2 = (_bs2.empty() ? bs1 : _bs2);
+     const auto nsh1 = bs1.size();
+     const auto nsh2 = bs2.size();
+     const auto bs1_equiv_bs2 = (&bs1 == &bs2);
+
+     Matrix K(nsh1, nsh2, 0.0);
+
+     // construct the 2-electron repulsion integrals engine
+     using libint2::Engine;
+
+     // !!! very important: cannot screen primitives in Schwarz computation !!!
+     auto epsilon = 0.;
+     Engine engine(Kernel, std::max(max_nprim(bs1), max_nprim(bs2)), 
+	 	std::max(max_l(bs1), max_l(bs2)), 0, epsilon, params);
+
+	 const auto& buf = engine.results();
+
+	 // loop over permutationally-unique set of shells
+	 for (auto s1 = 0l, s12 = 0l; s1 != nsh1; ++s1) {
+		 auto n1 = bs1[s1].size();  // number of basis functions in this shell
+
+		 auto s2_max = bs1_equiv_bs2 ? s1 : nsh2 - 1;
+		 for (auto s2 = 0; s2 <= s2_max; ++s2, ++s12) {
+			 auto n2 = bs2[s2].size();
+			 auto n12 = n1 * n2;
+
+			 engine.compute2<Kernel, libint2::BraKet::xx_xx, 0>(bs1[s1], bs2[s2],
+			 bs1[s1], bs2[s2]);
+
+			 // the diagonal elements are the Schwarz ints ... use Map.diagonal()
+			 Eigen::Map<const EMatrix> buf_mat(buf[0], n12, n12);
+			 auto norm2 = use_2norm ? buf_mat.diagonal().norm()
+				 : buf_mat.diagonal().lpNorm<Eigen::Infinity>();
+			 K(s1, s2) = std::sqrt(norm2);
+			 if (bs1_equiv_bs2) K(s2, s1) = K(s1, s2);
+		 }
+	 }
+
+     return K;
+ }
+ 
+ shellpair_list_t IntegralEngine::compute_shellpair_list(const std::vector<libint2::Shell>& bs1, 
+ const std::vector<libint2::Shell> _bs2, double threshold) {
+ 		
+	 const std::vector<libint2::Shell> &bs2 = (_bs2.empty() ? bs1 : _bs2);
+	 const auto nsh1 = bs1.size();
+	 const auto nsh2 = bs2.size();
+	 const auto bs1_equiv_bs2 = (&bs1 == &bs2);
+
+	 // construct the 2-electron repulsion integrals engine
+	 using libint2::Engine;
+	 using libint2::Operator;
+	 Engine engine(Operator::overlap, std::max(max_nprim(bs1), max_nprim(bs2)),
+	 std::max(max_l(bs1), max_l(bs2)), 0);
+
+	 shellpair_list_t result;
+	 const auto& buf = engine.results();
+
+	 // loop over permutationally-unique set of shells
+	 for (auto s1 = 0l, s12 = 0l; s1 != nsh1; ++s1) {
+		 if (result.find(s1) == result.end())
+			 result.insert(std::make_pair(s1, std::vector<size_t>()));
+
+		 auto n1 = bs1[s1].size();  // number of basis functions in this shell
+
+		 auto s2_max = bs1_equiv_bs2 ? s1 : nsh2 - 1;
+		 for (auto s2 = 0; s2 <= s2_max; ++s2, ++s12) {
+	
+			 auto on_same_center = (bs1[s1].O == bs2[s2].O);
+			 bool significant = on_same_center;
+			 if (not on_same_center) {
+				 auto n2 = bs2[s2].size();
+				 engine.compute(bs1[s1], bs2[s2]);
+				 Eigen::Map<const EMatrix> buf_mat(buf[0], n1, n2);
+				 auto norm = buf_mat.norm();
+				 significant = (norm >= threshold);
+			 }
+
+			 if (significant) {
+				 result[s1].emplace_back(s2);
+			 }
+		 }
+	 }
+
+	 // resort shell list in increasing order, i.e. result[s][s1] < result[s][s2]
+	 // if s1 < s2
+	 for (auto s1 = 0l; s1 != nsh1; ++s1) {
+		auto& list = result[s1];
+		std::sort(list.begin(), list.end());
+	 }
+
+	 return result;
+ }
+ 
+ template <libint2::Operator obtype>
+ std::vector<EMatrix> IntegralEngine::compute_1body_ints_deriv(unsigned deriv_order, const std::vector<libint2::Shell>& obs, const std::vector<Atom> &atoms) 
+ {
+	 const auto n = nbasis(obs);
+	 const auto nshells = obs.size();
+	 constexpr auto nopers = libint2::operator_traits<obtype>::nopers;
+	 const auto nresults = nopers * libint2::num_geometrical_derivatives(atoms.size(), deriv_order);
+	 typedef std::vector<EMatrix> result_type;
+	 result_type result(nresults);
+	 for (auto& r : result) r = EMatrix::Zero(n, n);
+
+	 using libint2::Engine;
+	 using libint2::Operator; 
+		
+	 // construct the 1-body integrals engine
+	 Engine engine(obtype, max_nprim(obs), max_l(obs), deriv_order);
+	 // nuclear attraction ints engine needs to know where the charges sit ...
+	 // the nuclei are charges in this case; in QM/MM there will also be classical
+	 // charges
+	 if (obtype == Operator::nuclear) {
+		 std::vector<std::pair<double,std::array<double,3>>> q;
+		 for(const auto& atom : atoms) {
+			 q.push_back( {static_cast<double>(atom.getCharge()), {{atom.getX(), atom.getY(), atom.getZ()}}} );
+		 }
+		 engine.set_params(q);
+	 }
+	 
+	 auto shell2bf = map_shell_to_basis_function(obs);
+	 auto shell2atom = map_shell_to_atom(atoms, obs);
+		
+	 const auto natoms = atoms.size();
+	 const auto two_times_ncoords = 6*natoms;
+	 const auto nderivcenters_shset = 2 + ((obtype == Operator::nuclear) ? natoms : 0);
+
+	 const auto& buf = engine.results();
+	 shellpair_list_t obs_shellpair_list = compute_shellpair_list(obs);
+		
+	 // loop over unique shell pairs, {s1,s2} such that s1 >= s2
+	 // this is due to the permutational symmetry of the real integrals over
+	 // Hermitian operators: (1|2) = (2|1)
+	 for (auto s1 = 0l, s12 = 0l; s1 != nshells; ++s1) {
+		 auto bf1 = shell2bf[s1];  // first basis function in this shell
+		 auto n1 = obs[s1].size();
+		 auto atom1 = shell2atom[s1];
+		 assert(atom1 != -1);
+
+		 auto s1_offset = s1 * (s1+1) / 2;
+		 for (auto s2: obs_shellpair_list[s1]) {
+			 auto s12 = s1_offset + s2;
+
+			 auto bf2 = shell2bf[s2];
+			 auto n2 = obs[s2].size();
+			 auto atom2 = shell2atom[s2];
+
+			 auto n12 = n1 * n2;
+
+			 // compute shell pair; return is the pointer to the buffer
+			 engine.compute(obs[s1], obs[s2]);
+
+			 // "copy" lambda copies shell set \c idx to the operator matrix with
+			 // index \c op
+			 auto add_shellset_to_dest = [&](std::size_t op, std::size_t idx,
+			 double scale = 1.0) {
+				 // "map" buffer to a const Eigen Matrix, and copy it to the
+				 // corresponding blocks of the result
+				 Eigen::Map<const EMatrix> buf_mat(buf[idx], n1, n2);
+				 if (scale == 1.0)
+					 result[op].block(bf1, bf2, n1, n2) += buf_mat;
+				 else
+					 result[op].block(bf1, bf2, n1, n2) += scale * buf_mat;
+				 if (s1 != s2) {  // if s1 >= s2, copy {s1,s2} to the corresponding
+				 // {s2,s1} block, note the transpose!
+				 if (scale == 1.0)
+					 result[op].block(bf2, bf1, n2, n1) += buf_mat.transpose();
+				 else
+					 result[op].block(bf2, bf1, n2, n1) += scale * buf_mat.transpose();
+			 }
+		 };
+
+		 switch (deriv_order) {
+			 case 0: {
+				 for (std::size_t op = 0; op != nopers; ++op) {
+					 add_shellset_to_dest(op, op);
+				 }
+			 } break;
+
+			 // map deriv quanta for this shell pair to the overall deriv quanta
+			 //
+			 // easiest to explain with example:
+			 // in sto-3g water shells 0 1 2 sit on atom 0, shells 3 and 4 on atoms
+			 // 1 and 2 respectively
+			 // each call to engine::compute for nuclear ints will return
+			 // derivatives
+			 // with respect to 15 coordinates, obtained as 3 (x,y,z) times 2 + 3 =
+			 // 5 centers
+			 // (2 centers on which shells sit + 3 nuclear charges)
+			 // (for overlap, kinetic, and emultipole ints we there are only 6
+			 // coordinates
+			 //  since the operator is coordinate-independent, or derivatives with
+			 //  respect to
+			 //  the operator coordinates are not computed)
+			 //
+
+			 case 1: {
+				 std::size_t shellset_idx = 0;
+				 for (auto c = 0; c != nderivcenters_shset; ++c) {
+					 auto atom = (c == 0) ? atom1 : ((c == 1) ? atom2 : c - 2);
+					 auto op_start = 3 * atom * nopers;
+					 auto op_fence = op_start + nopers;
+					 for (auto xyz = 0; xyz != 3; ++xyz, op_start += nopers, op_fence += nopers) {
+						 for (unsigned int op = op_start; op != op_fence; ++op, ++shellset_idx) {
+							 add_shellset_to_dest(op, shellset_idx);
+						 }
+					 }
+				 }
+			 } break;
+
+			 case 2: {
+				 //
+				 // must pay attention to symmetry when computing 2nd and higher-order derivs
+				 // e.g. d2 (s1|s2) / dX dY involves several cases:
+				 // 1. only s1 (or only s2) depends on X AND Y (i.e. X and Y refer to same atom) =>
+				 //    d2 (s1|s2) / dX dY = (d2 s1 / dX dY | s2)
+				 // 2. s1 depends on X only, s2 depends on Y only (or vice versa) =>
+				 //    d2 (s1|s2) / dX dY = (d s1 / dX | d s2 / dY)
+				 // 3. s1 AND s2 depend on X AND Y (i.e. X and Y refer to same atom) =>
+				 //    case A: X != Y
+				 //    d2 (s1|s2) / dX dY = (d2 s1 / dX dY | s2) + (d s1 / dX | d s2 / dY)
+				 //      + (d s1 / dY | d s2 / dX) + (s1| d2 s2 / dX dY )
+				 //    case B: X == Y
+				 //    d2 (s1|s2) / dX2 = (d2 s1 / dX2 | s2) + 2 (d s1 / dX | d s2 / dX)
+				 //      + (s1| d2 s2 / dX2 )
+
+				 // computes upper triangle index
+				 // n2 = matrix size times 2
+				 // i,j = (unordered) indices
+#define upper_triangle_index(n2, i, j) (std::min((i), (j))) * ((n2) - (std::min((i), (j))) - 1) / 2 + (std::max((i), (j)))
+
+				 // look over shellsets in the order in which they appear
+				 std::size_t shellset_idx = 0;
+				 for (auto c1 = 0; c1 != nderivcenters_shset; ++c1) {
+					 auto a1 = (c1 == 0) ? atom1 : ((c1 == 1) ? atom2 : c1 - 2);
+					 auto coord1 = 3 * a1;
+					 for (auto xyz1 = 0; xyz1 != 3; ++xyz1, ++coord1) {
+
+						 for (auto c2 = c1; c2 != nderivcenters_shset; ++c2) {
+							 auto a2 = (c2 == 0) ? atom1 : ((c2 == 1) ? atom2 : c2 - 2);
+							 auto xyz2_start = (c1 == c2) ? xyz1 : 0;
+							 auto coord2 = 3 * a2 + xyz2_start;
+							 for (auto xyz2 = xyz2_start; xyz2 != 3; ++xyz2, ++coord2) {
+
+								 double scale = (coord1 == coord2 && c1 != c2) ? 2.0 : 1.0;
+
+								 const auto coord12 =
+									 upper_triangle_index(two_times_ncoords, coord1, coord2);
+								 auto op_start = coord12 * nopers;
+								 auto op_fence = op_start + nopers;
+								 for (auto op = op_start; op != op_fence; ++op, ++shellset_idx) {
+									 add_shellset_to_dest(op, shellset_idx, scale);
+								 }
+							 }
+						 }
+					 }
+				 }
+			 } break;
+#undef upper_triangle_index
+
+			 default: {
+				 assert(false && "not yet implemented");
+
+				 using ShellSetDerivIterator = libint2::FixedOrderedIntegerPartitionIterator<std::vector<unsigned int>>;
+				 ShellSetDerivIterator shellset_diter(deriv_order, nderivcenters_shset);
+				 while (shellset_diter) {
+					 const auto& deriv = *shellset_diter;
+				 }
+			 }
+		 }  // copy shell block switch
+	 }
+ }  // s2 <= s1
+ return result;
 }

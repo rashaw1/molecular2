@@ -59,6 +59,12 @@
 #include "tensor4.hpp"
 #include <libint2.hpp>
 #include <vector>
+#include <array>
+#include <unordered_map>
+#include <Eigen/Dense>
+
+typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> EMatrix;
+using shellpair_list_t = std::unordered_map<size_t, std::vector<size_t>>;
 
 // Declare forward dependencies
 class Atom;
@@ -89,6 +95,7 @@ public:
   Matrix getNucAttract() const { return naints; }
   double getERI(int i, int j, int k, int l) const;
   Tensor4 getERI() const { return twoints; }
+  Matrix& getPrescreen() { return prescreen; }
 
   // Intrinsic routines
   void printERI(std::ostream& output, int NSpher) const;
@@ -125,12 +132,27 @@ public:
   size_t max_nprim(const std::vector<libint2::Shell>& shells);
   int max_l(const std::vector<libint2::Shell>& shells);
   std::vector<size_t> map_shell_to_basis_function(const std::vector<libint2::Shell>& shells);
+  std::vector<long> map_shell_to_atom(const std::vector<Atom>& atoms, const std::vector<libint2::Shell>& shells);
+  
+  shellpair_list_t compute_shellpair_list(const std::vector<libint2::Shell>& bs1, 
+  	const std::vector<libint2::Shell> _bs2 = std::vector<libint2::Shell>(), double threshold = 1e-12);
+  
+  EMatrix compute_shellblock_norm(const std::vector<libint2::Shell> &shells, const Matrix& A);
+  
+  template <libint2::Operator Kernel = libint2::Operator::coulomb>
+  Matrix compute_schwarz_ints( const std::vector<libint2::Shell> &_bs1, 
+  	const std::vector<libint2::Shell> _bs2 = std::vector<libint2::Shell>(), bool use_2norm = false,
+	typename libint2::operator_traits<Kernel>::oper_params_type params = libint2::operator_traits<Kernel>::default_params());
 
   Matrix compute_1body_ints(const std::vector<libint2::Shell>& shells,
 			    libint2::Operator t,
 			    const std::vector<Atom>& atoms = std::vector<Atom>());
 
   Tensor4 compute_eris(const std::vector<libint2::Shell>& shells);
+  
+  template <libint2::Operator obtype>
+  std::vector<EMatrix> compute_1body_ints_deriv(unsigned deriv_order, const std::vector<libint2::Shell>& obs,
+  	const std::vector<Atom> &atoms);
 
 };
 
