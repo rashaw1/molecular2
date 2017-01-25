@@ -24,7 +24,7 @@
 #include "logger.hpp"
 
 typedef Eigen::DiagonalMatrix<double, Eigen::Dynamic, Eigen::Dynamic>
-    DiagonalMatrix;
+	DiagonalMatrix;
 
 // Constructor
 Fock::Fock(IntegralEngine& ints, Molecule& m) : integrals(ints), molecule(m)
@@ -47,7 +47,7 @@ Fock::Fock(IntegralEngine& ints, Molecule& m) : integrals(ints), molecule(m)
 	direct = molecule.getLog().direct();
 	diis = molecule.getLog().diis();
 	iter = 0;
-	MAX = 10;
+	MAX = 8;
 	twoints = false;
 	if (!direct){
 		Vector ests = integrals.getEstimates();
@@ -104,7 +104,16 @@ void Fock::formOrthog()
 	orthog = U * orthog * U.transpose();
 }
   
-
+void Fock::average(Vector &w) {
+	if (diis && iter > 2) {
+		// Average the fock matrices according to the weights
+		focka.assign(nbfs, nbfs, 0.0);
+		int offset = focks.size() - w.size();
+		for (int i = offset; i < focks.size(); i++) {
+			focka = focka + w[i-offset]*focks[i]; 
+		} 
+	}
+}
 
 // Transform the AO fock matrix to the MO basis 
 void Fock::transform(bool first)
@@ -114,7 +123,6 @@ void Fock::transform(bool first)
 		fockm = (orthog.transpose()) * ( hcore * orthog);
 	} else {
 		// Form the orthogonalised fock matrix
-		if (diis) DIIS();
 		fockm = orthog.transpose() * (focka * orthog);
 	}
 }
@@ -260,7 +268,7 @@ void Fock::formJKdirect()
 				for(auto s4=0; s4<=s4_max; ++s4) {
 
 					const auto Dnorm1234 = do_schwarz_screen ? std::max(D_shblk_norm(s1, s4),
-						std::max(D_shblk_norm(s2, s4), std::max(D_shblk_norm(s3, s4), Dnorm123))) : 0.0;
+					std::max(D_shblk_norm(s2, s4), std::max(D_shblk_norm(s3, s4), Dnorm123))) : 0.0;
 						
 					if(do_schwarz_screen && Dnorm1234 * Schwarz(s1, s2) * Schwarz(s3, s4) < fock_precision) 
 						continue;
@@ -318,25 +326,17 @@ void Fock::formJKdirect()
 void Fock::formJKfile()
 {
 }
-
-// Add an error vector
-void Fock::addErr(Vector e)
-{
-	if (iter > MAX) {
-		errs.erase(errs.begin()); // Remove first element
-	}
-	errs.push_back(e); // Push e onto the end of errs
-}	
 		
 
 void Fock::makeFock()
 {
 	focka = hcore + jkints;
 	if (diis) { // Archive for averaging
-		if (iter > MAX) {
+		if (iter >= MAX) {
 			focks.erase(focks.begin());
 		}
 		focks.push_back(focka);
+		iter++;
 	}		
 }
 
@@ -344,65 +344,12 @@ void Fock::makeFock(Matrix& jbints)
 {
 	focka = hcore + 0.5*(jints + jbints - kints);
 	if (diis) { // Archive for averaging
-		if (iter > MAX) {
+		if (iter >= MAX) {
 			focks.erase(focks.begin());
 		}
 		focks.push_back(focka);
+		iter++;
 	}
-}
-
-// Perform DIIS averaging
-// Direct inversion of the iterative subspace
-// Greatly improves convergence and numerical behaviour
-// of the scf iterations.
-void Fock::DIIS()
-{
-	if (iter > 1) {
-		int lim = (iter < MAX ? iter : MAX);
-		Matrix B(lim+1, lim+1, -1.0); // Error norm matrix
-		B(lim, lim) = 0.0;
-    
-		// The elements of B are <e_i | e_j >
-		for (int i = 0; i < lim; i++){
-			for (int j = i; j < lim; j++){
-				B(i, j) = inner(errs[i], errs[j]);
-				B(j, i) = B(i, j);
-			}
-		}
-
-		// Solve the linear system of equations for the weights
-		Vector w(lim+1, 0.0); w[lim] = -1.0;
-    
-		Eigen::MatrixXd temp(lim+1, lim+1);
-		for (int i = 0; i < lim+1; i++){
-			for (int j = 0; j < lim+1; j++){
-				temp(i, j) = B(i, j);
-			}
-		}
-
-		Eigen::JacobiSVD<Eigen::MatrixXd> svd(temp, Eigen::ComputeFullU | Eigen::ComputeFullV);
-		temp = svd.singularValues().asDiagonal();
-		for (int i = 0; i < lim+1; i++){
-			if (fabs(temp(i, i)) > molecule.getLog().precision())
-				temp(i, i) = 1.0/temp(i, i);
-		}
-		temp = svd.matrixV() * temp * svd.matrixU().transpose();
-    
-		for (int i = 0; i < lim+1; i++){
-			for (int j = 0; j < lim+1; j++){
-				B(i, j) = temp(i, j);
-			}
-		}
-
-		w = B*w;
-    
-		// Average the fock matrices according to the weights
-		focka.assign(nbfs, nbfs, 0.0);
-		for (int i = 0; i < lim; i++) {
-			focka = focka + w(i)*focks[i];   
-		} 
-	}
-	iter++;
 }
 
 void Fock::simpleAverage(Matrix& D0, double weight)
@@ -608,14 +555,14 @@ std::vector<EMatrix> Fock::compute_2body_fock_deriv(const std::vector<Atom> &ato
 	double precision = molecule.getLog().precision();
 	const auto n = integrals.nbasis(shells);
 	const auto nshells = shells.size();
-    const auto nderiv = libint2::num_geometrical_derivatives(atoms.size(), deriv_order);
+	const auto nderiv = libint2::num_geometrical_derivatives(atoms.size(), deriv_order);
 	const auto nderiv_shellset = libint2::num_geometrical_derivatives(atoms.size(), deriv_order);
 	const auto ncoords_times_2 = (atoms.size() * 3) * 2;
 	
 	std::vector<EMatrix> G(nderiv, EMatrix::Zero(n, n));
 	
-    const auto do_schwarz_screen = Schwarz.ncols() != 0 && Schwarz.nrows() != 0;
-    EMatrix D_shblk_norm = integrals.compute_shellblock_norm(shells, dens);
+	const auto do_schwarz_screen = Schwarz.ncols() != 0 && Schwarz.nrows() != 0;
+	EMatrix D_shblk_norm = integrals.compute_shellblock_norm(shells, dens);
 	auto fock_precision = molecule.getLog().precision();
 	auto maxnprim =  integrals.max_nprim(shells);
 	auto maxnprim4 = maxnprim * maxnprim * maxnprim * maxnprim;
@@ -632,7 +579,7 @@ std::vector<EMatrix> Fock::compute_2body_fock_deriv(const std::vector<Atom> &ato
 	size_t shell_atoms[4];
 	auto obs_shellpair_list = integrals.compute_shellpair_list(shells);
 	
-    // loop over permutationally-unique set of shells
+	// loop over permutationally-unique set of shells
 	for (auto s1 = 0l, s1234 = 0l; s1 != nshells; ++s1) {
 		auto bf1_first = shell2bf[s1];  // first basis function in this shell
 		auto n1 = shells[s1].size();       // number of basis functions in this shell
@@ -651,7 +598,7 @@ std::vector<EMatrix> Fock::compute_2body_fock_deriv(const std::vector<Atom> &ato
 				shell_atoms[2] = shell2atom[s3];
 
 				const auto Dnorm123 = do_schwarz_screen ? std::max(D_shblk_norm(s1, s3),
-					std::max(D_shblk_norm(s2, s3), Dnorm12)) : 0.0;
+				std::max(D_shblk_norm(s2, s3), Dnorm12)) : 0.0;
 
 				const auto s4_max = (s1 == s3) ? s2 : s3;
 				for (const auto& s4 : obs_shellpair_list[s3]) {
@@ -659,7 +606,7 @@ std::vector<EMatrix> Fock::compute_2body_fock_deriv(const std::vector<Atom> &ato
 						break;
 
 					const auto Dnorm1234 = do_schwarz_screen ? std::max(D_shblk_norm(s1, s4),
-						std::max(D_shblk_norm(s2, s4), std::max(D_shblk_norm(s3, s4), Dnorm123))) : 0.0;
+					std::max(D_shblk_norm(s2, s4), std::max(D_shblk_norm(s3, s4), Dnorm123))) : 0.0;
 
 					if (do_schwarz_screen && Dnorm1234 * Schwarz(s1, s2) * Schwarz(s3, s4) < fock_precision)
 						continue;

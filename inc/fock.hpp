@@ -49,7 +49,6 @@ private:
   Matrix hessian;
   Vector eps;
   std::vector<Matrix> focks;
-  std::vector<Vector> errs;
   Matrix dens;
   IntegralEngine& integrals;
   Molecule& molecule;
@@ -72,7 +71,6 @@ public:
   void setDIIS(bool d) { diis = d; } 
   void formHCore();
   void formOrthog();
-  void addErr(Vector e);
   void transform(bool first = false);
   void diagonalise();
   void makeJK();
@@ -83,7 +81,7 @@ public:
   void makeFock();
   void makeFock(Matrix& jbints);
   void makeDens(int nocc);
-  void DIIS();
+  void average(Vector &w);
   void simpleAverage(Matrix& D0, double weight = 0.5);
   
   void compute_forces(const std::vector<Atom> &atoms, int nocc); 
