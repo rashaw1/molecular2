@@ -32,6 +32,8 @@ public:
   double operator()(int i, int j, int k, int l) const;
   Tensor4& operator=(const Tensor4& other);
   Tensor4 operator+(const Tensor4& other) const;
+  Tensor4 operator-(const Tensor4& other) const;
+  friend double fnorm(const Tensor4& t);
 };
 
 #endif

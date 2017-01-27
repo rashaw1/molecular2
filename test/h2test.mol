@@ -1,7 +1,8 @@
 basis, cc-pvdz
-integral, direct
-!rhf,
-uhf,
+!integral, direct
+rhf,
+!uhf,
+mp2,
 geom,
 h, 0.0, 0.0, 0.0
 h, 0.0, 0.0, 1.4

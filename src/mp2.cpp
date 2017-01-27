@@ -10,7 +10,7 @@
 #include <thread>
 
 // Constructor
-MP2::MP2(Fock& _focker) : focker(_focker)
+MP2::MP2(Fock& _focker) : spinBasis(false), focker(_focker)
 {
 	N = focker.getDens().nrows();
 	nocc = focker.getMolecule().getNel()/2;
@@ -66,104 +66,109 @@ void MP2::transformIntegrals()
 }
 
 void MP2::spatialToSpin() {
-	if (focker.getMolecule().getLog().direct()) {
-		Error e("MP2TRANS", "Integral direct CC not implemented yet.");
-		focker.getMolecule().getLog().error(e);
-		nocc = 0;
-	} else if (moInts.getW() == 0) {
-		Error e("SPINTRANS", "Integrals have not yet been transformed to the MO basis");
-		focker.getMolecule().getLog().error(e);
-		nocc = 0;
-	} else {
-		Tensor4 temp = moInts;
-		for (int p = 0; p < N; p++)
-			for (int q = 0; q < N; q++)
-				for (int r = 0; r < N; r++)
-					for (int s = 0; s < N; s++) {
-						auto val1 = temp(p, r, q, s) * (p%2 == r%2) * (q%2 == s%2);
-						auto val2 = temp(p, s, q, r) * (p%2 == s%2) * (q%2 == r%2);
+	if (!spinBasis) {
+		if (focker.getMolecule().getLog().direct()) {
+			Error e("MP2TRANS", "Integral direct CC not implemented yet.");
+			focker.getMolecule().getLog().error(e);
+			nocc = 0;
+		} else if (moInts.getW() == 0) {
+			Error e("SPINTRANS", "Integrals have not yet been transformed to the MO basis");
+			focker.getMolecule().getLog().error(e);
+			nocc = 0;
+		} else {
+			Tensor4 temp = moInts;
+			for (int p = 0; p < N; p++){ 
+				for (int q = 0; q < N; q++) {
+					for (int r = 0; r < N; r++) {
+						for (int s = 0; s < N; s++) {
+							auto val1 = temp(p, r, q, s) * (p%2 == r%2) * (q%2 == s%2);
+							auto val2 = temp(p, s, q, r) * (p%2 == s%2) * (q%2 == r%2);
 						
-						moInts(p, q, r, s) = val1 - val2;
+							moInts(p, q, r, s) = val1 - val2;
+						}
 					}
+				}
+			}
+			spinBasis = true;
+		}
+	
 	}
-	
 }
+	void MP2::transformThread(int start, int end, Tensor4& moTemp)
+	{
+		Matrix& C = focker.getCP();
+		IntegralEngine& aoInts = focker.getIntegrals();
 
-void MP2::transformThread(int start, int end, Tensor4& moTemp)
-{
-	Matrix& C = focker.getCP();
-	IntegralEngine& aoInts = focker.getIntegrals();
+		int offset = end - start;
+		Tensor4 temp1(offset, N, N, N, 0.0);
+		Tensor4 temp2(offset, N, N, N, 0.0);
+		Tensor4 temp3(offset, N, N, N, 0.0);
 
-	int offset = end - start;
-	Tensor4 temp1(offset, N, N, N, 0.0);
-	Tensor4 temp2(offset, N, N, N, 0.0);
-	Tensor4 temp3(offset, N, N, N, 0.0);
-
-	// Transform as four 'quarter-transforms'
-	for (int p = start; p < end; p++){
+		// Transform as four 'quarter-transforms'
+		for (int p = start; p < end; p++){
 		
-		for (int mu = 0; mu < N; mu++){
-			for (int a = 0; a < N; a++){
-				for (int b = 0; b < N; b++){
-					for (int c = 0; c < N; c++)
-						temp1(p-start, a, b, c) += C(mu, p)*aoInts.getERI(mu, a, b, c);
-				} // b
-			} // a
-		} // mu
+			for (int mu = 0; mu < N; mu++){
+				for (int a = 0; a < N; a++){
+					for (int b = 0; b < N; b++){
+						for (int c = 0; c < N; c++)
+							temp1(p-start, a, b, c) += C(mu, p)*aoInts.getERI(mu, a, b, c);
+					} // b
+				} // a
+			} // mu
 		
-		for (int q = 0; q < N; q++){
-			for (int nu = 0; nu < N; nu++){
-				for (int b = 0; b < N; b++){
-					for (int c = 0; c < N; c++)
-						temp2(p-start, q, b, c) += C(nu, q)*temp1(p-start, nu, b, c);
-				} // b
-			} // nu
+			for (int q = 0; q < N; q++){
+				for (int nu = 0; nu < N; nu++){
+					for (int b = 0; b < N; b++){
+						for (int c = 0; c < N; c++)
+							temp2(p-start, q, b, c) += C(nu, q)*temp1(p-start, nu, b, c);
+					} // b
+				} // nu
 
-			for (int r = 0; r < N; r++){
-				for (int lam = 0; lam < N; lam++){
-					for (int c = 0; c < N; c++)
-						temp3(p-start, q, r, c) += C(lam, r)*temp2(p-start, q, lam, c);
-				} // lam
+				for (int r = 0; r < N; r++){
+					for (int lam = 0; lam < N; lam++){
+						for (int c = 0; c < N; c++)
+							temp3(p-start, q, r, c) += C(lam, r)*temp2(p-start, q, lam, c);
+					} // lam
 				
-				for (int s = 0; s < N; s++){
-					for (int sig = 0; sig < N; sig++)
-						moTemp(p-start, q, r, s) += C(sig, s)*temp3(p-start, q, r, sig);
-				} // s
-			} // r
-		} // q
-	} // p
-}
+					for (int s = 0; s < N; s++){
+						for (int sig = 0; sig < N; sig++)
+							moTemp(p-start, q, r, s) += C(sig, s)*temp3(p-start, q, r, sig);
+					} // s
+				} // r
+			} // q
+		} // p
+	}
 
-// Determine the MP2 energy
-void MP2::calculateEnergy()
-{
-	Vector& eps = focker.getEps();
+	// Determine the MP2 energy
+	void MP2::calculateEnergy()
+	{
+		Vector& eps = focker.getEps();
 
-	double ediff, etemp;
-	energy = 0.0;
-	for (int i = 0; i < nocc; i++){
-		for (int j = 0; j < nocc; j++){
+		double ediff, etemp;
+		energy = 0.0;
+		for (int i = 0; i < nocc; i++){
+			for (int j = 0; j < nocc; j++){
 			
-			for (int a = nocc; a < N; a++){	
-				for (int b = nocc; b < N; b++){
-					ediff = eps[i] + eps[j] - eps[a] - eps[b];
-					etemp = moInts(i, a, j, b)*(2.0*moInts(a, i, b, j) - moInts(a, j, b, i));
+				for (int a = nocc; a < N; a++){	
+					for (int b = nocc; b < N; b++){
+						ediff = eps[i] + eps[j] - eps[a] - eps[b];
+						etemp = moInts(i, a, j, b)*(2.0*moInts(a, i, b, j) - moInts(a, j, b, i));
 					
-					energy += etemp/ediff;
-				} // b
-			} // a
-		} // j
-	} // i
-}
+						energy += etemp/ediff;
+					} // b
+				} // a
+			} // j
+		} // i
+	}
 
-void MP2::calculateEnergy(const Tensor4& t) {
-	energy = 0.0;
+	void MP2::calculateEnergy(const Tensor4& t) {
+		energy = 0.0;
 	
-	for (int i = 0; i < nocc; i++)
-		for (int j = 0; j < nocc; j++)
-			for (int a = nocc; a < N; a++)
-				for (int b = nocc; b < N; b++) energy += moInts(i, j, a, b) * t(i, j, a-nocc, b-nocc);
+		for (int i = 0; i < nocc; i++)
+			for (int j = 0; j < nocc; j++)
+				for (int a = nocc; a < N; a++)
+					for (int b = nocc; b < N; b++) energy += moInts(i, j, a, b) * t(i, j, a-nocc, b-nocc);
 	
-	energy *= 0.25;
-}	
+		energy *= 0.25;
+	}	
 					

@@ -165,10 +165,9 @@ public:
  	 using libint2::Engine;
  	 using libint2::Operator; 
 	
-	 std::cout << "Constructing engine... " << deriv_order << std::endl << std::flush;
  	 // construct the 1-body integrals engine
  	 Engine engine(obtype, max_nprim(obs), max_l(obs), deriv_order);
-	 std::cout << "done." << std::endl << std::flush;
+
  	 // nuclear attraction ints engine needs to know where the charges sit ...
  	 // the nuclei are charges in this case; in QM/MM there will also be classical
  	 // charges

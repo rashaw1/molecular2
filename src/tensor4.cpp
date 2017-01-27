@@ -6,6 +6,7 @@
 
 #include "tensor4.hpp"
 #include <iostream>
+#include <cmath>
 
 Tensor4::Tensor4(int a, int b, int c, int d) : w(a), x(b), y(c), z(d)
 {
@@ -98,4 +99,32 @@ Tensor4 Tensor4::operator+(const Tensor4& other) const
 		}
 	}
 	return retVal;
+}
+
+Tensor4 Tensor4::operator-(const Tensor4& other) const
+{
+	Tensor4 retVal(w, x, y, z);
+	for (int i = 0; i < w; i++){
+		for (int j = 0; j < x; j++){
+			for (int k = 0; k < y; k++){
+				for (int l = 0; l < z; l++){
+					retVal(i, j, k, l) = data(i*x+j, k*z+l) - other(i, j, k, l);
+				}
+			}
+		}
+	}
+	return retVal;
+}
+
+// Frobenius norm
+double fnorm(const Tensor4& t)
+{
+	double retval = 0.0;
+	for (int i = 0; i < t.w; i++)
+		for (int j = 0; j < t.x; j++)
+			for (int k = 0; k < t.y; k++)
+				for (int l = 0; l < t.z; l++)
+					retval += t(i, j, k, l) * t(i, j, k, l);
+	
+	return std::sqrt(retval);
 }

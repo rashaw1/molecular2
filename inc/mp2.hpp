@@ -12,6 +12,7 @@ private:
 	int N, nocc;
 	double energy;
 	Tensor4 moInts;
+	bool spinBasis;
 	Fock& focker;
 public:
 	MP2(Fock& _focker);
