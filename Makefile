@@ -1,5 +1,5 @@
 # Project name
-PROJECT = molecular
+PROJECT = molecular.x
 # Compiler
 CXX = g++
 

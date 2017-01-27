@@ -1,4 +1,5 @@
 molecular
+molecular.x
 
 #exclude object files
 *.o

@@ -70,17 +70,16 @@ void MP2::spatialToSpin() {
 		Error e("MP2TRANS", "Integral direct CC not implemented yet.");
 		focker.getMolecule().getLog().error(e);
 		nocc = 0;
-	} else if (moInts.nrows() == 0) {
+	} else if (moInts.getW() == 0) {
 		Error e("SPINTRANS", "Integrals have not yet been transformed to the MO basis");
 		focker.getMolecule().getLog().error(e);
 		nocc = 0;
 	} else {
-		int nmo = moInts.nrows();
 		Tensor4 temp = moInts;
-		for (int p = 0; p < nmos; p++)
-			for (int q = 0; q < nmos; q++)
-				for (int r = 0; r < nmos; r++)
-					for (int s = 0; s < nmos; s++) {
+		for (int p = 0; p < N; p++)
+			for (int q = 0; q < N; q++)
+				for (int r = 0; r < N; r++)
+					for (int s = 0; s < N; s++) {
 						auto val1 = temp(p, r, q, s) * (p%2 == r%2) * (q%2 == s%2);
 						auto val2 = temp(p, s, q, r) * (p%2 == s%2) * (q%2 == r%2);
 						

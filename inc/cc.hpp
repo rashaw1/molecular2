@@ -3,6 +3,7 @@
 
 #include "tensor4.hpp"
 #include "fock.hpp"
+#include "mp2.hpp"
 
 class IntegralEngine;
 

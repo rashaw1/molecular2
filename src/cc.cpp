@@ -42,7 +42,7 @@ void CCSD::build_guess() {
 			for (int a = nocc; a < N; a++)
 				for (int b = nocc; b < N; b++) {
 					auto resolvent = eocc - eps[a] - eps[b];
-					t(i, j, a - nocc, b-nocc) = spinInts(i, j, a, b) / resolvent;
+					doubles(i, j, a - nocc, b-nocc) = spinInts(i, j, a, b) / resolvent;
 				}
 			
 		}

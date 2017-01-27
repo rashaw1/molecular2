@@ -16,11 +16,11 @@ private:
 public:
 	MP2(Fock& _focker);
 	void transformIntegrals();
-	void spatialToSpint();
+	void spatialToSpin();
 	void transformThread(int start, int end, Tensor4& moTemp);
 	void calculateEnergy();
+	void calculateEnergy(const Tensor4& amplitudes);
 	double getEnergy() const { return energy; }
-	double getEnergy(const Tensor4& amplitudes);
 	Tensor4& getInts() { return moInts; }
 	int getN() const { return N; }
 	int getNocc() const { return nocc; }
