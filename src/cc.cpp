@@ -11,8 +11,8 @@
 
 // Constructor
 CCSD::CCSD(MP2& _mp2) : mp2(_mp2) {
-	N = mp2.getN();
-	nocc = mp2.getNocc();
+	N = 2*mp2.getN();
+	nocc = 2*mp2.getNocc();
 	energy = 0.0;
 	delta_e = 0.0;
 	delta_singles = 0.0;
@@ -24,11 +24,13 @@ void CCSD::build_fock() {
 	Tensor4& spinInts = mp2.getInts();
 	
 	// Assign the spin-Fock matrix
-	spinFock = hcore;
+	spinFock.assign(N, N, 0.0);
 	// Build 
 	for (int p = 0; p < N; p++)
-		for (int q = 0; q < N; q++) 
+		for (int q = 0; q < N; q++) {
+			spinFock(p, q) = hcore(p/2, q/2);
 			for (int m = 0; m < nocc; m++) spinFock(p, q) += spinInts(p, m, q, m);
+		}
 	
 	// Now build denominator arrays
 	Dia.resize(nocc, N-nocc);
@@ -54,16 +56,17 @@ void CCSD::build_guess() {
 	doubles.assign(nocc, nocc, N-nocc, N-nocc, 0.0);
 	for (int i = 0; i < nocc; i++) {
 		for (int j = 0; j < nocc; j++) {
-			auto eocc = eps[i] + eps[j];
+			auto eocc = eps[i/2] + eps[j/2];
 			
 			for (int a = nocc; a < N; a++)
 				for (int b = nocc; b < N; b++) {
-					auto resolvent = eocc - eps[a] - eps[b];
+					auto resolvent = eocc - eps[a/2] - eps[b/2];
 					doubles(i, j, a - nocc, b-nocc) = spinInts(i, j, a, b) / resolvent;
 				}
 			
 		}
 	}
+	std::cout << "DOUBLES" << std::endl; doubles.print(); std::cout << std::endl;
 	
 	mp2.calculateEnergy(doubles);	
 }

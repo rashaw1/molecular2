@@ -76,13 +76,14 @@ void MP2::spatialToSpin() {
 			focker.getMolecule().getLog().error(e);
 			nocc = 0;
 		} else {
-			Tensor4 temp = moInts;
-			for (int p = 0; p < N; p++){ 
-				for (int q = 0; q < N; q++) {
-					for (int r = 0; r < N; r++) {
-						for (int s = 0; s < N; s++) {
-							auto val1 = temp(p, r, q, s) * (p%2 == r%2) * (q%2 == s%2);
-							auto val2 = temp(p, s, q, r) * (p%2 == s%2) * (q%2 == r%2);
+			moInts.assign(2*N, 2*N, 2*N, 2*N, 0.0);
+			IntegralEngine& aoInts = focker.getIntegrals();
+			for (int p = 0; p < 2*N; p++){ 
+				for (int q = 0; q < 2*N; q++) {
+					for (int r = 0; r < 2*N; r++) {
+						for (int s = 0; s < 2*N; s++) {
+							auto val1 = aoInts.getERI(p/2, r/2, q/2, s/2) * (p%2 == r%2) * (q%2 == s%2);
+							auto val2 = aoInts.getERI(p/2, s/2, q/2, r/2) * (p%2 == s%2) * (q%2 == r%2);
 						
 							moInts(p, q, r, s) = val1 - val2;
 						}
@@ -90,6 +91,7 @@ void MP2::spatialToSpin() {
 				}
 			}
 			spinBasis = true;
+			std::cout << "MO INTS" << std::endl; moInts.print(); std::cout << std::endl;
 		}
 	
 	}
@@ -164,10 +166,10 @@ void MP2::spatialToSpin() {
 	void MP2::calculateEnergy(const Tensor4& t) {
 		energy = 0.0;
 	
-		for (int i = 0; i < nocc; i++)
-			for (int j = 0; j < nocc; j++)
-				for (int a = nocc; a < N; a++)
-					for (int b = nocc; b < N; b++) energy += moInts(i, j, a, b) * t(i, j, a-nocc, b-nocc);
+		for (int i = 0; i < 2*nocc; i++)
+			for (int j = 0; j < 2*nocc; j++)
+				for (int a = 2*nocc; a < 2*N; a++)
+					for (int b = 2*nocc; b < 2*N; b++) energy += moInts(i, j, a, b) * t(i, j, a-2*nocc, b-2*nocc);
 	
 		energy *= 0.25;
 	}	
