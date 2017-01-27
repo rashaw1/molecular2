@@ -65,6 +65,31 @@ void MP2::transformIntegrals()
 	}
 }
 
+void MP2::spatialToSpin() {
+	if (focker.getMolecule().getLog().direct()) {
+		Error e("MP2TRANS", "Integral direct CC not implemented yet.");
+		focker.getMolecule().getLog().error(e);
+		nocc = 0;
+	} else if (moInts.nrows() == 0) {
+		Error e("SPINTRANS", "Integrals have not yet been transformed to the MO basis");
+		focker.getMolecule().getLog().error(e);
+		nocc = 0;
+	} else {
+		int nmo = moInts.nrows();
+		Tensor4 temp = moInts;
+		for (int p = 0; p < nmos; p++)
+			for (int q = 0; q < nmos; q++)
+				for (int r = 0; r < nmos; r++)
+					for (int s = 0; s < nmos; s++) {
+						auto val1 = temp(p, r, q, s) * (p%2 == r%2) * (q%2 == s%2);
+						auto val2 = temp(p, s, q, r) * (p%2 == s%2) * (q%2 == r%2);
+						
+						moInts(p, q, r, s) = val1 - val2;
+					}
+	}
+	
+}
+
 void MP2::transformThread(int start, int end, Tensor4& moTemp)
 {
 	Matrix& C = focker.getCP();
@@ -131,4 +156,15 @@ void MP2::calculateEnergy()
 		} // j
 	} // i
 }
+
+void MP2::calculateEnergy(const Tensor4& t) {
+	energy = 0.0;
+	
+	for (int i = 0; i < nocc; i++)
+		for (int j = 0; j < nocc; j++)
+			for (int a = nocc; a < N; a++)
+				for (int b = nocc; b < N; b++) energy += moInts(i, j, a, b) * t(i, j, a-nocc, b-nocc);
+	
+	energy *= 0.25;
+}	
 					

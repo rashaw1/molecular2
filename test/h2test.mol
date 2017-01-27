@@ -1,7 +1,7 @@
 basis, cc-pvdz
 integral, direct
-rhf,
-!uhf,
+!rhf,
+uhf,
 geom,
 h, 0.0, 0.0, 0.0
 h, 0.0, 0.0, 1.4

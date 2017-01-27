@@ -1,3 +1,5 @@
+molecular
+
 #exclude object files
 *.o
 *.obj
