@@ -26,6 +26,7 @@
 *.out
 *.app
 *.exe
+*.x
 
 #temp files
 *~

@@ -4,6 +4,7 @@
 #include "gshell.hpp"
 #include <iostream>
 #include <functional>
+#include <algorithm>
 #include <cmath>
 
 // Compute all the real spherical harmonics Slm(theta, phi) for l,m up to lmax

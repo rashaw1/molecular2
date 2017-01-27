@@ -358,6 +358,7 @@ void Fock::simpleAverage(Matrix& D0, double weight)
 }
 
 void Fock::compute_forces(const std::vector<Atom> &atoms, int nocc) {
+	std::cout << "Here" << std::endl << std::flush;
 	using libint2::Shell;
 	using libint2::Operator;
 
@@ -371,14 +372,16 @@ void Fock::compute_forces(const std::vector<Atom> &atoms, int nocc) {
 	Matrix F_Pulay(atoms.size(), 3, 0.0);
 	
 	// One-body contributions to forces
-	auto T1 = integrals.compute_1body_ints_deriv(Operator::kinetic, 1, shells, atoms);
-	auto V1 = integrals.compute_1body_ints_deriv(Operator::nuclear, 1, shells, atoms);
+	std::cout << "Kinetic and potential.. " << std::endl << std::flush;
+	auto T1 = integrals.compute_1body_ints_deriv<Operator::kinetic>(1, shells, atoms);
+	auto V1 = integrals.compute_1body_ints_deriv<Operator::nuclear>(1, shells, atoms);
 	for (auto atom = 0, i = 0; atom != atoms.size(); ++atom) {
 		for (auto xyz = 0; xyz != 3; ++xyz, ++i) {
 			auto force = 2 * (T1[i] + V1[i]).cwiseProduct(D).sum();
 			F1(atom, xyz) += force;
 		}
 	}
+	std::cout << "done." << std::endl << std::flush;
 	
 	// Pulay force
 	EMatrix evals_occ = EMatrix::Zero(nocc, nocc);
@@ -388,7 +391,9 @@ void Fock::compute_forces(const std::vector<Atom> &atoms, int nocc) {
 		for (int j = 0; j < nocc; ++j) C_occ(i, j) = CP(i, j);
 	}
 	EMatrix W = C_occ * evals_occ * C_occ.transpose();
-	auto S1 = integrals.compute_1body_ints_deriv(Operator::overlap, 1, shells, atoms);
+	std::cout << "Overlap.. " << std::endl << std::flush;
+	auto S1 = integrals.compute_1body_ints_deriv<Operator::overlap>(1, shells, atoms);
+	std::cout << "done." << std::endl << std::flush;
 	for (auto atom = 0, i = 0; atom != atoms.size(); ++atom) {
 		for (auto xyz = 0; xyz != 3; ++xyz, ++i) {
 			auto force = 2 * S1[i].cwiseProduct(W).sum();
@@ -457,8 +462,8 @@ void Fock::compute_hessian(const std::vector<Atom> &atoms, int nocc) {
 	Matrix H_Pulay(ncoords, ncoords, 0.0);
 	
 	// One-body contributions to the hessian
-	auto T2 = integrals.compute_1body_ints_deriv(Operator::kinetic, 2, shells, atoms);
-	auto V2 = integrals.compute_1body_ints_deriv(Operator::nuclear, 2, shells, atoms);
+	auto T2 = integrals.compute_1body_ints_deriv<Operator::kinetic>(2, shells, atoms);
+	auto V2 = integrals.compute_1body_ints_deriv<Operator::nuclear>(2, shells, atoms);
 	for (auto row = 0, i = 0; row != ncoords; ++row) {
 		for (auto col = row; col != ncoords; ++col, ++i) {
 			auto hess = 2 * (T2[i] + V2[i]).cwiseProduct(D).sum();
@@ -474,7 +479,7 @@ void Fock::compute_hessian(const std::vector<Atom> &atoms, int nocc) {
 		for (int j = 0; j < nocc; ++j) C_occ(i, j) = CP(i, j);
 	}
 	EMatrix W = C_occ * evals_occ * C_occ.transpose();
-	auto S2 = integrals.compute_1body_ints_deriv(Operator::overlap, 2, shells, atoms);
+	auto S2 = integrals.compute_1body_ints_deriv<Operator::overlap>(2, shells, atoms);
 	for (auto row = 0, i = 0; row != ncoords; ++row) {
 		for (auto col = row; col != ncoords; ++col, ++i) {
 			auto hess = 2 * S2[i].cwiseProduct(W).sum();
@@ -684,9 +689,7 @@ std::vector<EMatrix> Fock::compute_2body_fock_deriv(const std::vector<Atom> &ato
 							// computes upper triangle index
 							// n2 = matrix size times 2
 							// i,j = (unordered) indices
-#define upper_triangle_index(n2, i, j)                           \
-							(std::min((i), (j))) * ((n2) - (std::min((i), (j))) - 1) / 2 + \
-								(std::max((i), (j)))
+#define upper_triangle_index(n2, i, j) (i < j ? i : j) * (n2 - (i < j ? i : j) - 1) / 2 + (i > j ? i : j)
 									// look over shellsets in the order in which they appear
 									std::size_t shellset_idx = 0;
 							for (auto c1 = 0; c1 != 4; ++c1) {

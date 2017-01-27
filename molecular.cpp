@@ -26,6 +26,7 @@
 #include <cmath>
 #include "ecpint.hpp"
 #include "multiarr.hpp"
+#include <libint2.hpp>
 
 int main (int argc, char* argv[])
 {
@@ -64,6 +65,7 @@ int main (int argc, char* argv[])
 	log.localTime();
 	output.flush();
 	// Make an integral engine
+	libint2::initialize();
 	IntegralEngine integral(mol);
 
 	// All calculations will need some form of HF
@@ -109,6 +111,7 @@ int main (int argc, char* argv[])
 	}
 
 	// Finalise the run
+	libint2::finalize();
 	log.finalise();
       } catch (Error e){
 		  log.error(e);

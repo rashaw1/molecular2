@@ -39,7 +39,7 @@ void SCF::calcE()
 double SCF::calcE(const Matrix& hcore, const Matrix& dens, const Matrix& fock) 
 {
   one_E = 0.5*(dens*hcore).trace();
-  two_E = 0.5(dens*fock).trace();
+  two_E = 0.5*(dens*fock).trace();
   return (one_E+two_E);
 }
 
@@ -151,6 +151,7 @@ void SCF::rhf()
 	
 	std::vector<Atom> atoms;
 	for (int i = 0; i < molecule.getNAtoms(); ++i) atoms.push_back(molecule.getAtom(i));
+	std::cout << "Going in to forces" << std::endl << std::flush;
 	focker.compute_forces(atoms, nel/2);
 	focker.compute_hessian(atoms, nel/2);
 	
