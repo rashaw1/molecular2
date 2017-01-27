@@ -151,9 +151,9 @@ void SCF::rhf()
 	
 	std::vector<Atom> atoms;
 	for (int i = 0; i < molecule.getNAtoms(); ++i) atoms.push_back(molecule.getAtom(i));
-	std::cout << "Going in to forces" << std::endl << std::flush;
-	focker.compute_forces(atoms, nel/2);
-	focker.compute_hessian(atoms, nel/2);
+
+	//focker.compute_forces(atoms, nel/2);
+	//focker.compute_hessian(atoms, nel/2);
 	
     if (!converged) { 
       molecule.getLog().result("SCF failed to converge.");

@@ -14,7 +14,6 @@ COMPILE_OPTIONS = $(DEBUG)
 # Header include directories
 HEADERS = -I./inc -I/usr/local/Cellar/boost/1.63.0/include -I/usr/local/Cellar/eigen/3.3.1/include/eigen3 -I/usr/local/libint/2.3.0-beta.3/include -I/usr/local/libint/2.3.0-beta.3/include/libint2
 
-
 # Libraries for linking
 LIBS =  -L/usr/local/Cellar/boost/1.63.0/lib -L/usr/local/libint/2.3.0-beta.3/lib -lboost_system -lboost_timer -lint2 -std=c++11
 
