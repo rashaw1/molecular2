@@ -1,4 +1,4 @@
-basis, cc-pvdz
+basis, sto-3g
 nthreads, 8
 geom,
 C, 0.0, 0.0, 0.0

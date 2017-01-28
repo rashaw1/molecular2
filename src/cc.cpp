@@ -20,19 +20,27 @@ CCSD::CCSD(MP2& _mp2) : mp2(_mp2) {
 }
 
 void CCSD::build_fock() {
-	Matrix& hcore = mp2.getFock().getHCore();
+	// Transform hcore to MO basis
+	Matrix hcore_spatial = mp2.getFock().getCP().transpose() * mp2.getFock().getHCore() * mp2.getFock().getCP();
+	Matrix hcore(N, N, 0.0);
+	for (int p = 0; p < N; p++)
+		for (int q = p; q < N; q++) {
+			hcore(p, q) = hcore_spatial(p/2, q/2) * (p%2 == q%2);
+			hcore(q, p) = hcore(p, q);
+		}
+	
 	Tensor4& spinInts = mp2.getInts();
 	
 	// Assign the spin-Fock matrix
 	spinFock.assign(N, N, 0.0);
 	// Build 
-	/*for (int p = 0; p < N; p++)
-		for (int q = 0; q < N; q++) {
-			spinFock(p, q) = hcore(p/2, q/2);
+	for (int p = 0; p < N; p++) {
+		for (int q = p; q < N; q++) {
+			spinFock(p, q) = hcore(p, q);
 			for (int m = 0; m < nocc; m++) spinFock(p, q) += spinInts(p, m, q, m);
-		}*/
-	Vector& eps = mp2.getFock().getEps();
-	for (int p = 0; p < N; p++) spinFock(p, p) = eps[p/2];
+			spinFock(q, p) = spinFock(p, q);
+		}
+	}
 
 	// Now build denominator arrays
 	Dia.resize(nocc, N-nocc);
@@ -42,9 +50,11 @@ void CCSD::build_fock() {
 		
 			Dia(i, a) = spinFock(i, i) - spinFock(a+nocc, a+nocc);
 			
-			for (int j = 0; j < nocc; j++)
-				for (int b = 0; b < N-nocc; b++) 
+			for (int j = i; j < nocc; j++)
+				for (int b = a; b < N-nocc; b++)  {
 					Dijab(i, j, a, b) = Dia(i, a) + spinFock(j, j) - spinFock(b+nocc, b+nocc);  
+					Dijab(j, i, a, b) = Dijab(i, j, b, a) = Dijab(j, i, b, a) = Dijab(i, j, a, b);
+				}
 		}
 }
 
@@ -57,13 +67,14 @@ void CCSD::build_guess() {
 	Vector& eps = mp2.getFock().getEps();
 	doubles.assign(nocc, nocc, N-nocc, N-nocc, 0.0);
 	for (int i = 0; i < nocc; i++) {
-		for (int j = 0; j < nocc; j++) {
+		for (int j = i; j < nocc; j++) {
 			auto eocc = eps[i/2] + eps[j/2];
 			
 			for (int a = nocc; a < N; a++)
-				for (int b = nocc; b < N; b++) {
+				for (int b = a; b < N; b++) {
 					auto resolvent = eocc - eps[a/2] - eps[b/2];
-					doubles(i, j, a - nocc, b-nocc) = spinInts(i, j, a, b) / resolvent;
+					doubles(i, j, a-nocc, b-nocc) = doubles(j, i, b-nocc, a-nocc) = spinInts(i, j, a, b) / resolvent;
+					doubles(j, i, a-nocc, b-nocc) = doubles(i, j, b-nocc, a-nocc) = -doubles(i, j, a-nocc, b-nocc);
 				}
 			
 		}
@@ -75,12 +86,14 @@ void CCSD::build_guess() {
 void CCSD::build_intermediates(Matrix& F, Tensor4& W, Tensor4& tau, Tensor4& tautilde) {
 	// Construct tau tensors from amplitudes	
 	for (int i = 0; i < nocc; i++)
-		for (int j = 0; j < nocc; j++)
+		for (int j = i; j < nocc; j++)
 			for (int a = 0; a < N-nocc; a++)
-				for (int b = 0; b < N-nocc; b++) {
+				for (int b = a; b < N-nocc; b++) {
 					auto delta = singles(i, a) * singles(j, b) - singles(i, b) * singles(j, a);
-					tau(i, j, a, b) = doubles(i, j, a, b) + delta;
-					tautilde(i, j, a, b) = doubles(i, j, a, b) + 0.5*delta;
+					tau(i, j, a, b) = tau(j, i, b, a) = doubles(i, j, a, b) + delta;
+					tau(j, i, a, b) = tau(i, j, b, a) = -tau(i, j, a, b);
+					tautilde(i, j, a, b) = tautilde(j, i, b, a) = doubles(i, j, a, b) + 0.5*delta;
+					tautilde(j, i, a, b) = tautilde(i, j, b, a) = -tautilde(i, j, a, b);
 				}
 					
 	Tensor4& spinInts = mp2.getInts();		
@@ -217,6 +230,7 @@ void CCSD::build_amplitudes(Matrix& F, Tensor4& W, Tensor4& tau, Tensor4& tautil
 				 sum -= singles(m, a-nocc) * F(m, i);
 				 for (int e = nocc; e < N; e++) {
 					 sum += doubles(i, m, a-nocc, e-nocc) * F(m, e);
+					 sum -= singles(m, e-nocc) * spinInts(m, a, i, e);
 					 
 					 double sum2 = 0.0;
 					 for (int f = nocc; f < N; f++) sum2 += doubles(i, m, e-nocc, f-nocc) * spinInts(m, a, e, f);
@@ -224,9 +238,6 @@ void CCSD::build_amplitudes(Matrix& F, Tensor4& W, Tensor4& tau, Tensor4& tautil
 					 sum -= 0.5*sum2;
 				 }
 			 }
-			 
-			 for (int n = 0; n < nocc; n++)
-				 for (int f = nocc; f < N; f++) sum += singles(n, f-nocc) * spinInts(n, a, i, f);
 			 
 			 newSingles(i, a-nocc) += sum;
 			 newSingles(i, a-nocc) /= Dia(i, a-nocc);
@@ -236,11 +247,11 @@ void CCSD::build_amplitudes(Matrix& F, Tensor4& W, Tensor4& tau, Tensor4& tautil
 	// Build new doubles amplitudes
 	Tensor4 newDoubles(nocc, nocc, N-nocc, N-nocc, 0.0);
 	for (int i = 0; i < nocc; i++) {
-		for (int j = 0; j < nocc; j++) {
+		for (int j = i; j < nocc; j++) {
 			for (int a = nocc; a < N; a++) {
-				for (int b = nocc; b < N; b++) {
+				for (int b = a; b < N; b++) {
 					
-					newDoubles(i, j, a-nocc, b-nocc) = spinInts(i, j, a, b);
+					auto value = spinInts(i, j, a, b);
 					
 					double sum = 0.0;
 					for (int e = nocc; e < N; e++) {
@@ -292,8 +303,14 @@ void CCSD::build_amplitudes(Matrix& F, Tensor4& W, Tensor4& tau, Tensor4& tautil
 						sum += singles(m, b-nocc) * spinInts(m, a, i, j);
 					}
 					
-					newDoubles(i, j, a-nocc, b-nocc) += sum;
-					newDoubles(i, j, a-nocc, b-nocc) /= Dijab(i, j, a-nocc, b-nocc);
+					
+					value += sum;
+					value /= Dijab(i, j, a-nocc, b-nocc);
+					newDoubles(i, j, a-nocc, b-nocc) = value;
+					newDoubles(j, i, a-nocc, b-nocc) = -value;
+					newDoubles(i, j, b-nocc, a-nocc) = -value;
+					newDoubles(j, i, b-nocc, a-nocc) = value;
+				
 				}
 			}
 		}
@@ -357,17 +374,23 @@ void CCSD::compute()
 	Tensor4 W(N, N, N, N, 0.0);
 	Tensor4 tau(nocc, nocc, N-nocc, N-nocc, 0.0);
 	Tensor4 tautilde(nocc, nocc, N-nocc, N-nocc, 0.0);
+	
+	double time_interms, time_amps, time_en;
 	while (!converged && iter < MAXITER) {
 		
 		build_intermediates(F, W, tau, tautilde);
+		time_interms = log.getLocalTime();
 		build_amplitudes(F, W, tau, tautilde);
+		time_amps = log.getLocalTime();
 		calculateEnergy();
+		time_en = log.getLocalTime();
 		
 		log.iteration(iter, energy, delta_e, delta_doubles);
-		std::cout << "Iteration " << iter << ": " << delta_singles << std::endl;
+		std::cout << "Iteration " << iter << ": " << delta_singles << " " << time_interms << " " << time_amps << " " << time_en << std::endl;
 		converged = (delta_e < log.converge()) && (delta_doubles < log.converge());
 		iter++;
 	}
+	
 }
 
 					
