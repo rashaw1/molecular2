@@ -76,22 +76,26 @@ void MP2::spatialToSpin() {
 			focker.getMolecule().getLog().error(e);
 			nocc = 0;
 		} else {
+			Tensor4 temp = moInts;
 			moInts.assign(2*N, 2*N, 2*N, 2*N, 0.0);
-			IntegralEngine& aoInts = focker.getIntegrals();
-			for (int p = 0; p < 2*N; p++){ 
-				for (int q = 0; q < 2*N; q++) {
-					for (int r = 0; r < 2*N; r++) {
-						for (int s = 0; s < 2*N; s++) {
-							auto val1 = aoInts.getERI(p/2, r/2, q/2, s/2) * (p%2 == r%2) * (q%2 == s%2);
-							auto val2 = aoInts.getERI(p/2, s/2, q/2, r/2) * (p%2 == s%2) * (q%2 == r%2);
+			for (int p = 0; p < N; p++){ 
+				for (int q = 0; q < N; q++) {
+					for (int r = 0; r < N; r++) {
+						for (int s = 0; s < N; s++) {
+							auto val1 = temp(p, r, q, s);
+							auto val2 = temp(p, s, q, r);
 						
-							moInts(p, q, r, s) = val1 - val2;
+							moInts(2*p, 2*q, 2*r, 2*s) = val1 - val2;
+							moInts(2*p, 2*q+1, 2*r, 2*s+1) = val1;
+							moInts(2*p, 2*q+1, 2*r+1, 2*s) = -val2;
+							moInts(2*p+1, 2*q, 2*r+1, 2*s) = val1;
+							moInts(2*p+1, 2*q, 2*r, 2*s+1) = -val2;
+							moInts(2*p+1, 2*q+1, 2*r+1, 2*s+1) = val1 - val2; 
 						}
 					}
 				}
 			}
 			spinBasis = true;
-			std::cout << "MO INTS" << std::endl; moInts.print(); std::cout << std::endl;
 		}
 	
 	}

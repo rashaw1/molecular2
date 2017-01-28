@@ -1,6 +1,7 @@
-basis, sto-3g
+basis, cc-pvdz
 memory, 4000
 nthreads, 8
+maxiter, 30
 integral, direct
 geom, angstrom
 O,         -1.04480,        0.92441,        0.54698
