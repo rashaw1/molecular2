@@ -162,7 +162,7 @@ void SCF::rhf()
       molecule.getLog().print("\nTwo electron energy (Hartree) = " + std::to_string(two_E));
       molecule.getLog().print("\n");
       molecule.getLog().orbitals(focker.getEps(), nel, false);
-      molecule.getLog().result("RHF Energy = " + std::to_string(energy) + " Hartree");
+      molecule.getLog().result("RHF Energy", energy, "Hartree");
    }
   }
 }
@@ -247,7 +247,7 @@ void SCF::uhf()
     molecule.getLog().orbitals(focker.getEps(), nalpha, true);
     molecule.getLog().print("\nBETA ORBITALS");
     molecule.getLog().orbitals(focker2.getEps(), nbeta, true);
-    molecule.getLog().result("UHF Energy = " + std::to_string(energy) + " Hartree");
+    molecule.getLog().result("UHF Energy", energy, "Hartree");
   } else {
     molecule.getLog().result("UHF failed to converge");
   }

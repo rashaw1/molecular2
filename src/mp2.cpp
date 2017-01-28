@@ -84,14 +84,19 @@ void MP2::spatialToSpin() {
 						for (int s = 0; s < N; s++) {
 							auto val1 = temp(p, r, q, s);
 							auto val2 = temp(p, s, q, r);
-						
-							moInts(2*p, 2*q, 2*r, 2*s) = val1 - val2;
-							moInts(2*p, 2*q+1, 2*r, 2*s+1) = val1;
-							moInts(2*p, 2*q+1, 2*r+1, 2*s) = -val2;
-							moInts(2*p+1, 2*q, 2*r+1, 2*s) = val1;
-							moInts(2*p+1, 2*q, 2*r, 2*s+1) = -val2;
-							moInts(2*p+1, 2*q+1, 2*r+1, 2*s+1) = val1 - val2; 
+							auto diff = val1 - val2; 
+							
+							int P = 2*p; int Q = 2*q; int R = 2*r; int S = 2*s;
+							
+							moInts(P, Q, R, S) = diff;
+							moInts(P, Q+1, R, S+1) = val1;
+							moInts(P, Q+1, R+1, S) = -val2;
+							moInts(P+1, Q, R+1, S) = val1;
+							moInts(P+1, Q, R, S+1) = -val2;
+							moInts(P+1, Q+1, R+1, S+1) = diff; 
+							
 						}
+						
 					}
 				}
 			}

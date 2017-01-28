@@ -10,7 +10,7 @@
 #include <thread>
 
 // Constructor
-CCSD::CCSD(MP2& _mp2) : mp2(_mp2) {
+CCSD::CCSD(MP2& _mp2, bool _triples) : mp2(_mp2), withTriples(_triples) {
 	N = 2*mp2.getN();
 	nocc = 2*mp2.getNocc();
 	energy = 0.0;
@@ -108,8 +108,8 @@ void CCSD::build_intermediates(Matrix& F, Tensor4& W, Tensor4& tau, Tensor4& tau
 				for (int f = nocc; f < N; f++) {
 					sum2 += singles(m, f-nocc) * spinInts(m, a, f, e);
 					
-					for (int n = 0; n < nocc; n++)
-						sum3 += tautilde(m, n, a-nocc, f-nocc) * spinInts(m, n, e, f);
+					for (int n = m; n < nocc; n++)
+						sum3 += (2 - (m == n)) * tautilde(m, n, a-nocc, f-nocc) * spinInts(m, n, e, f);
 				}
 			}
 			F(a, e) += sum2 - 0.5 * (sum1 + sum3);
@@ -126,8 +126,8 @@ void CCSD::build_intermediates(Matrix& F, Tensor4& W, Tensor4& tau, Tensor4& tau
 				for (int n = 0; n < nocc; n++) {
 					sum2 += singles(n, e-nocc) * spinInts(m, n, i, e);
 					
-					for (int f = nocc; f < N; f++)
-						sum3 += tautilde(i, n, e-nocc, f-nocc) * spinInts(m, n, e, f);
+					for (int f = e; f < N; f++)
+						sum3 += (2 - (f==e)) * tautilde(i, n, e-nocc, f-nocc) * spinInts(m, n, e, f);
 				}
 			}
 			F(m, i) += 0.5*(sum1 + sum3) + sum2;
@@ -152,7 +152,7 @@ void CCSD::build_intermediates(Matrix& F, Tensor4& W, Tensor4& tau, Tensor4& tau
 	
 	W = spinInts;
 	for (int m = 0; m < nocc; m++) {
-		for (int n = 0; n < nocc; n++) {
+		for (int n = 0; n < m; n++) {
 			for (int i = 0; i < nocc; i++) {
 				for (int j = 0; j < nocc; j++) {
 					double sum = 0.0;
@@ -166,6 +166,7 @@ void CCSD::build_intermediates(Matrix& F, Tensor4& W, Tensor4& tau, Tensor4& tau
 						sum += 0.25 * sum2; 
 					}
 					W(m, n, i, j) += sum;
+					W(n, m, i, j) = - W(m, n, i, j);
 				}
 			}
 		}
@@ -174,7 +175,7 @@ void CCSD::build_intermediates(Matrix& F, Tensor4& W, Tensor4& tau, Tensor4& tau
 	for (int a = nocc; a < N; a++) {
 		for (int b = nocc; b < N; b++) {
 			for (int e = nocc; e < N; e++) {
-				for (int f = nocc; f < N; f++) {
+				for (int f = nocc; f < e; f++) {
 					double sum = 0.0;
 					for (int m = 0; m < nocc; m++) {
 						sum -= singles(m, b-nocc) * spinInts(a, m, e, f);
@@ -186,6 +187,7 @@ void CCSD::build_intermediates(Matrix& F, Tensor4& W, Tensor4& tau, Tensor4& tau
 						sum += 0.25 * sum2;
 					}
 					W(a, b, e, f) += sum;
+					W(a, b, f, e) = -W(a, b, e, f);
 				}
 				
 			}
@@ -347,6 +349,85 @@ void CCSD::calculateEnergy() {
 	energy = newEnergy; 
 }
 
+void CCSD::calculateTriples() {
+	triples_energy = 0.0; 
+	
+	int nvirt = N-nocc;
+	int nvirt2 = nvirt * nvirt;
+	double Dijk[nvirt * nvirt2];
+	double tijkd[nvirt * nvirt2];
+	double tijkc[nvirt * nvirt2];
+	
+	Tensor4& spinInts = mp2.getInts();
+	int A, B, C, a2x, a1x, b2x, b1x, c2x, c1x;
+	for (int i = 0; i < nocc; i++)
+		for (int j = 0; j < nocc; j++)
+			for (int k = 0; k < nocc; k++) {
+				auto fijk = spinFock(i, i) + spinFock(j, j) + spinFock(k, k);
+				
+				// Build Dijk and connected/disconnected tijk
+				for (int a = 0; a < nvirt; a++) {
+					a2x = a*nvirt2; a1x = a*nvirt; A = a+nocc;
+					for (int b = 0; b <= a; b++) {
+						b2x = b*nvirt2; b1x = b*nvirt; B = b+nocc;
+						for (int c = 0; c <= b; c++) {
+							c2x = c*nvirt2; c1x = c*nvirt; C = c+nocc;
+							auto val = fijk - spinFock(A, A) - spinFock(B, B) - spinFock(C, C);
+							Dijk[a2x + b1x + c] = Dijk[a2x + c1x + b] = Dijk[b2x + a1x + c] = val;
+							Dijk[b2x + c1x + a] = Dijk[c2x + a1x + b] = Dijk[c2x + b1x + a] = val;
+							
+							auto val2 = singles(i, a) * spinInts(j, k, B, C) - singles(j, a) * spinInts(i, k, B, C)
+									- singles(k, a) * spinInts(j, i, B, C) - singles(i, b) * spinInts(j, k, A, C)
+										+ singles(j, b) * spinInts(i, k, A, C) + singles(k, b) * spinInts(j, i, A, C)
+											- singles(i, c) * spinInts(j, k, B, A) + singles(j, c) * spinInts(i, k, B, A)
+												+ singles(k, c) * spinInts(j, i, B, A);
+							val2 /= val;
+							tijkd[a2x + b1x + c] = tijkd[b2x + c1x + a] = tijkd[c2x + a1x + b] = val2;
+							tijkd[a2x + c1x + b] = tijkd[b2x + a1x + c] = tijkd[c2x + b1x + a] = -val2;
+							
+							auto val3 = 0.0;
+							int E;
+							for (int e = 0; e < nvirt; e++) {
+								E = e + nocc;
+								val3 += doubles(j, k, a, e)*spinInts(E, i, B, C) - doubles(i, k, a, e)*spinInts(E, j, B, C)
+										- doubles(j, i, a, e)*spinInts(E, k, B, C) - doubles(j, k, b, e)*spinInts(E, i, A, C)
+											+ doubles(i, k, b, e)*spinInts(E, j, A, C) + doubles(j, i, b, e)*spinInts(E, k, A, C)
+												- doubles(j, k, c, e)*spinInts(E, i, B, A) + doubles(i, k, c, e)*spinInts(E, j, B, A)
+													+ doubles(j, i, c, e)*spinInts(E, k, B, A);
+							}
+							for (int m = 0; m < nocc; m++) {
+								val3 += -doubles(i, m, b, c)*spinInts(m, A, j, k) + doubles(j, m, b, c)*spinInts(m, A, i, k)
+										+ doubles(k, m, b, c)*spinInts(m, A, j, i) + doubles(i, m, a, c)*spinInts(m, B, j, k)
+											- doubles(j, m, a, c)*spinInts(m, B, i, k) - doubles(k, m, a, c)*spinInts(m, B, j, i)
+												+ doubles(i, m, b, a)*spinInts(m, C, j, k) - doubles(j, m, b, a)*spinInts(m, C, i, k)
+													- doubles(k, m, b, a)*spinInts(m, C, j, i);
+							}
+							
+							val3 /= val;
+							tijkc[a2x + b1x + c] = tijkc[b2x + c1x + a] = tijkc[c2x + a1x + b] = val3;
+							tijkc[a2x + c1x + b] = tijkc[b2x + a1x + c] = tijkc[c2x + b1x + a] = -val3;
+						}
+					}
+				}
+				
+				// Determine contribution to triples energy
+				for (int a = 0; a < nvirt; a++) {
+					a2x = a * nvirt2;
+					for (int b = 0; b < nvirt; b++) {
+						b1x = b *nvirt;
+						for (int c = 0; c < nvirt; c++) {
+							c1x = a2x + b1x + c;
+							triples_energy += tijkc[c1x] * Dijk[c1x] * ( tijkc[c1x] + tijkd[c1x]);
+						}
+					}
+				}
+							
+			}
+			
+	triples_energy /= 36.0;
+				
+}
+
 void CCSD::compute()
 {
 	Logger& log = mp2.getFock().getMolecule().getLog();
@@ -391,6 +472,17 @@ void CCSD::compute()
 		iter++;
 	}
 	
+	if (converged){
+		log.result("CCSD correlation energy", energy, "Hartree");
+		if (withTriples) {
+			log.print("Calculating triples... \n");
+			calculateTriples();
+			log.localTime();
+			log.result("(T) correction", triples_energy, "Hartree");
+			log.result("CCSD(T) correlation energy", energy + triples_energy, "Hartree");
+		}
+	} else log.result("CCSD failed to converge");
+		
 }
 
 					

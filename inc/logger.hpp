@@ -154,6 +154,7 @@ public:
   // Specific logging formats
   void title(const std::string& msg) const;
   void result(const std::string& msg) const;
+  void result(const std::string& name, const double value, const std::string& units) const;
   void error(Error& e);
   void localTime();
   void globalTime();

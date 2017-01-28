@@ -102,10 +102,10 @@ int main (int argc, char* argv[])
 		  log.print("Integral transformation complete.\n");
 		  log.localTime();
 		  //mp2obj.calculateEnergy();
-		  CCSD ccobj(mp2obj);
+		  CCSD ccobj(mp2obj, true);
 		  ccobj.compute();
-		  log.result("MP2 Energy Correction = " + std::to_string(mp2obj.getEnergy()) + " Hartree");
-		  log.result("Total Energy = " + std::to_string(hf.getEnergy() + mp2obj.getEnergy()) + " Hartree");
+		  log.result("MP2 Energy Correction", mp2obj.getEnergy(), "Hartree");
+		  log.result("Total Energy = ", hf.getEnergy() + mp2obj.getEnergy(), "Hartree");
 		  break;
 	  }
 	  default: { }

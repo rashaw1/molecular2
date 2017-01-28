@@ -584,6 +584,15 @@ void Logger::result(const std::string& msg) const
   outfile << std::string(msg.length(), '*') << "\n\n";
 }
 
+void Logger::result(const std::string& name, const double value, const std::string& units) const
+{
+	int length = name.length() + 25 + units.length();
+	outfile << "\n";
+	outfile << std::string(length, '*') << "\n";
+	outfile << name << " = " <<  std::setprecision(12) << value << " " << units << "\n";
+	outfile << std::string(length, '*') << "\n\n";
+}
+
 // Log an error
 void Logger::error(Error& e)
 {

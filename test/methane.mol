@@ -1,4 +1,4 @@
-basis, sto-3g
+basis, cc-pvdz
 nthreads, 8
 geom,
 C, 0.0, 0.0, 0.0
@@ -7,5 +7,6 @@ H, 1.18377, 1.18377, 1.18377
 H, -1.18377, 1.18377, -1.18377
 H, -1.18377, -1.18377, 1.18377
 geomend
+scf,converge,1e-4
 rhf,
 mp2,
