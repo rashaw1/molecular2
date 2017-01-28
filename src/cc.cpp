@@ -311,20 +311,20 @@ void CCSD::calculateEnergy() {
 	
 	Tensor4& spinInts = mp2.getInts();
 	
+	double sum1 = 0.0, sum2 = 0.0;
 	for (int i = 0; i < nocc; i++) {
 		for (int a = nocc; a < N; a++) {
 			newEnergy += spinFock(i, a) * singles(i, a-nocc);
 			
-			double sum1 = 0.0, sum2 = 0.0;
 			for (int  j = 0; j < nocc; j++) {
 				for (int b = nocc; b < N; b++) {
 					sum1 += spinInts(i, j, a, b) * doubles(i, j, a-nocc, b-nocc);
 					sum2 += spinInts(i, j, a, b) * singles(i, a-nocc) * singles(j, b-nocc);
 				}
 			}
-			newEnergy += 0.25 * sum1 + 0.5 * sum2;
 		}
 	}
+	newEnergy += 0.25*sum1 + 0.5*sum2; 
 	
 	delta_e = newEnergy - energy;
 	energy = newEnergy; 
