@@ -21,7 +21,7 @@ public:
 	void spatialToSpin();
 	void transformThread(int start, int end, Tensor4& moTemp);
 	void calculateEnergy();
-	void calculateEnergy(const Tensor4& amplitudes);
+	void calculateEnergy(const S4OddTensor4& amplitudes);
 	double getEnergy() const { return energy; }
 	S8OddTensor4& getSpinInts() { 
 		return spinInts;

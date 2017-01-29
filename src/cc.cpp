@@ -10,13 +10,15 @@
 #include <thread>
 
 // Constructor
-CCSD::CCSD(MP2& _mp2, bool _triples) : mp2(_mp2), withTriples(_triples) {
+CCSD::CCSD(MP2& _mp2, bool _triples, bool _doDiis) : mp2(_mp2), doDiis(_doDiis),  withTriples(_triples) {
 	N = 2*mp2.getN();
 	nocc = 2*mp2.getNocc();
 	energy = 0.0;
 	delta_e = 0.0;
 	delta_singles = 0.0;
 	delta_doubles = 0.0;
+	maxDiis = 5;
+	diis.init(maxDiis, doDiis);
 }
 
 void CCSD::build_fock() {
@@ -44,17 +46,15 @@ void CCSD::build_fock() {
 
 	// Now build denominator arrays
 	Dia.resize(nocc, N-nocc);
-	Dijab.resize(nocc, nocc, N-nocc, N-nocc);
+	Dijab.resize(nocc, N-nocc);
 	for (int i = 0; i < nocc; i++)
 		for (int a = 0; a < N-nocc; a++) {
 		
 			Dia(i, a) = spinFock(i, i) - spinFock(a+nocc, a+nocc);
 			
-			for (int j = i; j < nocc; j++)
-				for (int b = a; b < N-nocc; b++)  {
-					Dijab(i, j, a, b) = Dia(i, a) + spinFock(j, j) - spinFock(b+nocc, b+nocc);  
-					Dijab(j, i, a, b) = Dijab(i, j, b, a) = Dijab(j, i, b, a) = Dijab(i, j, a, b);
-				}
+			for (int j = 0; j <= i; j++)
+				for (int b = 0; b <= a; b++)
+					Dijab.set(i, j, a, b, Dia(i, a) + spinFock(j, j) - spinFock(b+nocc, b+nocc) );  
 		}
 }
 
@@ -65,16 +65,15 @@ void CCSD::build_guess() {
 	// Assign and build doubles amplitudes
 	S8OddTensor4& spinInts = mp2.getSpinInts();
 	Vector& eps = mp2.getFock().getEps();
-	doubles.assign(nocc, nocc, N-nocc, N-nocc, 0.0);
+	doubles.assign(nocc, N-nocc, 0.0);
 	for (int i = 0; i < nocc; i++) {
-		for (int j = i; j < nocc; j++) {
+		for (int j = 0; j <= i; j++) {
 			auto eocc = eps[i/2] + eps[j/2];
 			
 			for (int a = nocc; a < N; a++)
-				for (int b = a; b < N; b++) {
+				for (int b = nocc; b <= a; b++) {
 					auto resolvent = eocc - eps[a/2] - eps[b/2];
-					doubles(i, j, a-nocc, b-nocc) = doubles(j, i, b-nocc, a-nocc) = spinInts(i, j, a, b) / resolvent;
-					doubles(j, i, a-nocc, b-nocc) = doubles(i, j, b-nocc, a-nocc) = -doubles(i, j, a-nocc, b-nocc);
+					doubles.set(i, j, a-nocc, b-nocc, spinInts(i, j, a, b) / resolvent );
 				}
 			
 		}
@@ -83,17 +82,15 @@ void CCSD::build_guess() {
 	mp2.calculateEnergy(doubles);	
 }
 
-void CCSD::build_intermediates(Matrix& F, Tensor4& W, Tensor4& tau, Tensor4& tautilde) {
+void CCSD::build_intermediates(Matrix& F, Tensor4& W, S4OddTensor4& tau, S4OddTensor4& tautilde) {
 	// Construct tau tensors from amplitudes	
 	for (int i = 0; i < nocc; i++)
-		for (int j = i; j < nocc; j++)
+		for (int j = 0; j <= i; j++)
 			for (int a = 0; a < N-nocc; a++)
-				for (int b = a; b < N-nocc; b++) {
+				for (int b = 0; b <= a; b++) {
 					auto delta = singles(i, a) * singles(j, b) - singles(i, b) * singles(j, a);
-					tau(i, j, a, b) = tau(j, i, b, a) = doubles(i, j, a, b) + delta;
-					tau(j, i, a, b) = tau(i, j, b, a) = -tau(i, j, a, b);
-					tautilde(i, j, a, b) = tautilde(j, i, b, a) = doubles(i, j, a, b) + 0.5*delta;
-					tautilde(j, i, a, b) = tautilde(i, j, b, a) = -tautilde(i, j, a, b);
+					tau.set(i, j, a, b, doubles(i, j, a, b) + delta );
+					tautilde.set(i, j, a, b, doubles(i, j, a, b) + 0.5*delta );
 				}
 					
 	S8OddTensor4& spinInts = mp2.getSpinInts();		
@@ -219,7 +216,7 @@ void CCSD::build_intermediates(Matrix& F, Tensor4& W, Tensor4& tau, Tensor4& tau
 
 }	
 
-void CCSD::build_amplitudes(Matrix& F, Tensor4& W, Tensor4& tau, Tensor4& tautilde) {
+void CCSD::build_amplitudes(Matrix& F, Tensor4& W, S4OddTensor4& tau, S4OddTensor4& tautilde) {
 	S8OddTensor4& spinInts = mp2.getSpinInts();
 	
 	// Build new singles amplitudes
@@ -249,11 +246,11 @@ void CCSD::build_amplitudes(Matrix& F, Tensor4& W, Tensor4& tau, Tensor4& tautil
 	}
 	
 	// Build new doubles amplitudes
-	Tensor4 newDoubles(nocc, nocc, N-nocc, N-nocc, 0.0);
+	S4OddTensor4 newDoubles(nocc, N-nocc, 0.0);
 	for (int i = 0; i < nocc; i++) {
-		for (int j = i; j < nocc; j++) {
+		for (int j = 0; j <= i; j++) {
 			for (int a = nocc; a < N; a++) {
-				for (int b = a; b < N; b++) {
+				for (int b = nocc; b <= a; b++) {
 					
 					auto value = spinInts(i, j, a, b);
 					
@@ -310,10 +307,7 @@ void CCSD::build_amplitudes(Matrix& F, Tensor4& W, Tensor4& tau, Tensor4& tautil
 					
 					value += sum;
 					value /= Dijab(i, j, a-nocc, b-nocc);
-					newDoubles(i, j, a-nocc, b-nocc) = value;
-					newDoubles(j, i, a-nocc, b-nocc) = -value;
-					newDoubles(i, j, b-nocc, a-nocc) = -value;
-					newDoubles(j, i, b-nocc, a-nocc) = value;
+					newDoubles.set(i, j, a-nocc, b-nocc, value);
 				
 				}
 			}
@@ -321,10 +315,42 @@ void CCSD::build_amplitudes(Matrix& F, Tensor4& W, Tensor4& tau, Tensor4& tautil
 	}
 	
 	// Compute RMS differences
-	delta_singles = fnorm(newSingles - singles);
+	calculateError(newSingles, newDoubles);
 	singles = newSingles;
-	delta_doubles = fnorm(newDoubles - doubles);
 	doubles = newDoubles;
+}
+
+void CCSD::calculateError(Matrix& newSingles, S4OddTensor4& newDoubles) {
+	Matrix ds = newSingles - singles;
+	S4OddTensor4 dd = newDoubles -  doubles;
+	
+	delta_singles = fnorm(ds);
+	delta_doubles = fnorm(dd);
+	if (doDiis) {
+		// Save amplitudes
+		if (singles_cache.size() == maxDiis) {
+			singles_cache.erase(singles_cache.begin());
+			doubles_cache.erase(doubles_cache.begin());
+		}
+		singles_cache.push_back(newSingles);
+		doubles_cache.push_back(newDoubles);
+		
+		// Compute error vector
+		std::vector<Vector> errs;
+		errs.push_back(Vector(ds, false));
+		errs.push_back(Vector(dd, Tensor4::ODD_4));
+		Vector weights = diis.compute(errs);
+		if (iter > 2) {
+			newSingles.assign(nocc, N-nocc, 0.0);
+			newDoubles.assign(nocc, N-nocc, 0.0);
+			int offset = singles_cache.size() - weights.size();
+			for (int i = offset; i < singles_cache.size(); i++) {
+				newSingles = newSingles + weights[i-offset]*singles_cache[i];
+				newDoubles = newDoubles + weights[i-offset]*doubles_cache[i];
+			} 
+		}
+		
+	}
 }
 
 void CCSD::calculateEnergy() { 
@@ -431,11 +457,11 @@ void CCSD::compute()
 	log.print("\nBeginning CC iterations:\n\n");
 	bool converged = false; 
 	int MAXITER = log.maxiter();
-	int iter = 1;
+	iter = 1;
 	Matrix F(N, N, 0.0);
 	Tensor4 W(N, N, N, N, 0.0);
-	Tensor4 tau(nocc, nocc, N-nocc, N-nocc, 0.0);
-	Tensor4 tautilde(nocc, nocc, N-nocc, N-nocc, 0.0);
+	S4OddTensor4 tau(nocc, N-nocc, 0.0);
+	S4OddTensor4 tautilde(nocc, N-nocc, 0.0);
 	
 	double time_interms, time_amps, time_en;
 	while (!converged && iter < MAXITER) {
@@ -449,7 +475,7 @@ void CCSD::compute()
 		
 		log.iteration(iter, energy, delta_e, delta_doubles);
 		std::cout << "Iteration " << iter << ": " << delta_singles << " " << time_interms << " " << time_amps << " " << time_en << std::endl;
-		converged = (delta_e < log.converge()) && (delta_doubles < log.converge());
+		converged = (fabs(delta_e) < log.converge()) && (fabs(delta_doubles) < log.converge());
 		iter++;
 	}
 	

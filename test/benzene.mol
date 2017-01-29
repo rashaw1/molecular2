@@ -1,7 +1,7 @@
-basis, cc-pvdz
+basis, sto-3g
 memory, 4000
 nthreads, 8
-integral, direct
+!integral, direct
 geom, angstrom
 C, 0.000, 1.387, 0.000
 C, 1.201, 0.693, 0.000
@@ -17,5 +17,5 @@ H, -2.139, -1.235, 0.000
 H, -2.139, 1.235, 0.000
 geomend
 hf,
-!mp2,
+mp2,
 !integral, print, benzene.ints

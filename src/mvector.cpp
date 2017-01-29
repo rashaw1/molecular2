@@ -56,6 +56,56 @@ Vector::Vector(const Vector& u)
   v = u.v;
 }
 
+Vector::Vector(const Matrix& m, bool symm) {
+	if (symm) {
+		int nr = m.nrows();
+		n = (nr * (nr +1)) / 2;
+		for (int i = 0; i < nr; i++)
+			for (int j = 0; j <= i; j++)
+				v.push_back(m(i, j));
+	} else {
+		int nr = m.nrows();
+		int nc = m.ncols();
+		n = nr * nc;
+		for (int i = 0; i < nr; i++)
+			for (int j = 0; j < nc; j++)
+				v.push_back(m(i, j));
+	}
+}
+
+Vector::Vector(const Tensor4& t, Tensor4::TYPE symm) {
+
+	if (symm == Tensor4::ODD_8 || symm == Tensor4::EVEN_8) {
+		// 8-fold symmetry
+		int w = t.getW();
+		n = w*(w+1)*(w+2)*(3*w+1) / 24;
+		for (int i = 0; i < w; i++)
+			for (int j = 0; j <= i; j++)
+				for (int k = 0; k <= i; k++)
+					for (int l = 0; l <= k; l++)
+						v.push_back(t(i, j, k, l));
+	} else if (symm == Tensor4::ODD_4 || symm == Tensor4::EVEN_4) {
+		// 4-fold symmetry
+		int w = t.getW(); int x = t.getX();
+		n = w * x * (w+1) * (x+1) / 4;
+		for (int i = 0; i < w; i++)
+			for (int j = 0; j <= i; j++)
+				for (int k = 0; k < x; k++)
+					for (int l = 0; l <= k; l++)
+						v.push_back(t(i, j, k, l));
+	} else {
+		// No symmetries
+		int w = t.getW(); int x = t.getX();
+		int y = t.getY(); int z = t.getZ();
+		n = w*x*y*z;
+		for (int i = 0; i < w; i++)
+			for (int j = 0; j < x; j++)
+				for (int k = 0; k < y; k++)
+					for (int l = 0; l < z; l++)
+						v.push_back(t(i, j, k, l));
+	}
+}
+
 // Destructor
 
 Vector::~Vector()

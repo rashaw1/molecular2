@@ -62,6 +62,8 @@ void MP2::transformIntegrals()
 				}
 			}
 		}
+		
+		focker.getIntegrals().clearTwoInts();
 	}
 }
 
@@ -172,7 +174,7 @@ void MP2::spatialToSpin() {
 		} // i
 	}
 
-	void MP2::calculateEnergy(const Tensor4& t) {
+	void MP2::calculateEnergy(const S4OddTensor4& t) {
 		energy = 0.0;
 	
 		for (int i = 0; i < 2*nocc; i++)

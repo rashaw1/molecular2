@@ -97,6 +97,7 @@ public:
   double getERI(int i, int j, int k, int l) const;
   S8EvenTensor4 getERI() const { return twoints; }
   Matrix& getPrescreen() { return prescreen; }
+  void clearTwoInts() { twoints.resize(0); }
 
   // Intrinsic routines
   void printERI(std::ostream& output, int NSpher) const;

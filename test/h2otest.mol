@@ -4,7 +4,8 @@ O, 0.0, -0.143226, 0.0
 H, 1.63803684, 1.1365488, 0.0
 H, -1.63803684, 1.1365488, 0.0
 geomend
-scf,converge,1e-8
+scf,converge,1e-10
+scf,nodiis
 nthreads, 2
 rhf,
 mp2,

@@ -89,6 +89,36 @@ Tensor4& Tensor4::operator=(const Tensor4& other)
   return *this;
 }
 
+Tensor4 Tensor4::operator+() const 
+{
+	Tensor4 retVal(w, x, y, z);
+	for (int i = 0; i < w; i++){
+		for (int j = 0; j < x; j++){
+			for (int k = 0; k < y; k++){
+				for (int l = 0; l < z; l++){
+					retVal(i, j, k, l) = data[i*x*y*z + j*y*z + k*z + l];
+				}
+			}
+		}
+	}
+	return retVal;
+}
+
+Tensor4 Tensor4::operator-() const 
+{
+	Tensor4 retVal(w, x, y, z);
+	for (int i = 0; i < w; i++){
+		for (int j = 0; j < x; j++){
+			for (int k = 0; k < y; k++){
+				for (int l = 0; l < z; l++){
+					retVal(i, j, k, l) = -data[i*x*y*z + j*y*z + k*z + l];
+				}
+			}
+		}
+	}
+	return retVal;
+}
+
 Tensor4 Tensor4::operator+(const Tensor4& other) const
 {
 	Tensor4 retVal(w, x, y, z);
@@ -112,6 +142,20 @@ Tensor4 Tensor4::operator-(const Tensor4& other) const
 			for (int k = 0; k < y; k++){
 				for (int l = 0; l < z; l++){
 					retVal(i, j, k, l) = data[i*x*y*z + j*y*z + k*z +l] - other(i, j, k, l);
+				}
+			}
+		}
+	}
+	return retVal;
+}
+
+Tensor4 Tensor4::operator*=(const double& scalar) const {
+	Tensor4 retVal(w, x, y, z);
+	for (int i = 0; i < w; i++){
+		for (int j = 0; j < x; j++){
+			for (int k = 0; k < y; k++){
+				for (int l = 0; l < z; l++){
+					retVal(i, j, k, l) = data[i*x*y*z + j*y*z + k*z +l] * scalar;
 				}
 			}
 		}
@@ -244,6 +288,36 @@ S8EvenTensor4& S8EvenTensor4::operator=(const S8EvenTensor4& other)
   return *this;
 }
 
+S8EvenTensor4 S8EvenTensor4::operator+() const
+{
+	S8EvenTensor4 retVal(w);
+	for (int i = 0; i < w; i++){
+		for (int j = 0; j <= i; j++){
+			for (int k = 0; k <= i; k++){
+				for (int l = 0; l <= k; l++){
+					retVal(i, j, k, l) = data[imults[i] + j*jkmults[i+1] + jkmults[k] + l] ;
+				}
+			}
+		}
+	}
+	return retVal;
+}
+
+S8EvenTensor4 S8EvenTensor4::operator-() const
+{
+	S8EvenTensor4 retVal(w);
+	for (int i = 0; i < w; i++){
+		for (int j = 0; j <= i; j++){
+			for (int k = 0; k <= i; k++){
+				for (int l = 0; l <= k; l++){
+					retVal(i, j, k, l) = -data[imults[i] + j*jkmults[i+1] + jkmults[k] + l] ;
+				}
+			}
+		}
+	}
+	return retVal;
+}
+
 S8EvenTensor4 S8EvenTensor4::operator+(const S8EvenTensor4& other) const
 {
 	S8EvenTensor4 retVal(w);
@@ -274,6 +348,21 @@ S8EvenTensor4 S8EvenTensor4::operator-(const S8EvenTensor4& other) const
 	return retVal;
 }
 
+S8EvenTensor4 S8EvenTensor4::operator*=(const double& scalar) const
+{
+	S8EvenTensor4 retVal(w);
+	for (int i = 0; i < w; i++){
+		for (int j = 0; j <= i; j++){
+			for (int k = 0; k <= i; k++){
+				for (int l = 0; l <= k; l++){
+					retVal(i, j, k, l) = data[imults[i] + j*jkmults[i+1] + jkmults[k] + l] * scalar;
+				}
+			}
+		}
+	}
+	return retVal;
+}
+
 void S8EvenTensor4::updateMults() {
 	
 	imults.clear(); jkmults.clear();
@@ -284,7 +373,19 @@ void S8EvenTensor4::updateMults() {
 		imults.push_back(val/12);
 	}
 	jkmults.push_back( (w * (w+1))/2 );
+}
+
+// Frobenius norm
+double fnorm(const S8EvenTensor4& t)
+{
+	double retval = 0.0;
+	for (int i = 0; i < t.w; i++)
+		for (int j = 0; j <= i; j++)
+			for (int k = 0; k <= i; k++)
+				for (int l = 0; l <= k; l++)
+					retval += t(i, j, k, l) * t(i, j, k, l);
 	
+	return std::sqrt(8*retval);
 }
 
 S8OddTensor4::S8OddTensor4(int N) : S8EvenTensor4(N) { }
@@ -327,4 +428,233 @@ double S8OddTensor4::operator()(int i, int j, int k, int l) const {
 		L = tmp;
 	}
   	return (1 - 2*(parity%2)) * data[imults[I] + J*jkmults[I+1] + jkmults[K] + L];
+}
+
+S4OddTensor4::S4OddTensor4(int _w, int _x)
+{
+  // Resize the data matrix
+  resize(_w, _x);
+}
+
+S4OddTensor4::S4OddTensor4(int _w, int _x, double val)
+{
+  // Resize and assign the data matrix
+	assign(_w, _x, val);
+}
+
+S4OddTensor4::S4OddTensor4(const S4OddTensor4& other)
+{
+  resize(other.w, other.x);
+  for (int i = 0; i < w; i++){
+    for (int j = 0; j <= i; j++){
+      for (int k = 0; k < x; k++){
+        for (int l = 0; l <= k; l++){
+          data[(mults[i] + j)*mults[x] + mults[k] + l] = other(i, j, k, l);
+        }
+      } 
+    }
+  }
+}  
+
+void S4OddTensor4::resize(int _w, int _x)
+{
+	w = _w;
+	x = _x;
+	int size = (w * x * (w+1) * (x+1)) / 4;
+  	data.resize(size);
+	updateMults();
+}
+
+void S4OddTensor4::assign(int _w, int _x, double val)
+{
+	w = _w;
+	x = _x;
+  	int size = (w * x * (w+1) * (x+1)) / 4;
+  	data.resize(size);
+  	std::fill(data.begin(), data.end(), val);
+	updateMults();
+}
+
+void S4OddTensor4::print() const 
+{
+  for (int i = 0; i < w; i++){
+    for (int j = 0; j <= i; j++){
+      for (int k = 0; k < x; k++){
+	for (int l = 0; l <= k; l++){
+	  std::cout << i << " " << j << " " << k << " " << l << "   " << data[(mults[i] + j)*mults[x] + mults[k] + l] << "\n";
+	}
+      }
+    }
+  }
+  std::cout << "\n\n";
+}
+
+void S4OddTensor4::set(int i, int j, int k, int l, double value) {
+	int parity = 0;
+	int tmp = i;
+	if ( j > i ) {
+		i = j;
+		j = tmp;
+		parity++;
+	} 
+	tmp = k;
+	if ( l > k ) {
+		k = l;
+		l = tmp;
+		parity++;
+	}
+	data[(mults[i] + j)*mults[x] + mults[k] + l] = (1- 2*(parity%2)) * value;
+}
+
+double S4OddTensor4::operator()(int i, int j, int k, int l) const
+{
+	int parity = 0;
+	int tmp = i;
+	if ( j > i ) {
+		i = j;
+		j = tmp;
+		parity++;
+	} 
+	tmp = k;
+	if ( l > k ) {
+		k = l;
+		l = tmp;
+		parity++;
+	}
+			
+  	return (1 - 2*(parity%2)) * data[(mults[i] + j)*mults[x] + mults[k] + l];
+}
+
+S4OddTensor4& S4OddTensor4::operator=(const S4OddTensor4& other)
+{
+  resize(other.getW(), other.getX());
+  for (int i = 0; i < w; i++){
+    for (int j = 0; j <= i; j++){
+      for (int k = 0; k < x; k++){
+	for (int l = 0; l <= k; l++){
+	  data[(mults[i] + j)*mults[x] + mults[k] + l] = other(i, j, k, l);
+	}
+      }
+    }
+  }
+  return *this;
+}
+
+S4OddTensor4 S4OddTensor4::operator+() const
+{
+	S4OddTensor4 retVal(w, x);
+	for (int i = 0; i < w; i++){
+		for (int j = 0; j <= i; j++){
+			for (int k = 0; k < x; k++){
+				for (int l = 0; l <= k; l++){
+					retVal.set(i, j, k, l, data[(mults[i] + j)*mults[x] + mults[k] + l] );
+				}
+			}
+		}
+	}
+	return retVal;
+}
+
+S4OddTensor4 S4OddTensor4::operator-() const
+{
+	S4OddTensor4 retVal(w, x);
+	for (int i = 0; i < w; i++){
+		for (int j = 0; j <= i; j++){
+			for (int k = 0; k < x; k++){
+				for (int l = 0; l <= k; l++){
+					retVal.set(i, j, k, l, -data[(mults[i] + j)*mults[x] + mults[k] + l] );
+				}
+			}
+		}
+	}
+	return retVal;
+}
+
+S4OddTensor4 S4OddTensor4::operator+(const S4OddTensor4& other) const
+{
+	S4OddTensor4 retVal(w, x);
+	for (int i = 0; i < w; i++){
+		for (int j = 0; j <= i; j++){
+			for (int k = 0; k < x; k++){
+				for (int l = 0; l <= k; l++){
+					retVal.set(i, j, k, l, data[(mults[i] + j)*mults[x] + mults[k] + l] + other(i, j, k, l) );
+				}
+			}
+		}
+	}
+	return retVal;
+}
+
+S4OddTensor4 S4OddTensor4::operator-(const S4OddTensor4& other) const
+{
+	S4OddTensor4 retVal(w, x);
+	for (int i = 0; i < w; i++){
+		for (int j = 0; j <= i; j++){
+			for (int k = 0; k < x; k++){
+				for (int l = 0; l <= k; l++){
+					retVal.set(i, j, k, l, data[(mults[i] + j)*mults[x] + mults[k] + l] - other(i, j, k, l) );
+				}
+			}
+		}
+	}
+	return retVal;
+}
+
+S4OddTensor4 S4OddTensor4::operator*=(const double& scalar) const
+{
+	S4OddTensor4 retVal(w, x);
+	for (int i = 0; i < w; i++){
+		for (int j = 0; j <= i; j++){
+			for (int k = 0; k < x; k++){
+				for (int l = 0; l <= k; l++){
+					retVal.set(i, j, k, l, data[(mults[i] + j)*mults[x] + mults[k] + l] * scalar);
+				}
+			}
+		}
+	}
+	return retVal;
+}
+
+void S4OddTensor4::updateMults() {
+	
+	mults.clear();
+	auto max_i = w > x ? w : x;
+	for (int i = 0; i <= max_i; i++) {
+		int val = ( i * (i+1) ) / 2;
+		mults.push_back(val);
+	}
+	
+}
+
+// Frobenius norm
+double fnorm(const S4OddTensor4& t)
+{
+	double retval = 0.0;
+	for (int i = 0; i < t.w; i++)
+		for (int j = 0; j <= i; j++)
+			for (int k = 0; k < t.x; k++)
+				for (int l = 0; l <= k; l++)
+					retval += t(i, j, k, l) * t(i, j, k, l);
+	
+	return 2*std::sqrt(retval);
+}
+
+S4EvenTensor4::S4EvenTensor4(int n, int m) : S4OddTensor4(n, m) { }
+S4EvenTensor4::S4EvenTensor4(int n, int m, double val) : S4OddTensor4(n, m, val) { }
+S4EvenTensor4::S4EvenTensor4(const S4EvenTensor4& other) : S4OddTensor4(other) { } 
+
+void S4EvenTensor4::set(int i, int j, int k, int l, double val) {
+	int I = i > j ? i : j;
+	int J = i > j ? j : i;
+	int K = k > l ? k : l;
+	int L = k > l ? l : k;
+	data[(mults[i] + j)*mults[x] + mults[k] + l] = val;
+}
+
+double S4EvenTensor4::operator()(int i, int j, int k, int l) const {
+	int I = i > j ? i : j;
+	int J = i > j ? j : i;
+	int K = k > l ? k : l;
+	int L = k > l ? l : k;
+	return data[(mults[i] + j)*mults[x] + mults[k] + l];
 }

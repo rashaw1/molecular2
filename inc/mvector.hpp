@@ -18,6 +18,7 @@ class Matrix;
 
 #include "error.hpp"
 #include "mathutil.hpp"
+#include "tensor4.hpp"
 #include <vector>
 
 class Vector
@@ -33,6 +34,8 @@ public:
   Vector(int length, const double& a); // Vector with 'length' values, all a
   Vector(int length, const double* a); // Initialise vector to array a
   Vector(const Vector& u); // Copy constructor
+  Vector(const Matrix& m, bool symm = false);
+  Vector(const Tensor4& t, Tensor4::TYPE symm = Tensor4::DEFAULT);
   ~Vector(); // Destructor
   // Accessors
   int size() const { return n; } // Returns size of vector, n
