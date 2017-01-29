@@ -16,10 +16,12 @@
 #include <array>
 
 // Constructors and destructors
-Basis::Basis(std::string n, Vector& atoms)
+Basis::Basis(std::map<int, std::string> ns, Vector& atoms)
 {
-  BasisReader input(n); // Make a basis reading object
-  name = n;
+  BasisReader input(ns); // Make a basis reading object
+  auto it = ns.find(0);
+  if (it != ns.end()) name = it->second;
+  else name = "sto-3g";
   std::transform(name.begin(), name.end(), name.begin(), ::toupper);
   int natoms = atoms.size(); // Get how many different atoms there are
   // Now determine how many basis functions are needed
@@ -194,6 +196,7 @@ Basis& Basis::operator=(const Basis& other)
 
   // Assign attributes
   name = other.name;
+  names = other.names;
   charges = other.charges;
   shells = other.shells;
   lnums = other.lnums;

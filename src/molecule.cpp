@@ -362,7 +362,7 @@ Vector Molecule::rConsts(int units)
 }
 
 void Molecule::buildShellBasis() {
-	BasisReader b(log.bname);
+	BasisReader b(log.bnames);
 	for (int i = 0; i < natoms; i++) {
 		Atom &a = atoms[i];
 		double pos[3] = { a.getX(), a.getY(), a.getZ() };

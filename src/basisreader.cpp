@@ -31,7 +31,15 @@ void BasisReader::openFile(int q)
 	else if (q > 54 && q < 87) { row = "fifth"; } // Cs - Rn
 	else if (q > 86) { row = "sixth"; }
 	std::string filename = "basissets/";
-	filename += name; filename += row; filename += ".basis";
+	auto it = names.find(q);
+	std::string bn;
+	if (it != names.end()) bn = it->second; 
+	else {
+		it = names.find(0);
+		if (it != names.end()) bn = it->second;
+		else bn = "sto-3g";
+	}
+	filename += bn; filename += row; filename += ".basis";
 	// Open file, read only
 	input.open(filename, std::ifstream::in);
 }

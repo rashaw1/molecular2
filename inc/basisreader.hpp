@@ -27,6 +27,7 @@
 // Includes
 #include <string>
 #include <fstream>
+#include <map>
 
 // Declare forward dependencies
 class Vector;
@@ -36,12 +37,12 @@ class Basis;
 class BasisReader
 {
 private:
-  std::string name;
+  std::map<int, std::string> names;
   std::ifstream input;
   void openFile(int q);
   void closeFile();
 public:
-  BasisReader(std::string n) : name(n) {} // Constructor
+  BasisReader(std::map<int, std::string> ns) : names(ns) {} // Constructor
   int readNbfs(int q);
   BF readBF(int q, int i);
   Vector readShells(int q);

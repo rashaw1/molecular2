@@ -75,6 +75,7 @@ void FileReader::readParameters()
 	bprint = false;
 	diis = true;
 	angstrom = false;
+	basis[0] = "sto-3g";
 
 	// Read line by line and parse
 	std::string line, token;
@@ -113,8 +114,20 @@ void FileReader::readParameters()
 				case 5: { // Basis
 					line.erase(0, pos+1);
 					// Get rid of excess spaces
-					line.erase(std::remove(line.begin(), line.end(), ' '), line.end());
-					basis = line;
+					pos = line.find(',');
+					if (pos != std::string::npos) {
+						token = line.substr(0, pos);
+						token.erase(std::remove(token.begin(), token.end(), ' '), token.end());
+						std::transform(token.begin(), token.end(), token.begin(), ::tolower);
+						std::string token2 = line.substr(pos+1, line.length());
+						token2.erase(std::remove(token2.begin(), token2.end(), ' '), token2.end());
+						if (token == "default")
+							basis[0] = token2;
+						else {
+							int q = getAtomCharge(token);
+							basis[q] = token2;
+						}	
+					}
 					break;
 				}
 				case 6: { // GeomStart

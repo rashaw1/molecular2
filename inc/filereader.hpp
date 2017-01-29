@@ -22,6 +22,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <map>
  
  // Forward dependencies
  
@@ -33,7 +34,8 @@ private:
   int geomstart, geomend;
   double precision, thrint, memory, converge;
   bool direct, twoprint, diis, bprint, angstrom;
-  std::string basis, intfile;
+  std::string intfile;
+  std::map<int, std::string> basis;
   std::vector<std::string> geometry;
   std::vector<std::string> commands; 
   int findToken(std::string t); // Find the command being issued
@@ -47,7 +49,7 @@ public:
   int getMultiplicity() const { return multiplicity; }
   int getMaxIter() const { return maxiter; }
   int getNAtoms() const { return natoms; }
-  std::string getBasis() const { return basis;}
+  std::map<int, std::string> getBasis() const { return basis;}
   std::string getIntFile() const { return intfile; }
   std::vector<std::string> getCmds() const { return commands; }
   bool getDirect() const { return direct; }

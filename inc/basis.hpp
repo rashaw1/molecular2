@@ -46,6 +46,7 @@
 #include <string>
 #include <libint2.hpp>
 #include <vector>
+#include <map>
 
 // Forward declarations
 class BF;
@@ -57,6 +58,7 @@ class Basis
 private:
   BF* bfs;
   std::string name;
+  std::map<int, std::string> names;
   Vector charges;
   Vector shells;
   Vector lnums;
@@ -68,11 +70,14 @@ public:
   // Need to specify the name of the basis, n, and a list of the 
   // distinct atoms that are needed (as a vector of atomic numbers)
   Basis() : name("Undefined") { } // Default constructor
-  Basis(std::string n, Vector& atoms);
+  Basis(std::map<int, std::string> ns, Vector& atoms);
   ~Basis(); // Destructor
   // Accessors
   int getNBFs() const { return charges.size(); }
   std::string getName() const { return name; }
+  std::string getName(int q) const { 
+	  return names.find(q)->second;
+  }
   Vector getCharges() const { return charges; }
   int findPosition(int q) const;
   int findShellPosition(int q) const;

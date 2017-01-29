@@ -1,4 +1,5 @@
-basis, cc-pvdz
+basis, default, cc-pvdz
+basis, H, sto-3g
 geom,
 O, 0.0, -0.143226, 0.0
 H, 1.63803684, 1.1365488, 0.0

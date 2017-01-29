@@ -112,7 +112,7 @@ public:
   static const double TOBOHR;
   static const double TOANG;
   
-  std::string bname;
+  std::map<int, std::string> bnames;
   
   // Constructor/destructor
   Logger(std::ifstream& in, std::ofstream& out, std::ostream& e);
