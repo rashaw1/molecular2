@@ -149,7 +149,9 @@ public:
   void print(const PBF& pbf) const; // Primitive gaussian - exponent, norm, ang. momenta
   // Print out an iteration
   void iteration(int iter, double energy, double delta, double dd);
+  void iterationCC(int iter, double energy, double delta_e, double delta_s, double delta_d, double t_interm, double t_amps, double t_iter);
   void initIteration();
+  void initIterationCC();
   void orbitals(const Vector& eps, int nel, bool one = false);
   // Specific logging formats
   void title(const std::string& msg) const;
@@ -161,6 +163,7 @@ public:
   void errTime();
   double getLocalTime();
   double getGlobalTime();
+  void flush();
   void init();
   void finalise();
 };

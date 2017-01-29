@@ -464,6 +464,7 @@ void CCSD::compute()
 	S4OddTensor4 tautilde(nocc, N-nocc, 0.0);
 	
 	double time_interms, time_amps, time_en;
+	log.initIterationCC();
 	while (!converged && iter < MAXITER) {
 		
 		build_intermediates(F, W, tau, tautilde);
@@ -473,8 +474,7 @@ void CCSD::compute()
 		calculateEnergy();
 		time_en = log.getLocalTime();
 		
-		log.iteration(iter, energy, delta_e, delta_doubles);
-		std::cout << "Iteration " << iter << ": " << delta_singles << " " << time_interms << " " << time_amps << " " << time_en << std::endl;
+		log.iterationCC(iter, energy, delta_e, delta_singles, delta_doubles, time_interms, time_amps, time_interms+time_amps+time_en);
 		converged = (fabs(delta_e) < log.converge()) && (fabs(delta_doubles) < log.converge());
 		iter++;
 	}

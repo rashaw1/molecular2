@@ -193,6 +193,40 @@ int Logger::nextCmd()
 			rval = 3;
 		} else if (token == "MP2"){
 			rval = 4;
+			std::vector<std::string>::iterator p = std::find(cmds.begin(), cmds.end(), "CCSD(T)");
+			std::vector<std::string>::iterator q = std::find(cmds.begin(), cmds.end(), "CCSD");
+			if (p != cmds.end()) {
+				rval = 6; 
+				cmds.erase(p);
+				if (q != cmds.end()) cmds.erase(q);
+			} else if (q != cmds.end()) {
+				rval = 5;
+				cmds.erase(q);
+			}
+		} else if (token == "CCSD") {
+			rval = 7;
+			std::vector<std::string>::iterator p = std::find(cmds.begin(), cmds.end(), "CCSD(T)");
+			std::vector<std::string>::iterator q = std::find(cmds.begin(), cmds.end(), "MP2");
+			if (q != cmds.end() && p != cmds.end()) {
+				rval = 6; 
+				cmds.erase(q);
+				cmds.erase(p);
+			} else if (p != cmds.end()) {
+				rval = 8;
+				cmds.erase(p);
+			} else if (q != cmds.end()) {
+				rval = 5;
+				cmds.erase(q);
+			}
+		} else if (token == "CCSD(T)") {
+			rval = 8;
+			std::vector<std::string>::iterator p = std::find(cmds.begin(), cmds.end(), "CCSD");
+			std::vector<std::string>::iterator q = std::find(cmds.begin(), cmds.end(), "MP2");
+			if (q != cmds.end()) {
+				rval = 6;
+				cmds.erase(q);
+			} 
+			if (p != cmds.end()) cmds.erase(p);
 		}
 		ncmd++;
 	}
@@ -617,6 +651,20 @@ void Logger::initIteration()
   outfile << std::string(107, '-') << "\n";
 }
 
+void Logger::initIterationCC()
+{
+  outfile << "\n";
+  outfile << std::setw(12) << "Iteration";
+  outfile << std::setw(24) << "Energy";
+  outfile << std::setw(24) << "Delta E";
+  outfile << std::setw(20) << "Delta T1";
+  outfile << std::setw(20) << "Delta T2";
+  outfile << std::setw(15) << "Time Interm";
+  outfile << std::setw(15) << "Time Amps";
+  outfile << std::setw(15) << "Time total\n";
+  outfile << std::string(150, '-') << "\n";
+}
+
 // Print a single iteration
 void Logger::iteration(int iter, double energy, double delta, double dd)
 {
@@ -626,6 +674,24 @@ void Logger::iteration(int iter, double energy, double delta, double dd)
   outfile << std::setw(24) << dd;
   outfile << std::setw(20) << std::setprecision(6) << getLocalTime();
   outfile << "\n";
+  
+  if (iter % 5 == 0) flush();
+}
+
+// Print a single iteration
+void Logger::iterationCC(int iter, double energy, double delta_e, double delta_s, double delta_d, double t_interm, double t_amps, double t_iter)
+{
+  outfile << std::setw(12) << iter;
+  outfile << std::setw(24) << std::setprecision(12) << energy;
+  outfile << std::setw(24) << delta_e;
+  outfile << std::setw(20) << std::setprecision(9) << delta_s;
+  outfile << std::setw(20) << delta_d;
+  outfile << std::setw(15) << std::setprecision(6) << t_interm;
+  outfile << std::setw(15) << t_amps;
+  outfile << std::setw(15) << t_iter;
+  outfile << "\n";
+  
+  if (iter % 5 == 0) flush();
 }
 
 // Print out the orbitals from an SCF calculation
@@ -698,6 +764,12 @@ double Logger::getLocalTime()
 double Logger::getGlobalTime()
 {
   return ((double)(timer.elapsed().wall))/(1e9);
+}
+
+// Flush the output streams
+void Logger::flush() {
+	outfile.flush();
+	errstream.flush();
 }
 
 // Initialise the output

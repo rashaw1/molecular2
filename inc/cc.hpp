@@ -39,6 +39,8 @@ public:
 	void calculateTriples();
 	void calculateError(Matrix& newSingles, S4OddTensor4& newDoubles);
 	void compute();
+  double getEnergy() const { return energy; }
+  double getETriples() const { return triples_energy; }
 };
 
 #endif 
