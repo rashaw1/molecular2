@@ -1,8 +1,7 @@
 basis, cc-pvdz
-integral,print,test/h2ints.int
 rhf,
 !uhf,
-!mp2,
+mp2,
 geom,
 h, 0.0, 0.0, 0.0
 h, 0.0, 0.0, 1.4

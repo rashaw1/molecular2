@@ -15,7 +15,7 @@ MP2::MP2(Fock& _focker) : spinBasis(false), focker(_focker)
 	N = focker.getDens().nrows();
 	nocc = focker.getMolecule().getNel()/2;
 	energy = 0.0;
-	moInts.assign(N, N, N, N, 0.0);
+	moInts.assign(N, 0.0);
 }
 
 // Integral transformation
@@ -76,24 +76,23 @@ void MP2::spatialToSpin() {
 			focker.getMolecule().getLog().error(e);
 			nocc = 0;
 		} else {
-			Tensor4 temp = moInts;
-			moInts.assign(2*N, 2*N, 2*N, 2*N, 0.0);
+			spinInts.assign(2*N, 0.0);
 			for (int p = 0; p < N; p++){ 
 				for (int q = 0; q < N; q++) {
 					for (int r = 0; r < N; r++) {
 						for (int s = 0; s < N; s++) {
-							auto val1 = temp(p, r, q, s);
-							auto val2 = temp(p, s, q, r);
+							auto val1 = moInts(p, r, q, s);
+							auto val2 = moInts(p, s, q, r);
 							auto diff = val1 - val2; 
 							
 							int P = 2*p; int Q = 2*q; int R = 2*r; int S = 2*s;
 							
-							moInts(P, Q, R, S) = diff;
-							moInts(P, Q+1, R, S+1) = val1;
-							moInts(P, Q+1, R+1, S) = -val2;
-							moInts(P+1, Q, R+1, S) = val1;
-							moInts(P+1, Q, R, S+1) = -val2;
-							moInts(P+1, Q+1, R+1, S+1) = diff; 
+							spinInts.set(P, Q, R, S, diff);
+							spinInts.set(P, Q+1, R, S+1, val1);
+							spinInts.set(P, Q+1, R+1, S, -val2);
+							spinInts.set(P+1, Q, R+1, S, val1);
+							spinInts.set(P+1, Q, R, S+1, -val2);
+							spinInts.set(P+1, Q+1, R+1, S+1, diff); 
 							
 						}
 						
@@ -101,6 +100,7 @@ void MP2::spatialToSpin() {
 				}
 			}
 			spinBasis = true;
+			moInts.resize(0);
 		}
 	
 	}
@@ -178,7 +178,7 @@ void MP2::spatialToSpin() {
 		for (int i = 0; i < 2*nocc; i++)
 			for (int j = 0; j < 2*nocc; j++)
 				for (int a = 2*nocc; a < 2*N; a++)
-					for (int b = 2*nocc; b < 2*N; b++) energy += moInts(i, j, a, b) * t(i, j, a-2*nocc, b-2*nocc);
+					for (int b = 2*nocc; b < 2*N; b++) energy += spinInts(i, j, a, b) * t(i, j, a-2*nocc, b-2*nocc);
 	
 		energy *= 0.25;
 	}	

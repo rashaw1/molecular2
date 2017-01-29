@@ -17,7 +17,7 @@ protected:
   std::vector<double> data;
   int w, x, y, z;
 public:
-  Tensor4() { } 
+  Tensor4() { w = x = y = z = 0; } 
   Tensor4(int a, int b, int c, int d);
   Tensor4(int a, int b, int c, int d, double val);
   Tensor4(const Tensor4& other);
@@ -43,7 +43,7 @@ protected:
 	std::vector<int> jkmults;
 	void updateMults();
 public:
-    S8EvenTensor4() { } 
+    S8EvenTensor4() { w = 0; } 
     S8EvenTensor4(int N);
     S8EvenTensor4(int N, double val);
    	S8EvenTensor4(const S8EvenTensor4& other);	
@@ -60,11 +60,11 @@ public:
 class S8OddTensor4 : public S8EvenTensor4 
 {
 public:
-    S8OddTensor4() { } 
+    S8OddTensor4() { w = 0; } 
     S8OddTensor4(int N);
     S8OddTensor4(int N, double val);
    	S8OddTensor4(const S8OddTensor4& other);	
-    virtual double& operator()(int i, int j, int k, int l);
+	virtual void set(int i, int j, int k, int l, double value);
     virtual double operator()(int i, int j, int k, int l) const;
 };
 

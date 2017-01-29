@@ -11,7 +11,8 @@ class MP2
 private:
 	int N, nocc;
 	double energy;
-	Tensor4 moInts;
+	S8EvenTensor4 moInts;
+	S8OddTensor4 spinInts;
 	bool spinBasis;
 	Fock& focker;
 public:
@@ -22,7 +23,12 @@ public:
 	void calculateEnergy();
 	void calculateEnergy(const Tensor4& amplitudes);
 	double getEnergy() const { return energy; }
-	Tensor4& getInts() { return moInts; }
+	S8OddTensor4& getSpinInts() { 
+		return spinInts;
+	}
+	S8EvenTensor4& getMOInts() {
+		return moInts;
+	}
 	int getN() const { return N; }
 	int getNocc() const { return nocc; }
 	Fock& getFock() { return focker; }

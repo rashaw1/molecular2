@@ -291,11 +291,14 @@ S8OddTensor4::S8OddTensor4(int N) : S8EvenTensor4(N) { }
 S8OddTensor4::S8OddTensor4(int N, double val) : S8EvenTensor4(N, val) { }
 S8OddTensor4::S8OddTensor4(const S8OddTensor4& other) : S8EvenTensor4(other) { } 
 
-double& S8OddTensor4::operator()(int i, int j, int k, int l) {
-	int I = i > j ? i : j;
-	int J = i > j ? j : i;
-	int K = k > l ? k : l;
-	int L = k > l ? l : k;
+void S8OddTensor4::set(int i, int j, int k, int l, double val) {
+	int parity = 0;
+	int I = i;
+	int J = j;
+	int K = k;
+	int L = l;
+	if (j > i) { I = j; J = i; parity++; }
+	if (l > k) { K = l; L = k; parity++; }
 	if (K > I) {
 		int tmp = I;
 		I = K;
@@ -304,7 +307,7 @@ double& S8OddTensor4::operator()(int i, int j, int k, int l) {
 		J = L;
 		L = tmp;
 	}
-  	return data[imults[I] + J*jkmults[I+1] + jkmults[K] + L];
+	data[imults[I] + J*jkmults[I+1] + jkmults[K] + L] = (1 - 2*(parity%2)) * val;
 }
 
 double S8OddTensor4::operator()(int i, int j, int k, int l) const {
