@@ -81,7 +81,7 @@ private:
   Matrix naints;
   Matrix prescreen;
   Vector sizes;
-  Tensor4 twoints;
+  S8EvenTensor4 twoints;
 public:
   IntegralEngine(Molecule& m); //Constructor
   ~IntegralEngine();
@@ -95,39 +95,13 @@ public:
   double getNucAttract(int i, int j) const { return naints(i, j); }
   Matrix getNucAttract() const { return naints; }
   double getERI(int i, int j, int k, int l) const;
-  Tensor4 getERI() const { return twoints; }
+  S8EvenTensor4 getERI() const { return twoints; }
   Matrix& getPrescreen() { return prescreen; }
 
   // Intrinsic routines
   void printERI(std::ostream& output, int NSpher) const;
-  void formERI(bool tofile);
-	void diagERIThread(int start, int end, int NS, int threadSize, Vector &atoms, Vector &shells,
-				Vector &bfs, Tensor4 &twints, Matrix &pscreen);
-	void offDiagERIThread(int start, int end, int NS, int threadSize, Vector &atoms,
-						  Vector &shells, Vector &bfs, Tensor4 &twints);
-  Vector getVals(double a, double b, const Vector& A, const Vector& B) const;
-  Vector overlapKinetic(const PBF& u, const PBF& v, const Vector& ucoords,
-			const Vector& vcoords) const;
-  double nucAttract(const PBF& u, const PBF& v, const Vector& ucoords, 
-		    const Vector& vcoords, const Vector& ccoords) const;
-  double mmNucAttract(const PBF& u, const PBF& v, const Vector& ucoords,
-  			const Vector& vcoords, const Vector& ccoords) const;
-  Tensor4 makeE(int u, int v, double K, double p, double PA, double PB) const;
-  Tensor4 twoe(Atom& A, Atom& B, Atom& C, Atom& D, int shellA, int shellB,
-	      int shellC, int shellD) const;
-  Tensor6 twoe(const PBF& u, const PBF& v, const PBF& w, const PBF& x, 
-	      const Vector& ucoords, const Vector& vcoords, const Vector& wcoords,
-	      const Vector& xcoords) const;
   double makeContracted(Vector& c1, Vector& c2, Vector& ints) const;
   Matrix makeSpherical(const Matrix& ints, const Vector& lnums) const;
-  void formOverlapKinetic();
-  void formNucAttract();
-  double multipole(BF& a,  BF& b, const Vector& acoords,
-		   const Vector& bcoords, const Vector& ccoords, 
-		   const Vector& powers) const;
-  double multipole(PBF& u, PBF& v, const Vector& ucoords,
-		   const Vector& vcoords, const Vector& ccoords,
-		   const Vector& powers) const;
 
   size_t nbasis(const std::vector<libint2::Shell>& shells);
   size_t max_nprim(const std::vector<libint2::Shell>& shells);
@@ -149,7 +123,7 @@ public:
 			    libint2::Operator t,
 			    const std::vector<Atom>& atoms = std::vector<Atom>());
 
-  Tensor4 compute_eris(const std::vector<libint2::Shell>& shells);
+  S8EvenTensor4 compute_eris(const std::vector<libint2::Shell>& shells);
   
   template<libint2::Operator obtype>
   std::vector<EMatrix> compute_1body_ints_deriv(unsigned deriv_order, const std::vector<libint2::Shell>& obs, const std::vector<Atom> &atoms)

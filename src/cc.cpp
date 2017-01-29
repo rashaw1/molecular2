@@ -354,78 +354,57 @@ void CCSD::calculateTriples() {
 	
 	int nvirt = N-nocc;
 	int nvirt2 = nvirt * nvirt;
-	double Dijk[nvirt * nvirt2];
-	double tijkd[nvirt * nvirt2];
-	double tijkc[nvirt * nvirt2];
 	
 	Tensor4& spinInts = mp2.getInts();
-	int A, B, C, a2x, a1x, b2x, b1x, c2x, c1x;
+	double fijk, Dijk, tijkd, tijkc;
+	int A, B, C;
 	for (int i = 0; i < nocc; i++)
-		for (int j = 0; j < nocc; j++)
-			for (int k = 0; k < nocc; k++) {
-				auto fijk = spinFock(i, i) + spinFock(j, j) + spinFock(k, k);
+		for (int j = 0; j <= i; j++)
+			for (int k = 0; k <= j; k++) {
+				fijk = spinFock(i, i) + spinFock(j, j) + spinFock(k, k);
 				
 				// Build Dijk and connected/disconnected tijk
 				for (int a = 0; a < nvirt; a++) {
-					a2x = a*nvirt2; a1x = a*nvirt; A = a+nocc;
+					A = a+nocc;
 					for (int b = 0; b <= a; b++) {
-						b2x = b*nvirt2; b1x = b*nvirt; B = b+nocc;
+						B = b+nocc;
 						for (int c = 0; c <= b; c++) {
-							c2x = c*nvirt2; c1x = c*nvirt; C = c+nocc;
-							auto val = fijk - spinFock(A, A) - spinFock(B, B) - spinFock(C, C);
-							Dijk[a2x + b1x + c] = Dijk[a2x + c1x + b] = Dijk[b2x + a1x + c] = val;
-							Dijk[b2x + c1x + a] = Dijk[c2x + a1x + b] = Dijk[c2x + b1x + a] = val;
+							C = c+nocc;
+							Dijk = fijk - spinFock(A, A) - spinFock(B, B) - spinFock(C, C);
 							
-							auto val2 = singles(i, a) * spinInts(j, k, B, C) - singles(j, a) * spinInts(i, k, B, C)
+							tijkd= singles(i, a) * spinInts(j, k, B, C) - singles(j, a) * spinInts(i, k, B, C)
 									- singles(k, a) * spinInts(j, i, B, C) - singles(i, b) * spinInts(j, k, A, C)
 										+ singles(j, b) * spinInts(i, k, A, C) + singles(k, b) * spinInts(j, i, A, C)
 											- singles(i, c) * spinInts(j, k, B, A) + singles(j, c) * spinInts(i, k, B, A)
 												+ singles(k, c) * spinInts(j, i, B, A);
-							val2 /= val;
-							tijkd[a2x + b1x + c] = tijkd[b2x + c1x + a] = tijkd[c2x + a1x + b] = val2;
-							tijkd[a2x + c1x + b] = tijkd[b2x + a1x + c] = tijkd[c2x + b1x + a] = -val2;
+							tijkd /= Dijk;
 							
-							auto val3 = 0.0;
+							tijkc = 0.0;
 							int E;
 							for (int e = 0; e < nvirt; e++) {
 								E = e + nocc;
-								val3 += doubles(j, k, a, e)*spinInts(E, i, B, C) - doubles(i, k, a, e)*spinInts(E, j, B, C)
+								tijkc += doubles(j, k, a, e)*spinInts(E, i, B, C) - doubles(i, k, a, e)*spinInts(E, j, B, C)
 										- doubles(j, i, a, e)*spinInts(E, k, B, C) - doubles(j, k, b, e)*spinInts(E, i, A, C)
 											+ doubles(i, k, b, e)*spinInts(E, j, A, C) + doubles(j, i, b, e)*spinInts(E, k, A, C)
 												- doubles(j, k, c, e)*spinInts(E, i, B, A) + doubles(i, k, c, e)*spinInts(E, j, B, A)
 													+ doubles(j, i, c, e)*spinInts(E, k, B, A);
 							}
 							for (int m = 0; m < nocc; m++) {
-								val3 += -doubles(i, m, b, c)*spinInts(m, A, j, k) + doubles(j, m, b, c)*spinInts(m, A, i, k)
+								tijkc += -doubles(i, m, b, c)*spinInts(m, A, j, k) + doubles(j, m, b, c)*spinInts(m, A, i, k)
 										+ doubles(k, m, b, c)*spinInts(m, A, j, i) + doubles(i, m, a, c)*spinInts(m, B, j, k)
 											- doubles(j, m, a, c)*spinInts(m, B, i, k) - doubles(k, m, a, c)*spinInts(m, B, j, i)
 												+ doubles(i, m, b, a)*spinInts(m, C, j, k) - doubles(j, m, b, a)*spinInts(m, C, i, k)
 													- doubles(k, m, b, a)*spinInts(m, C, j, i);
 							}
 							
-							val3 /= val;
-							tijkc[a2x + b1x + c] = tijkc[b2x + c1x + a] = tijkc[c2x + a1x + b] = val3;
-							tijkc[a2x + c1x + b] = tijkc[b2x + a1x + c] = tijkc[c2x + b1x + a] = -val3;
+							tijkc /= Dijk;
+
+							triples_energy += tijkc * Dijk * (tijkc + tijkd);
 						}
 					}
-				}
-				
-				// Determine contribution to triples energy
-				for (int a = 0; a < nvirt; a++) {
-					a2x = a * nvirt2;
-					for (int b = 0; b < nvirt; b++) {
-						b1x = b *nvirt;
-						for (int c = 0; c < nvirt; c++) {
-							c1x = a2x + b1x + c;
-							triples_energy += tijkc[c1x] * Dijk[c1x] * ( tijkc[c1x] + tijkd[c1x]);
-						}
-					}
-				}
-							
-			}
-			
-	triples_energy /= 36.0;
-				
+				}			
+			}			
+
 }
 
 void CCSD::compute()
