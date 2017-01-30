@@ -16,7 +16,7 @@
 #include <array>
 
 // Constructors and destructors
-Basis::Basis(std::map<int, std::string> ns, Vector& atoms)
+Basis::Basis(std::map<int, std::string> ns, Vector& atoms, bool _ecps) : names(ns), maxl(0), ecps(_ecps)
 {
   BasisReader input(ns); // Make a basis reading object
   auto it = ns.find(0);
@@ -60,6 +60,13 @@ Basis::~Basis()
   if (charges.size() > 0){
     delete[] bfs;
   }
+}
+
+std::string Basis::getName(int q) const {
+	auto it = names.find(q);
+	std::string n = name;
+	if (it != names.end()) n = it->second;
+	return n; 
 }
 
 // Accessors
@@ -172,6 +179,8 @@ Vector Basis::getLnums(int q) const
 void Basis::addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std::vector <libint2::real_t>> &coeffs, double *pos) {
 	using libint2::Shell;
 	
+	maxl = l > maxl ? l : maxl; 
+	
 	std::vector<libint2::Shell::Contraction> contr_arr; 
 	for (auto &contr : coeffs) {
 		libint2::Shell::Contraction newC;
@@ -200,6 +209,7 @@ Basis& Basis::operator=(const Basis& other)
   charges = other.charges;
   shells = other.shells;
   lnums = other.lnums;
+  ecps = other.ecps;
   
   // Copy across bfs
   int nbfs = charges.size();

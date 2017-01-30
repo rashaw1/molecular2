@@ -27,10 +27,10 @@
 #include "basis.hpp"
 #include "logger.hpp"
 #include "tensor4.hpp"
-#include "tensor6.hpp"
-#include "tensor7.hpp"
-#include "ten4ten6.hpp"
-#include "ten4ten4.hpp"
+#include "ecp.hpp"
+#include "ecpint.hpp"
+#include "gshell.hpp"
+
 #include <cmath>
 #include <iomanip>
 #include <string>
@@ -69,7 +69,14 @@ IntegralEngine::IntegralEngine(Molecule& m) : molecule(m)
 	
 	sints = compute_1body_ints(shells, libint2::Operator::overlap);
 	tints = compute_1body_ints(shells, libint2::Operator::kinetic);
+	
 	naints = compute_1body_ints(shells, libint2::Operator::nuclear, atoms);
+	naints.print(); std::cout << std::endl << std::endl; 
+	
+	if(molecule.getBasis().hasECPS()) {
+		naints = naints + compute_ecp_ints(shells);
+	}
+	//naints.print(); std::cout << std::endl << std::endl; 
   
 	molecule.getLog().print("One electron integrals complete\n");
 	molecule.getLog().localTime();
@@ -362,7 +369,7 @@ const std::vector<Atom>& atoms)
 	if (obtype == Operator::nuclear) {
 		std::vector<std::pair<double,std::array<double,3>>> q;
 		for(const auto& atom : atoms) {
-			q.push_back( {static_cast<double>(atom.getCharge()), {{atom.getX(), atom.getY(), atom.getZ()}}} );
+			q.push_back( {static_cast<double>(atom.getEffectiveCharge()), {{atom.getX(), atom.getY(), atom.getZ()}}} );
 		}
 		engine.set_params(q);
 	}
@@ -593,5 +600,63 @@ Matrix IntegralEngine::compute_schwarz_ints( const std::vector<libint2::Shell> &
 	 }
 
 	 return result;
+ }
+ 
+ Matrix IntegralEngine::compute_ecp_ints(const std::vector<libint2::Shell>& shells, int deriv_order) {
+ 	const auto n = nbasis(shells);
+	Matrix ecps(n, n, 0.0);
+	std::cout << n << std::endl;
+	
+	// Initialise ecp integral engine
+	molecule.getLog().print("\nIntialising ECP integral calculations...\n");
+	ECPIntegral ecpint(molecule.getECPBasis(), molecule.getBasis().getMaxL(), molecule.getECPBasis().getMaxL(), deriv_order);
+	molecule.getLog().localTime();
+	
+	ECPBasis& ecpset = molecule.getECPBasis();
+	for (int i = 0; i < ecpset.getN(); i++)
+		std::cout << ecpset.getECP(i).center()[0] << " " << ecpset.getECP(i).center()[1] << " " << ecpset.getECP(i).center()[2] << std::endl;
+	auto shell2bf = map_shell_to_basis_function(shells);
+	
+	// loop over shells
+	for(auto s1=0; s1!=shells.size(); ++s1) {
+
+		auto bf1 = shell2bf[s1];
+		auto n1 = shells[s1].size();
+		
+		double A[3] = { shells[s1].O[0], shells[s1].O[1], shells[s1].O[2] };
+		GaussianShell shellA(A, shells[s1].contr[0].l);
+		for (auto c : shells[s1].contr)
+			for (int i = 0; i < c.coeff.size(); i++) 
+				shellA.addPrim(shells[s1].alpha[i], c.coeff[i]);
+
+		for(auto s2=0; s2<=s1; ++s2) {
+
+			auto bf2 = shell2bf[s2];
+			auto n2 = shells[s2].size();
+			
+			double B[3] = { shells[s2].O[0], shells[s2].O[1], shells[s2].O[2] };
+			GaussianShell shellB(B, shells[s2].contr[0].l); 
+			for (auto c : shells[s2].contr)
+				for (int i = 0; i < c.coeff.size(); i++)
+					shellB.addPrim(shells[s2].alpha[i], c.coeff[i]);
+			
+			Matrix shellPairInts = ecpint.compute_pair(shellA, shellB);
+			//shellPairInts.print(); std::cout << "\n\n";
+			for (int i = bf1; i < bf1 + shellPairInts.nrows(); i++) {
+				for (int j = bf2; j < bf2 + shellPairInts.ncols(); j++) {
+					ecps(i, j) = shellPairInts(i-bf1, j-bf2);
+					ecps(j, i) = ecps(i, j);
+				}
+			}
+			
+			bf2 += n2; 
+		}
+		
+		bf1 += n1; 
+	}
+	
+	//ecps.print();
+	//std::cout << std::endl << std::endl;
+	return ecps;
  }
  

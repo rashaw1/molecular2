@@ -62,9 +62,11 @@ int main (int argc, char* argv[])
 			try{
 				// Create the molecule and print initial output
 				Molecule mol(log, 1);
+				mol.buildShellBasis();
+				mol.buildECPBasis();
+				mol.calcEnuc();
 				log.print(mol, true);
 				log.print(log.getBasis(), log.bprint());
-				mol.buildShellBasis();
 				log.print("\nPRELIMINARIES FINISHED");
 				log.localTime();
 				log.flush();

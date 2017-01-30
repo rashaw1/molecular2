@@ -54,6 +54,7 @@ int FileReader::findToken(std::string t)
 	else if (t == "mp2") { rval = 20; }
 	else if (t == "ccsd") { rval = 21; }
 	else if (t == "ccsd(t)") { rval = 22; }
+	else if (t == "ecp") { rval = 23; }
 	return rval;
 }
 
@@ -75,6 +76,7 @@ void FileReader::readParameters()
 	bprint = false;
 	diis = true;
 	angstrom = false;
+	ecp = false;
 	basis[0] = "sto-3g";
 
 	// Read line by line and parse
@@ -257,6 +259,22 @@ void FileReader::readParameters()
 				}
 				case 22: { // CCSD(T) directive
 					commands.push_back("CCSD(T)");
+					break;
+				}
+				case 23: { // ECP basis 
+					line.erase(0, pos+1);
+					ecp = true;
+					// Get rid of excess spaces
+					pos = line.find(',');
+					if (pos != std::string::npos) {
+						token = line.substr(0, pos);
+						token.erase(std::remove(token.begin(), token.end(), ' '), token.end());
+						std::transform(token.begin(), token.end(), token.begin(), ::tolower);
+						std::string token2 = line.substr(pos+1, line.length());
+						token2.erase(std::remove(token2.begin(), token2.end(), ' '), token2.end());
+						int q = getAtomCharge(token);
+						basis[-q] = token2;
+					}
 					break;
 				}
 				default: { // Unkown command issued

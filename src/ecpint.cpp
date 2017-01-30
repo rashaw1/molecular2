@@ -2,6 +2,7 @@
 
 #include "ecpint.hpp"
 #include "gshell.hpp"
+#include "matrix.hpp"
 #include <iostream>
 #include <functional>
 #include <algorithm>
@@ -560,7 +561,6 @@ void RadialIntegral::type2(int l, int l1start, int l1end, int l2start, int l2end
 	}
 	
 	if (failed) {
-		std::cerr << "Failed at first attempt\n";
 		// Not converged, switch to big grid
 		double zeta_a, zeta_b, c_a, c_b, weight, XA, XB, X;
 		double A = data.Am;
@@ -884,18 +884,16 @@ void ECPIntegral::compute_shell_pair(ECP &U, GaussianShell &shellA, GaussianShel
 	}
 }
 
-void ECPIntegral::compute_pair(GaussianShell &shellA, GaussianShell &shellB) {
+Matrix ECPIntegral::compute_pair(GaussianShell &shellA, GaussianShell &shellB) {
 	TwoIndex<double> tempValues;
-	TwoIndex<double> values(shellA.ncartesian(), shellB.ncartesian(), 0.0);
+	Matrix values(shellA.ncartesian(), shellB.ncartesian(), 0.0);
 	for (int i = 0; i < basis.getN(); i++) {
 		 compute_shell_pair(basis.getECP(i), shellA, shellB, tempValues);
 		 for (int na = 0; na < shellA.ncartesian(); na++) {
 			 for (int nb = 0; nb < shellB.ncartesian(); nb++) values(na, nb) += tempValues(na, nb);
 		 }
 	}
-	for (int na = 0; na < shellA.ncartesian(); na++) {
-		 for (int nb = 0; nb < shellB.ncartesian(); nb++) std::cout << na << " " << nb << " " << values(na, nb) << "\n";
-	}
+	return values;
 }
 
 

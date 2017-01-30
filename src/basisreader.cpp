@@ -12,6 +12,7 @@
 #include "ioutil.hpp"
 #include "mvector.hpp"
 #include "bf.hpp"
+#include "ecp.hpp"
 #include "error.hpp"
 #include "basis.hpp"
 #include <algorithm>
@@ -25,11 +26,12 @@ void BasisReader::openFile(int q)
 	// Find which row of elements q is in
 	// Note that the first row is taken here to be H-Ne
 	std::string row = "first";
-	if (q > 10 && q < 19){ row = "second"; } // Na - Ar
-	else if (q > 18 && q < 37) { row = "third"; } // K - Kr
-	else if (q > 36 && q < 55) { row = "fourth"; } // Rb - Xe
-	else if (q > 54 && q < 87) { row = "fifth"; } // Cs - Rn
-	else if (q > 86) { row = "sixth"; }
+	int Q = q < 0 ? -q : q; 
+	if (Q > 10 && Q < 19){ row = "second"; } // Na - Ar
+	else if (Q > 18 && Q < 37) { row = "third"; } // K - Kr
+	else if (Q > 36 && Q < 55) { row = "fourth"; } // Rb - Xe
+	else if (Q > 54 && Q < 87) { row = "fifth"; } // Cs - Rn
+	else if (Q > 86) { row = "sixth"; }
 	std::string filename = "basissets/";
 	auto it = names.find(q);
 	std::string bn;
@@ -39,6 +41,7 @@ void BasisReader::openFile(int q)
 		if (it != names.end()) bn = it->second;
 		else bn = "sto-3g";
 	}
+	std::transform(bn.begin(), bn.end(), bn.begin(), ::toupper);
 	filename += bn; filename += row; filename += ".basis";
 	// Open file, read only
 	input.open(filename, std::ifstream::in);
@@ -120,7 +123,11 @@ BF BasisReader::readBF(int q, int i)
 				else if (shell == "d") { lmult = 6; }
 				else if (shell == "f") { lmult = 10; }
 				else if (shell == "g") { lmult = 15; }
-	
+				else if (shell == "h") { lmult = 21; }
+				else if (shell == "i") { lmult = 28; }
+				else if (shell == "k") { lmult = 36; }
+				else if (shell == "l") { lmult = 45; }
+ 	
 				// Iterate through bfs to find right one
 				int sublmult;
 				std::getline(input, line);
@@ -384,6 +391,676 @@ BF BasisReader::readBF(int q, int i)
 							}
 							break;
 						}
+						case 21: { // h-type
+							switch(sublmult) { 
+								case 1: { 
+									l3 = 5; l2 = l1 = 0;
+									break;
+								}
+								case 2: { 
+									l3 = 4; l2 = 1;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += tempexps.size(); }
+									break;
+								}
+								case 3: {
+									l3 = 4; l2 = 0;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 2*tempexps.size(); }
+									break;
+								}
+								case 4: {
+									l3 = 3; l2 = 2;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 3*tempexps.size(); }
+									break;
+								}
+								case 5: {
+									l3 = 3; l2 = 1;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 4*tempexps.size(); }
+									break;
+								}
+								case 6: {
+									l3 = 3; l2 = 0;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 5*tempexps.size(); }
+									break;
+								}
+								case 7: {
+									l3 = 2; l2 = 3;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 6*tempexps.size(); }
+									break;
+								}
+								case 8: {
+									l3 = 2; l2 = 2;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 7*tempexps.size(); }
+									break;
+								}
+								case 9: {
+									l3 = 2; l2 = 1;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 8*tempexps.size(); }
+									break;
+								}
+								case 10: {
+									l3 = 2; l2 = 0;  l1 = 3;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 9*tempexps.size(); }
+									break;
+								}
+								case 11: {
+									l3 = 1; l2 = 4;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 10*tempexps.size(); }
+									break;
+								}
+								case 12: {
+									l3 = 1; l2 = 3;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 11*tempexps.size(); }
+									break;
+								}
+								case 13: {
+									l3 = 1; l2 = 2;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 12*tempexps.size(); }
+									break;
+								}
+								case 14: {
+									l3 = 1; l2 = 1;  l1 = 3;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 13*tempexps.size(); }
+									break;
+								}
+								case 15: {
+									l3 = 1; l2 = 0;  l1 = 4;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 14*tempexps.size(); }
+									break;
+								}
+								case 16: {
+									l3 = 0; l2 = 5;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 15*tempexps.size(); }
+									break;
+								}
+								case 17: {
+									l3 = 0; l2 = 4;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 16*tempexps.size(); }
+									break;
+								}
+								case 18: {
+									l3 = 0; l2 = 3;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 17*tempexps.size(); }
+									break;
+								}
+								case 19: {
+									l3 = 0; l2 = 2;  l1 = 3;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 18*tempexps.size(); }
+									break;
+								}
+								case 20: {
+									l3 = 0; l2 = 1;  l1 = 4;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 19*tempexps.size(); }
+									break;
+								}
+								case 21: {
+									l3 = 0; l2 = 0;  l1 = 5;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 20*tempexps.size(); }
+									break;
+								}
+								default: { l1 = l2 = l3 = 0; }
+							}
+							break;
+						}
+						case 28: { // i-type
+							switch(sublmult) { 
+								case 1: { 
+									l3 = 6; l2 = l1 = 0;
+									break;
+								}
+								case 2: { 
+									l3 = 5; l2 = 1;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += tempexps.size(); }
+									break;
+								}
+								case 3: {
+									l3 = 5; l2 = 0;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 2*tempexps.size(); }
+									break;
+								}
+								case 4: {
+									l3 = 4; l2 = 2;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 3*tempexps.size(); }
+									break;
+								}
+								case 5: {
+									l3 = 4; l2 = 1;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 4*tempexps.size(); }
+									break;
+								}
+								case 6: {
+									l3 = 4; l2 = 0;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 5*tempexps.size(); }
+									break;
+								}
+								case 7: {
+									l3 = 3; l2 = 3;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 6*tempexps.size(); }
+									break;
+								}
+								case 8: {
+									l3 = 3; l2 = 2;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 7*tempexps.size(); }
+									break;
+								}
+								case 9: {
+									l3 = 3; l2 = 1;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 8*tempexps.size(); }
+									break;
+								}
+								case 10: {
+									l3 = 3; l2 = 0;  l1 = 3;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 9*tempexps.size(); }
+									break;
+								}
+								case 11: {
+									l3 = 2; l2 = 4;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 10*tempexps.size(); }
+									break;
+								}
+								case 12: {
+									l3 = 2; l2 = 3;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 11*tempexps.size(); }
+									break;
+								}
+								case 13: {
+									l3 = 2; l2 = 2;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 12*tempexps.size(); }
+									break;
+								}
+								case 14: {
+									l3 = 2; l2 = 1;  l1 = 3;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 13*tempexps.size(); }
+									break;
+								}
+								case 15: {
+									l3 = 2; l2 = 0;  l1 = 4;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 14*tempexps.size(); }
+									break;
+								}
+								case 16: {
+									l3 = 1; l2 = 5;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 15*tempexps.size(); }
+									break;
+								}
+								case 17: {
+									l3 = 1; l2 = 4;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 16*tempexps.size(); }
+									break;
+								}
+								case 18: {
+									l3 = 1; l2 = 3;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 17*tempexps.size(); }
+									break;
+								}
+								case 19: {
+									l3 = 1; l2 = 2;  l1 = 3;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 18*tempexps.size(); }
+									break;
+								}
+								case 20: {
+									l3 = 1; l2 = 1;  l1 = 4;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 19*tempexps.size(); }
+									break;
+								}
+								case 21: {
+									l3 = 1; l2 = 0;  l1 = 5;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 20*tempexps.size(); }
+									break;
+								}
+								case 22: {
+									l3 = 0; l2 = 6;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 21*tempexps.size(); }
+									break;
+								}
+								case 23: {
+									l3 = 0; l2 = 5;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 22*tempexps.size(); }
+									break;
+								}
+								case 24: {
+									l3 = 0; l2 = 4;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 23*tempexps.size(); }
+									break;
+								}
+								case 25: {
+									l3 = 0; l2 = 3;  l1 = 3;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 24*tempexps.size(); }
+									break;
+								}
+								case 26: {
+									l3 = 0; l2 = 2;  l1 = 4;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 25*tempexps.size(); }
+									break;
+								}
+								case 27: {
+									l3 = 0; l2 = 1;  l1 = 5;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 26*tempexps.size(); }
+									break;
+								}
+								case 28: {
+									l3 = 0; l2 = 0;  l1 = 6;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 27*tempexps.size(); }
+									break;
+								}
+								default: { l1 = l2 = l3 = 0; }
+							}
+							break;
+						}
+						case 36: { // k-type
+							switch(sublmult) { 
+								case 1: { 
+									l3 = 7; l2 = l1 = 0;
+									break;
+								}
+								case 2: { 
+									l3 = 6; l2 = 1;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += tempexps.size(); }
+									break;
+								}
+								case 3: {
+									l3 = 6; l2 = 0;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 2*tempexps.size(); }
+									break;
+								}
+								case 4: {
+									l3 = 5; l2 = 2;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 3*tempexps.size(); }
+									break;
+								}
+								case 5: {
+									l3 = 5; l2 = 1;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 4*tempexps.size(); }
+									break;
+								}
+								case 6: {
+									l3 = 5; l2 = 0;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 5*tempexps.size(); }
+									break;
+								}
+								case 7: {
+									l3 = 4; l2 = 3;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 6*tempexps.size(); }
+									break;
+								}
+								case 8: {
+									l3 = 4; l2 = 2;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 7*tempexps.size(); }
+									break;
+								}
+								case 9: {
+									l3 = 4; l2 = 1;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 8*tempexps.size(); }
+									break;
+								}
+								case 10: {
+									l3 = 4; l2 = 0;  l1 = 3;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 9*tempexps.size(); }
+									break;
+								}
+								case 11: {
+									l3 = 3; l2 = 4;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 10*tempexps.size(); }
+									break;
+								}
+								case 12: {
+									l3 = 3; l2 = 3;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 11*tempexps.size(); }
+									break;
+								}
+								case 13: {
+									l3 = 3; l2 = 2;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 12*tempexps.size(); }
+									break;
+								}
+								case 14: {
+									l3 = 3; l2 = 1;  l1 = 3;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 13*tempexps.size(); }
+									break;
+								}
+								case 15: {
+									l3 = 3; l2 = 0;  l1 = 4;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 14*tempexps.size(); }
+									break;
+								}
+								case 16: {
+									l3 = 2; l2 = 5;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 15*tempexps.size(); }
+									break;
+								}
+								case 17: {
+									l3 = 2; l2 = 4;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 16*tempexps.size(); }
+									break;
+								}
+								case 18: {
+									l3 = 2; l2 = 3;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 17*tempexps.size(); }
+									break;
+								}
+								case 19: {
+									l3 = 2; l2 = 2;  l1 = 3;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 18*tempexps.size(); }
+									break;
+								}
+								case 20: {
+									l3 = 2; l2 = 1;  l1 = 4;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 19*tempexps.size(); }
+									break;
+								}
+								case 21: {
+									l3 = 2; l2 = 0;  l1 = 5;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 20*tempexps.size(); }
+									break;
+								}
+								case 22: {
+									l3 = 1; l2 = 6;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 21*tempexps.size(); }
+									break;
+								}
+								case 23: {
+									l3 = 1; l2 = 5;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 22*tempexps.size(); }
+									break;
+								}
+								case 24: {
+									l3 = 1; l2 = 4;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 23*tempexps.size(); }
+									break;
+								}
+								case 25: {
+									l3 = 1; l2 = 3;  l1 = 3;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 24*tempexps.size(); }
+									break;
+								}
+								case 26: {
+									l3 = 1; l2 = 2;  l1 = 4;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 25*tempexps.size(); }
+									break;
+								}
+								case 27: {
+									l3 = 1; l2 = 1;  l1 = 5;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 26*tempexps.size(); }
+									break;
+								}
+								case 28: {
+									l3 = 1; l2 = 0;  l1 = 6;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 27*tempexps.size(); }
+									break;
+								}
+								case 29: {
+									l3 = 0; l2 = 7;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 28*tempexps.size(); }
+									break;
+								}
+								case 30: {
+									l3 = 0; l2 = 6;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 29*tempexps.size(); }
+									break;
+								}
+								case 31: {
+									l3 = 0; l2 = 5;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 30*tempexps.size(); }
+									break;
+								}
+								case 32: {
+									l3 = 0; l2 = 4;  l1 = 3;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 31*tempexps.size(); }
+									break;
+								}
+								case 33: {
+									l3 = 0; l2 = 3;  l1 = 4;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 32*tempexps.size(); }
+									break;
+								}
+								case 34: {
+									l3 = 0; l2 = 2;  l1 = 5;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 33*tempexps.size(); }
+									break;
+								}
+								case 35: {
+									l3 = 0; l2 = 1;  l1 = 6;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 34*tempexps.size(); }
+									break;
+								}
+								case 36: {
+									l3 = 0; l2 = 0;  l1 = 7;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 35*tempexps.size(); }
+									break;
+								}
+								default: { l1 = l2 = l3 = 0; }
+							}
+							break;
+						}
+						case 45: { // l-type
+							switch(sublmult) { 
+								case 1: { 
+									l3 = 8; l2 = l1 = 0;
+									break;
+								}
+								case 2: { 
+									l3 = 7; l2 = 1;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += tempexps.size(); }
+									break;
+								}
+								case 3: {
+									l3 = 7; l2 = 0;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 2*tempexps.size(); }
+									break;
+								}
+								case 4: {
+									l3 = 6; l2 = 2;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 3*tempexps.size(); }
+									break;
+								}
+								case 5: {
+									l3 = 6; l2 = 1;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 4*tempexps.size(); }
+									break;
+								}
+								case 6: {
+									l3 = 6; l2 = 0;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 5*tempexps.size(); }
+									break;
+								}
+								case 7: {
+									l3 = 5; l2 = 3;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 6*tempexps.size(); }
+									break;
+								}
+								case 8: {
+									l3 = 5; l2 = 2;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 7*tempexps.size(); }
+									break;
+								}
+								case 9: {
+									l3 = 5; l2 = 1;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 8*tempexps.size(); }
+									break;
+								}
+								case 10: {
+									l3 = 5; l2 = 0;  l1 = 3;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 9*tempexps.size(); }
+									break;
+								}
+								case 11: {
+									l3 = 4; l2 = 4;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 10*tempexps.size(); }
+									break;
+								}
+								case 12: {
+									l3 = 4; l2 = 3;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 11*tempexps.size(); }
+									break;
+								}
+								case 13: {
+									l3 = 4; l2 = 2;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 12*tempexps.size(); }
+									break;
+								}
+								case 14: {
+									l3 = 4; l2 = 1;  l1 = 3;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 13*tempexps.size(); }
+									break;
+								}
+								case 15: {
+									l3 = 4; l2 = 0;  l1 = 4;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 14*tempexps.size(); }
+									break;
+								}
+								case 16: {
+									l3 = 3; l2 = 5;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 15*tempexps.size(); }
+									break;
+								}
+								case 17: {
+									l3 = 3; l2 = 4;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 16*tempexps.size(); }
+									break;
+								}
+								case 18: {
+									l3 = 3; l2 = 3;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 17*tempexps.size(); }
+									break;
+								}
+								case 19: {
+									l3 = 3; l2 = 2;  l1 = 3;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 18*tempexps.size(); }
+									break;
+								}
+								case 20: {
+									l3 = 3; l2 = 1;  l1 = 4;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 19*tempexps.size(); }
+									break;
+								}
+								case 21: {
+									l3 = 3; l2 = 0;  l1 = 5;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 20*tempexps.size(); }
+									break;
+								}
+								case 22: {
+									l3 = 2; l2 = 6;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 21*tempexps.size(); }
+									break;
+								}
+								case 23: {
+									l3 = 2; l2 = 5;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 22*tempexps.size(); }
+									break;
+								}
+								case 24: {
+									l3 = 2; l2 = 4;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 23*tempexps.size(); }
+									break;
+								}
+								case 25: {
+									l3 = 2; l2 = 3;  l1 = 3;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 24*tempexps.size(); }
+									break;
+								}
+								case 26: {
+									l3 = 2; l2 = 2;  l1 = 4;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 25*tempexps.size(); }
+									break;
+								}
+								case 27: {
+									l3 = 2; l2 = 1;  l1 = 5;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 26*tempexps.size(); }
+									break;
+								}
+								case 28: {
+									l3 = 2; l2 = 0;  l1 = 6;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 27*tempexps.size(); }
+									break;
+								}
+								case 29: {
+									l3 = 1; l2 = 7;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 28*tempexps.size(); }
+									break;
+								}
+								case 30: {
+									l3 = 1; l2 = 6;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 29*tempexps.size(); }
+									break;
+								}
+								case 31: {
+									l3 = 1; l2 = 5;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 30*tempexps.size(); }
+									break;
+								}
+								case 32: {
+									l3 = 1; l2 = 4;  l1 = 3;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 31*tempexps.size(); }
+									break;
+								}
+								case 33: {
+									l3 = 1; l2 = 3;  l1 = 4;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 32*tempexps.size(); }
+									break;
+								}
+								case 34: {
+									l3 = 1; l2 = 2;  l1 = 5;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 33*tempexps.size(); }
+									break;
+								}
+								case 35: {
+									l3 = 1; l2 = 1;  l1 = 6;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 34*tempexps.size(); }
+									break;
+								}
+								case 36: {
+									l3 = 1; l2 = 0;  l1 = 7;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 35*tempexps.size(); }
+									break;
+								}
+								case 37: {
+									l3 = 0; l2 = 8;  l1 = 0;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 36*tempexps.size(); }
+									break;
+								}
+								case 38: {
+									l3 = 0; l2 = 7;  l1 = 1;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 37*tempexps.size(); }
+									break;
+								}
+								case 39: {
+									l3 = 0; l2 = 6;  l1 = 2;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 38*tempexps.size(); }
+									break;
+								}
+								case 40: {
+									l3 = 0; l2 = 5;  l1 = 3;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 39*tempexps.size(); }
+									break;
+								}
+								case 41: {
+									l3 = 0; l2 = 4;  l1 = 4;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 40*tempexps.size(); }
+									break;
+								}
+								case 42: {
+									l3 = 0; l2 = 3;  l1 = 5;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 41*tempexps.size(); }
+									break;
+								}
+								case 43: {
+									l3 = 0; l2 = 2;  l1 = 6;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 42*tempexps.size(); }
+									break;
+								}
+								case 44: {
+									l3 = 0; l2 = 1;  l1 = 7;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 43*tempexps.size(); }
+									break;
+								}
+								case 45: {
+									l3 = 0; l2 = 0;  l1 = 8;
+									for (int index = 0; index< ids.size(); index++) { ids[index] += 44*tempexps.size(); }
+									break;
+								}
+								default: { l1 = l2 = l3 = 0; }
+							}
+							break;
+						}
 						default:{
 							l1 = l2 = l3 = 0;
 						}
@@ -577,6 +1254,8 @@ void BasisReader::readShellBasis(Basis& b, int q, double *pos) {
 				else if (temp == "g") { lmult = 4; }
 				else if (temp == "h") { lmult = 5; }
 				else if (temp == "i") { lmult = 6; }
+				else if (temp == "k") { lmult = 7; }
+				else if (temp == "l") { lmult = 8; }
 			  
 				std::vector<libint2::real_t> exps;
 				line.erase(0, position+delim.length());
@@ -631,4 +1310,87 @@ void BasisReader::readShellBasis(Basis& b, int q, double *pos) {
 	} else {
 		throw(Error("IOERR", "Could not open basis file."));
 	}
+}
+
+ECP BasisReader::readECP(int q, ECPBasis& ecpset, double* center) {
+	openFile(-q);
+	
+	std::string delim = ",";
+
+	ECP newECP(center); 
+	// Check it's open
+	if (input.is_open()){
+		// Parse
+		std::string aname = getAtomName(q);
+		aname += delim;
+		std::size_t position;
+		std::string line, token, word;
+		std::getline(input, line);
+		int ncore, maxl;
+    
+		// Main loop
+		while(!input.eof()){
+			position = line.find(aname);
+			if (position != std::string::npos){ // Atom type found
+				// Get the shell type
+				line.erase(0, position+aname.length());
+
+				position = line.find(delim);
+				if (position != std::string::npos) {
+					token = line.substr(0, position);
+					ncore = std::stoi(token);
+						
+					auto it = ecpset.core_electrons.find(q);
+					if (it == ecpset.core_electrons.end()) ecpset.core_electrons[q] = ncore; 
+					
+					line.erase(0, position+delim.length());
+					position = line.find(delim);
+					
+					if (position != std::string::npos) {
+						token = line.substr(0, position);
+						maxl = std::stoi(token);
+					}
+				}
+				
+				for (int i = 0; i<= maxl; i++) {
+					std::getline(input, line);
+					position = line.find(';');
+					if (position != std::string::npos) {
+						token = line.substr(0, position); 
+						int nprims = std::stoi(token);
+						line.erase(0, position+1); 
+						
+						int j = 0;
+						position = line.find(';'); 
+						while (j < nprims && position != std::string::npos) {
+							token = line.substr(0, position);
+							line.erase(0, position+1);
+							position = token.find(',');
+							int n = 0; double d = 0.0, a = 1.0; 
+							if (position != std::string::npos) {
+								word = token.substr(0, position); 
+								n = std::stoi(word);
+								token.erase(0, position+1);
+								position = token.find(',');
+								word = token.substr(0, position);
+								a = std::stod(word);
+								token.erase(0, position+1);
+								d = std::stod(token);
+							}
+							position = line.find(';');
+							int l = i == 0 ? maxl : i-1; 
+							newECP.addPrimitive(n, l, a, d, true);
+							j++; 
+						}
+						
+					}
+				}
+			}
+			std::getline(input, line);
+		}
+	} else {
+		throw(Error("READECP", "Unable to open ECP basis file."));
+	}
+	closeFile();			
+	return newECP; 
 }

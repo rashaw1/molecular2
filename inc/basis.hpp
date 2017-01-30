@@ -62,7 +62,8 @@ private:
   Vector charges;
   Vector shells;
   Vector lnums;
-  
+  int maxl;
+  bool ecps; 
   std::vector<libint2::Shell> intShells;
 public:
   // Constructors and destructor
@@ -70,20 +71,20 @@ public:
   // Need to specify the name of the basis, n, and a list of the 
   // distinct atoms that are needed (as a vector of atomic numbers)
   Basis() : name("Undefined") { } // Default constructor
-  Basis(std::map<int, std::string> ns, Vector& atoms);
+  Basis(std::map<int, std::string> ns, Vector& atoms, bool _ecps = false);
   ~Basis(); // Destructor
   // Accessors
   int getNBFs() const { return charges.size(); }
   std::string getName() const { return name; }
-  std::string getName(int q) const { 
-	  return names.find(q)->second;
-  }
+  std::string getName(int q) const;
   Vector getCharges() const { return charges; }
   int findPosition(int q) const;
   int findShellPosition(int q) const;
+  bool hasECPS() const { return ecps; }
   BF& getBF(int i);
   BF& getBF(int q, int i);
   int getSize(int q) const;
+  int getMaxL() const { return maxl; }
   int getShellSize(int q) const;
   Vector getShells(int q) const;
   std::vector<libint2::Shell>& getIntShells() { return intShells; }

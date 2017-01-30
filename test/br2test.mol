@@ -1,8 +1,7 @@
-basis, cc-pvdz-pp
+basis, default, cc-pvdz-pp
+ecp, br, ecp10mdf
 rhf,
-uhf,
 geom,
 br, 1.5, 0.1, 0.9
-br, 0.8, 0.8, 0.8
+br, -0.1, 0.8, -0.1
 geomend
-nthreads, 2

@@ -33,7 +33,7 @@ private:
   int charge, multiplicity, maxiter, natoms, nthreads;
   int geomstart, geomend;
   double precision, thrint, memory, converge;
-  bool direct, twoprint, diis, bprint, angstrom;
+  bool direct, twoprint, diis, bprint, angstrom, ecp;
   std::string intfile;
   std::map<int, std::string> basis;
   std::vector<std::string> geometry;
@@ -56,6 +56,7 @@ public:
   bool getTwoPrint() const { return twoprint; }
   bool getDIIS() const { return diis; }
   bool getBPrint() const { return bprint; }
+  bool getECP() const { return ecp; }
   bool getAngstrom() const { return angstrom; }
   double getMemory() const { return memory; }
   double getPrecision() const { return precision; }

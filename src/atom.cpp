@@ -14,6 +14,7 @@
 #include "pbf.hpp"
 #include "matrix.hpp"
 #include <iostream>
+#include "ecp.hpp"
 
 //Constructors
 Atom::Atom(const Vector& coords, int q, double m)
@@ -21,6 +22,11 @@ Atom::Atom(const Vector& coords, int q, double m)
   x = coords(0);
   y = coords(1);
   z = coords(2);
+  core = 0;
+  pos = new double[3];
+  pos[0] = x;
+  pos[1] = y;
+  pos[2] = z;
   charge = q;
   mass = m;
   nbfs = 0;
@@ -33,6 +39,11 @@ Atom::Atom(const Atom& other)
   x = other.x;
   y = other.y;
   z = other.z;
+  core = other.core;
+  pos = new double[3];
+  pos[0] = x;
+  pos[1] = y;
+  pos[2] = z;
   mass = other.mass;
   charge = other.charge;
   nbfs = other.nbfs;
@@ -83,6 +94,10 @@ void Atom::setBasis(Basis& bs)
   }
   shells = bs.getShells(charge);
   lnums = bs.getLnums(charge);
+}
+
+void Atom::setCore(ECPBasis& ecpset) {
+	core = ecpset.getECPCore(charge);	
 }
 
 // Get the number of distinct primitives in a given shell
@@ -230,11 +245,13 @@ void Atom::rotate(const Matrix& U)
   x = U(0, 0)*x + U(0, 1)*y + U(0, 2)*z;
   y = U(1, 0)*x + U(1, 1)*y + U(1, 2)*z;
   z = U(2, 0)*x + U(2, 1)*y + U(2, 2)*z;
+  pos[0] = x; pos[1] = y; pos[2] = z;
 }
 
 void Atom::translate(double dx, double dy, double dz)
 {
   x += dx; y += dy; z += dz;
+  pos[0] = x; pos[1] = y; pos[2] = z;
 }
 
 // Overloaded operators
@@ -248,8 +265,13 @@ Atom& Atom::operator=(const Atom& other)
   // Assign attributes
   charge = other.charge;
   nbfs = other.nbfs;
+  core = other.core;
   nshells = other.nshells;
   x = other.x; y = other.y; z = other.z;
+  pos = new double[3];
+  pos[0] = other.pos[0];
+  pos[1] = other.pos[1];
+  pos[2] = other.pos[2];
   mass = other.mass;
   shells = other.shells;
   lnums = other.lnums;

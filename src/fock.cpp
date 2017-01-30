@@ -427,7 +427,7 @@ void Fock::compute_forces(const std::vector<Atom> &atoms, int nocc) {
 			auto r12_3 = r12 * r12_2;
 
 			auto z1z2_over_r12_3 =
-				atom1.getCharge() * atom2.getCharge() / r12_3;
+				atom1.getEffectiveCharge() * atom2.getEffectiveCharge() / r12_3;
 
 			auto fx = -x12 * z1z2_over_r12_3;
 			auto fy = -y12 * z1z2_over_r12_3;
@@ -515,7 +515,7 @@ void Fock::compute_hessian(const std::vector<Atom> &atoms, int nocc) {
 			auto r12 = sqrt(r12_2);
 			auto r12_5 = r12 * r12_2 * r12_2;
 
-			auto z1z2_over_r12_5 = atom1.getCharge() * atom2.getCharge() / r12_5;
+			auto z1z2_over_r12_5 = atom1.getEffectiveCharge() * atom2.getEffectiveCharge() / r12_5;
 
 			HN(3*a1 + 0, 3*a1 + 0) += z1z2_over_r12_5 * (3*x12_2 - r12_2);
 			HN(3*a1 + 1, 3*a1 + 1) += z1z2_over_r12_5 * (3*y12_2 - r12_2);

@@ -11,14 +11,22 @@
 
 // GaussianECP constructor and copy constructor
 GaussianECP::GaussianECP() : n(0), l(0), a(0), d(0) {}
-GaussianECP::GaussianECP(int _n, int _l, double _a, double _d) : n(_n), l(_l), a(_a), d(_d) {}
+GaussianECP::GaussianECP(int _n, int _l, double _a, double _d) : n(_n-2), l(_l), a(_a), d(_d) {}
 GaussianECP::GaussianECP(const GaussianECP& other) : n(other.n), l(other.l), a(other.a), d(other.d) {}
 
 
 // class ECP
 
-ECP::ECP() : N(0), L(-1) {}
-ECP::ECP(const double *_center) : N(0), L(-1), center_(_center) {}
+ECP::ECP() : N(0), L(-1) {
+	center_.resize(3);	
+}
+ECP::ECP(const double *_center) : N(0), L(-1) {
+	center_.resize(3);
+	center_[0] = _center[0];
+	center_[1] = _center[1];
+	center_[2] = _center[2];
+}
+
 ECP::ECP(const ECP &other) {
 	gaussians = other.gaussians;
 	N = other.N;
@@ -60,4 +68,11 @@ void ECPBasis::addECP(ECP &U) {
 }
 
 ECP& ECPBasis::getECP(int i) { return basis[i]; }
+
+int ECPBasis::getECPCore(int q) {
+	int core = 0;
+	auto it = core_electrons.find(q);
+	if (it != core_electrons.end()) core = it->second;
+	return core;
+}
 

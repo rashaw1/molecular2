@@ -33,6 +33,8 @@
 class Vector;
 class BF;
 class Basis;
+class ECP;
+class ECPBasis;
 
 class BasisReader
 {
@@ -45,6 +47,7 @@ public:
   BasisReader(std::map<int, std::string> ns) : names(ns) {} // Constructor
   int readNbfs(int q);
   BF readBF(int q, int i);
+  ECP readECP(int q, ECPBasis& ecpset, double *pos);
   Vector readShells(int q);
   Vector readLnums(int q);
   Vector readShells(Vector& qs);

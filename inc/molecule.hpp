@@ -51,6 +51,7 @@
 #include "atom.hpp"
 #include <string>
 #include "bf.hpp"
+#include "ecp.hpp"
 
 // Declare forward dependcies
 class Logger;
@@ -62,6 +63,7 @@ class Molecule
 {
 private:
   Basis bfset;
+  ECPBasis ecpset;
   Atom* atoms;
   Logger& log;
   int charge, nel, multiplicity, natoms;
@@ -74,6 +76,7 @@ public:
   ~Molecule(); // Deletes the atom array
   
   void buildShellBasis();
+  void buildECPBasis();
   
   // Accessors
   int getNAtoms() const { return natoms; }
@@ -85,6 +88,8 @@ public:
   Atom& getAtom(int i) { return atoms[i]; } // Return atom i
   BF& getBF(int q, int i) { return bfset.getBF(q, i); } // Return basis func. i of atom q
   Basis& getBasis() { return bfset; }
+  ECPBasis& getECPBasis() { return ecpset; }
+  ECP& getECP(int i) { return ecpset.getECP(i); }
   // Routines
   void rotate(const Matrix& U);
   void translate(double x, double y, double z);

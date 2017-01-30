@@ -34,7 +34,7 @@ void Molecule::init()
     
     atoms = new Atom[natoms];
     nel = 0; // Initialise to no electrons
-
+	
     // Populate the array, and give the atoms
     // their basis functions. At the same time,
     // calculate the number of electrons
@@ -46,9 +46,6 @@ void Molecule::init()
 
     // Account for overall charge
     nel -= charge;
-    
-    // Calculate the nuclear energy
-    calcEnuc();
 
   } else { // Nothing to do
     Error e("INIT", "There are no atoms!");
@@ -132,11 +129,11 @@ void Molecule::calcEnuc()
 
   // Outer loop over all atoms
   for (int i = 0; i < log.getNatoms(); i++) {
-    zi = atoms[i].getCharge();
+    zi = atoms[i].getEffectiveCharge();
     // Inner loop over all atoms with index
     // greater than i, to avoid double counting
     for (int j = i+1; j < log.getNatoms(); j++){
-      enuc += (zi*atoms[j].getCharge())/dist(i, j);
+      enuc += (zi*atoms[j].getEffectiveCharge())/dist(i, j);
     }
   }
 }
@@ -318,7 +315,7 @@ std::string Molecule::rType()
   } else {
     // Calculate the principal moments of inertia
     Vector I(3);
-    I = getInertia();
+    I = getInertia(false);
 
     // All moments are >= 0, so no need to use fabs
     // Linear if Ic = Ib > Ia = 0
@@ -344,7 +341,7 @@ Vector Molecule::rConsts(int units)
 {
   // First get the principal moments of inertia
   Vector I(3);
-  I = getInertia();
+  I = getInertia(false);
   
   double K;
   // Choose units
@@ -367,6 +364,23 @@ void Molecule::buildShellBasis() {
 		Atom &a = atoms[i];
 		double pos[3] = { a.getX(), a.getY(), a.getZ() };
  	  	b.readShellBasis(bfset, a.getCharge(), pos);
+	}
+}
+
+void Molecule::buildECPBasis() {
+	if (bfset.hasECPS()) {
+		BasisReader b(log.bnames); 
+		for (int i = 0; i < natoms; i++) {
+			Atom& a = atoms[i];
+			auto it = log.bnames.find(-a.getCharge());
+			if (it != log.bnames.end()) {
+				ECP newECP = b.readECP(a.getCharge(), ecpset, a.getPos());
+				std::cout << a.getPos()[0] << " " << a.getPos()[1] << " " << a.getPos()[2] << std::endl;
+				ecpset.addECP(newECP);
+			}
+	  		atoms[i].setCore(ecpset);
+			nel -= atoms[i].getCharge() - atoms[i].getEffectiveCharge();
+		}
 	}
 }
   

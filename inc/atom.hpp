@@ -45,28 +45,33 @@
 // Declare forward dependencies
 class Matrix;
 class PBF;
+class ECPBasis;
 
 // Begin class definition
 class Atom
 {
 private:
   BF* bfs;
-  int charge, nbfs, nshells;
+  int charge, core, nbfs, nshells;
   Vector shells, lnums;
   double x, y, z, mass;
+  double *pos; 
 public:
   // Constructors
-  Atom() : charge(-1), nbfs(0) { } // Default
+  Atom() : charge(-1), core(0),  nbfs(0) { } // Default
   Atom(const Vector& coords, int q, double m); // q = charge, m = mass
   Atom(const Atom& other); // Copy constructor
   ~Atom(); // Destructor - gets rid of array bfs
   // Accessors
   int getCharge() const { return charge; }
+  int getEffectiveCharge() const { return charge - core; }
+  void setCore(ECPBasis& ecpset); 
   double getMass() const { return mass; }
   int getNbfs() const { return nbfs; }
   int getNshells() const { return nshells; }
   int getNShellPrims(int shell) const;
-  Vector getCoords() const;
+  Vector getCoords() const; 
+  double* getPos() const { return pos; }
   double getX() const { return x; }
   double getY() const { return y; }
   double getZ() const { return z; }

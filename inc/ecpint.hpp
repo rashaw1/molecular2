@@ -22,6 +22,7 @@
 //namespace psi {
 
 class GaussianShell;
+class Matrix;
 
 /** 
   * Calculates real spherical harmonics S_lm(theta, phi) for all l, m up to lmax
@@ -307,7 +308,7 @@ public:
 	ECPIntegral(ECPBasis &basis, int maxLB, int maxLU, int deriv=0);
 	
 	/// Overridden shell-pair integral calculation over all ECP centers
-	void compute_pair(GaussianShell &shellA, GaussianShell &shellB);
+	Matrix compute_pair(GaussianShell &shellA, GaussianShell &shellB);
 	
 	/// Calculates the type 1 integrals for the given ECP center over the given shell pair
 	void type1(ECP& U, GaussianShell &shellA, GaussianShell &shellB, ShellPairData &data, FiveIndex<double> &CA, FiveIndex<double> &CB, TwoIndex<double> &values);

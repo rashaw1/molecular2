@@ -14,6 +14,7 @@
 #define ECP_HEAD
 
 #include <vector>
+#include <map>
 
 //namespace psi {
 // Object describing a Gaussian of angular momentum l of the form
@@ -31,7 +32,7 @@ class ECP {
 private:
 	std::vector<GaussianECP> gaussians; // All the primitives in the ECP expansion
 	int N, L; // # of Gaussians and maximum angular momentum
-	const double *center_;
+	std::vector<double> center_;
 	
 public:
 	ECP();
@@ -39,8 +40,10 @@ public:
 	ECP(const ECP &other);
 	
 	void addPrimitive(int n, int l, double a, double d, bool needSort = true);
-	const double* center() const { return center_; }
+	const double* center() const { return &center_[0]; }
 	void sort(); // Sort primitives according to angular momentum
+	GaussianECP& getGaussian(int i) { return gaussians[i]; }
+	int getN() const { return N; }
 	
 	// Evaluate U_l(r)
 	double evaluate(double r, int l);
@@ -57,8 +60,11 @@ private:
 public:
 	ECPBasis();
 	
+	std::map<int, int> core_electrons;
+	
 	void addECP(ECP &U);
 	ECP& getECP(int i);
+	int getECPCore(int q); 
 	int getMaxL() const { return maxL; }
 	int getN() const { return N; }
 };

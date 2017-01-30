@@ -162,7 +162,7 @@ Logger::Logger(std::ifstream& in, std::ofstream& out, std::ostream& e) : infile(
 		qs.resizeCopy(k);
 		// Find the basis name and initialise the basis set
 		bnames = input.getBasis();
-		Basis b(bnames, qs);
+		Basis b(bnames, qs, input.getECP());
 		basisset = b;
 
 	} else { // Our first error :(
@@ -320,7 +320,9 @@ void Logger::print(Basis& b, bool full) const
 
 	// Start printing
 	title("Basis Set");
-	outfile << "BASIS: " << b.getName() << "\n";
+	outfile << "DEFAULT: " << b.getName() << "\n";
+	for (int i = 0; i < qs.size(); i++)
+		outfile << getAtomName(qs[i]) << " " << b.getName(qs[i]) << "\n";
 	outfile << "Total no. of cgbfs: " << nbfs << "\n";
 	outfile << "Total no. of prims: " << nprims << "\n";
 	title("Specification");
@@ -415,7 +417,7 @@ void Logger::print(const Atom& a) const
 	c = a.getCoords();
 	outfile << std::fixed << std::setprecision(6);
 	outfile << std::setw(10) << getAtomName(q);
-	outfile << std::setw(10) << q;
+	outfile << std::setw(10) << a.getEffectiveCharge();
 	outfile << std::setw(10) << a.getMass();
 	outfile << std::setw(10) << a.getNbfs();
 	outfile << std::setw(4) << "(" << std::setw(8) << c(0);
