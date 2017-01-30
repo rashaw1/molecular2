@@ -75,15 +75,7 @@ IntegralEngine::IntegralEngine(Molecule& m) : molecule(m)
 		naints = naints + compute_ecp_ints(shells);
 	}
 	
-	Vector lnums(naints.nrows());
-	int pos = 0;
-	for (auto a : atoms) {
-		Vector ltemp = molecule.getBasis().getLnums(a.getCharge());
-		for (int i = 0; i < ltemp.size(); i++) lnums[pos++] = ltemp[i];
-	}
-	Matrix newnaints = makeSpherical(naints, lnums);
-	newnaints.print(); std::cout << std::endl;
-	//naints.print(); std::cout << std::endl << std::endl; 
+	naints.print(); std::cout << std::endl << std::endl; 
   
 	molecule.getLog().print("One electron integrals complete\n");
 	molecule.getLog().localTime();
