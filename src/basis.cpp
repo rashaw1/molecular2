@@ -176,7 +176,7 @@ Vector Basis::getLnums(int q) const
   return l;
 }
 
-void Basis::addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std::vector <libint2::real_t>> &coeffs, double *pos) {
+void Basis::addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std::vector <libint2::real_t>> &coeffs, double *pos, int atom) {
 	using libint2::Shell;
 	
 	maxl = l > maxl ? l : maxl; 
@@ -192,6 +192,7 @@ void Basis::addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std:
 	std::array<libint2::real_t, 3> O = { pos[0], pos[1], pos[2] };
 
 	intShells.push_back(Shell(exps, contr_arr, O));
+	shellAtomList.push_back(atom);
 }
 
   

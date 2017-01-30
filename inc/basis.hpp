@@ -65,6 +65,7 @@ private:
   int maxl;
   bool ecps; 
   std::vector<libint2::Shell> intShells;
+  std::vector<int> shellAtomList;
 public:
   // Constructors and destructor
   // Note - no copy constructor, as it doesn't really seem necessary
@@ -87,10 +88,11 @@ public:
   int getMaxL() const { return maxl; }
   int getShellSize(int q) const;
   Vector getShells(int q) const;
+  int getShellAtom(int i) const { return shellAtomList[i]; }
   std::vector<libint2::Shell>& getIntShells() { return intShells; }
   Vector getLnums(int q) const;
   
-  void addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std::vector <libint2::real_t>> &coeffs, double *pos);
+  void addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std::vector <libint2::real_t>> &coeffs, double *pos, int atom);
   
   // Overloaded operators
   Basis& operator=(const Basis& other);

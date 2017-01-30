@@ -69,13 +69,20 @@ IntegralEngine::IntegralEngine(Molecule& m) : molecule(m)
 	
 	sints = compute_1body_ints(shells, libint2::Operator::overlap);
 	tints = compute_1body_ints(shells, libint2::Operator::kinetic);
-	
 	naints = compute_1body_ints(shells, libint2::Operator::nuclear, atoms);
-	naints.print(); std::cout << std::endl << std::endl; 
 	
 	if(molecule.getBasis().hasECPS()) {
 		naints = naints + compute_ecp_ints(shells);
 	}
+	
+	Vector lnums(naints.nrows());
+	int pos = 0;
+	for (auto a : atoms) {
+		Vector ltemp = molecule.getBasis().getLnums(a.getCharge());
+		for (int i = 0; i < ltemp.size(); i++) lnums[pos++] = ltemp[i];
+	}
+	Matrix newnaints = makeSpherical(naints, lnums);
+	newnaints.print(); std::cout << std::endl;
 	//naints.print(); std::cout << std::endl << std::endl; 
   
 	molecule.getLog().print("One electron integrals complete\n");
@@ -371,6 +378,7 @@ const std::vector<Atom>& atoms)
 		for(const auto& atom : atoms) {
 			q.push_back( {static_cast<double>(atom.getEffectiveCharge()), {{atom.getX(), atom.getY(), atom.getZ()}}} );
 		}
+			
 		engine.set_params(q);
 	}
 
@@ -613,8 +621,6 @@ Matrix IntegralEngine::compute_schwarz_ints( const std::vector<libint2::Shell> &
 	molecule.getLog().localTime();
 	
 	ECPBasis& ecpset = molecule.getECPBasis();
-	for (int i = 0; i < ecpset.getN(); i++)
-		std::cout << ecpset.getECP(i).center()[0] << " " << ecpset.getECP(i).center()[1] << " " << ecpset.getECP(i).center()[2] << std::endl;
 	auto shell2bf = map_shell_to_basis_function(shells);
 	
 	// loop over shells
@@ -655,8 +661,8 @@ Matrix IntegralEngine::compute_schwarz_ints( const std::vector<libint2::Shell> &
 		bf1 += n1; 
 	}
 	
-	//ecps.print();
-	//std::cout << std::endl << std::endl;
+	ecps.print();
+	std::cout << std::endl << std::endl;
 	return ecps;
  }
  

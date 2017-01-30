@@ -59,10 +59,15 @@ double ECP::evaluate(double r, int l) {
 	return value; 
 }
 
+void ECP::setPos(double x, double y, double z) {
+	center_[0] = x; center_[1] = y; center_[2] = z;
+}
+
 ECPBasis::ECPBasis() : N(0), maxL(-1) {}
 
-void ECPBasis::addECP(ECP &U) {
+void ECPBasis::addECP(ECP &U, int atom) {
 	basis.push_back(U);
+	atomList.push_back(atom);
 	N++;
 	maxL = U.getL() > maxL ? U.getL() : maxL;
 }

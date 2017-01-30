@@ -41,6 +41,7 @@ public:
 	
 	void addPrimitive(int n, int l, double a, double d, bool needSort = true);
 	const double* center() const { return &center_[0]; }
+	void setPos(double x, double y, double z);
 	void sort(); // Sort primitives according to angular momentum
 	GaussianECP& getGaussian(int i) { return gaussians[i]; }
 	int getN() const { return N; }
@@ -55,6 +56,7 @@ public:
 class ECPBasis {
 private:
 	std::vector<ECP> basis;
+	std::vector<int> atomList;
 	int N, maxL;
 	
 public:
@@ -62,9 +64,10 @@ public:
 	
 	std::map<int, int> core_electrons;
 	
-	void addECP(ECP &U);
+	void addECP(ECP &U, int atom);
 	ECP& getECP(int i);
 	int getECPCore(int q); 
+	int getAtom(int i) { return atomList[i]; }
 	int getMaxL() const { return maxL; }
 	int getN() const { return N; }
 };

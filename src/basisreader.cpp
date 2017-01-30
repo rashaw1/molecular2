@@ -1225,7 +1225,7 @@ Vector BasisReader::readLnums(Vector& qs)
 	return lnums;
 }
 
-void BasisReader::readShellBasis(Basis& b, int q, double *pos) {
+void BasisReader::readShellBasis(Basis& b, int q, double *pos, int atom) {
 	
 	openFile(q);
 	std::string delim = ",";
@@ -1295,7 +1295,7 @@ void BasisReader::readShellBasis(Basis& b, int q, double *pos) {
 						cvals.push_back(std::stod(temp2));
 					}
 					coeffs.push_back(cvals);
-					b.addShell(lmult, e, coeffs, pos);
+					b.addShell(lmult, e, coeffs, pos, atom);
 					std::getline(input, line);
 				}
 				

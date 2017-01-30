@@ -36,9 +36,9 @@ Atom::Atom(const Vector& coords, int q, double m)
 // Copy constructor
 Atom::Atom(const Atom& other)
 {
-  x = other.x;
-  y = other.y;
-  z = other.z;
+  x = other.x; 
+  y = other.y; 
+  z = other.z; 
   core = other.core;
   pos = new double[3];
   pos[0] = x;
@@ -183,7 +183,7 @@ PBF& Atom::getShellPrim(int shell, int i)
 
 int Atom::getNSpherical() const
 {
-  int scount=0, pcount=0, dcount=0, fcount=0, gcount=0; // Currently only cope with up to g-type bfs
+  int scount=0, pcount=0, dcount=0, fcount=0, gcount=0, hcount=0, icount=0, kcount=0, lcount=0; // Currently only cope with up to l-type bfs
   // Loop over all bfs
   for (int i = 0; i < nbfs; i++){
     switch(bfs[i].getLnum()){
@@ -207,11 +207,27 @@ int Atom::getNSpherical() const
       gcount++;
       break;
     }
+	case 5: { // h type
+		hcount++;
+		break;
+	}
+	case 6: {
+		icount++;
+		break;
+	}
+	case 7: {
+		kcount++;
+		break;
+	}
+	case 8: {
+		lcount++;
+		break;
+	}
     default: scount++; // Assume s type
     }
   }
 
-  return scount+pcount+(5*dcount/6)+(7*fcount/10)+(9*gcount/15);
+  return scount+pcount+(5*dcount/6)+(7*fcount/10)+(9*gcount/15)+(11*hcount/21)+(13*icount/28)+(15*kcount/36)+(17*lcount/45);
 }
 
 int Atom::getNSpherShellBF(int shell) const
@@ -228,6 +244,10 @@ int Atom::getNSpherShellBF(int shell) const
 	case 2: { ns = 5*(nc/6); break; }
 	case 3: { ns = 7*(nc/10); break; }
 	case 4: { ns = 9*(nc/15); break; } 
+	case 5: { ns = 11*(nc/21); break; }
+	case 6: { ns = 13*(nc/28); break; }
+	case 7: { ns = 15*(nc/36); break; }
+	case 8: { ns = 17*(nc/45); break; }
 	default: ns = nc;
 	}
 	

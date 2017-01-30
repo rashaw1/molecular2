@@ -53,7 +53,7 @@ public:
   Vector readShells(Vector& qs);
   Vector readLnums(Vector& qs);
  
-  void readShellBasis(Basis& b, int q, double *pos);
+  void readShellBasis(Basis& b, int q, double *pos, int atom);
 };
 
 #endif

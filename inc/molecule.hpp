@@ -77,6 +77,7 @@ public:
   
   void buildShellBasis();
   void buildECPBasis();
+  void updateBasisPositions();
   
   // Accessors
   int getNAtoms() const { return natoms; }

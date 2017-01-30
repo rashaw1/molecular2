@@ -66,10 +66,12 @@ int main (int argc, char* argv[])
 				mol.buildECPBasis();
 				mol.calcEnuc();
 				log.print(mol, true);
+				mol.updateBasisPositions();
 				log.print(log.getBasis(), log.bprint());
 				log.print("\nPRELIMINARIES FINISHED");
 				log.localTime();
 				log.flush();
+				
 				// Make an integral engine
 				libint2::initialize();
 				IntegralEngine integral(mol);

@@ -475,7 +475,7 @@ void Logger::print(Molecule& mol, bool inertia) const
 		Vector rconsts(3);
 		rconsts = mol.rConsts(1); // MHz
 		Vector inert(3);
-		inert = mol.getInertia(true);
+		inert = mol.getInertia(false);
 		// Print it out
 		outfile << std::string(30, '.') << "\n";
 		outfile << "Principal Moments of Inertia\n";
