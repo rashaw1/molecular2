@@ -64,13 +64,14 @@ class Molecule
 private:
   Basis bfset;
   ECPBasis ecpset;
+protected:
   Atom* atoms;
   Logger& log;
   int charge, nel, multiplicity, natoms;
   double enuc;
 public:
   // Constructors and destructor
-  void init(); // An initialisation function
+  virtual void init(); // An initialisation function
   Molecule(Logger& logger, int q = 0); // Need the log for input, q is charge
   Molecule(const Molecule& other); // Copy constructor
   ~Molecule(); // Deletes the atom array
@@ -106,6 +107,16 @@ public:
   double torsionAngle(int i, int j, int k, int l) const;
   std::string rType();
   Vector rConsts(int units);
+};
+
+class Fragment : public Molecule 
+{
+private:
+	std::vector<Atom> frag_atoms; 
+public:
+	Fragment(Logger& logger, Atom* as, int q = 0, int mult = 1); 
+	Fragment(const Fragment& other);
+	void init(Atom* as, int q, int mult);
 };
 
 #endif

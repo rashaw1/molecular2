@@ -17,6 +17,7 @@
 #include "basisreader.hpp"
 #include "solvers.hpp"
 #include <cmath>
+#include <vector>
 #include <libint2.hpp>
 
 // An initialisation function, for code reuse purposes
@@ -55,6 +56,17 @@ void Molecule::init()
 	}
 }
 
+void Fragment::init(int q, int mult, Atom* as)
+{
+	charge = q;
+	multiplicity = mult;
+	atoms = as; 
+	if (as.size() <= 0) {
+		Error e("FRAGINIT", "There are no atoms in this fragment!");
+		log.error(e);
+	}
+}
+
 // Constructor
 Molecule::Molecule(Logger& logger, int q) : log(logger)
 {
@@ -76,6 +88,15 @@ Molecule::~Molecule()
 		delete [] atoms;
 	}
 }
+
+Fragment::Fragment(Logger& logger, Atom* as, int q, int mult) : log(logger) {
+	init(as, q, mult); 
+}
+
+Fragment::Fragment(const Fragment& other) : log(other.log) {
+	init(other.atoms, other.charge, other.multiplicity);
+}
+
 
 // Routines
 

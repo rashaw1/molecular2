@@ -148,7 +148,7 @@ int main (int argc, char* argv[])
 					log.flush();
 					cmd = log.nextCmd();
 				}
-
+				
 				// Finalise the run
 				libint2::finalize();
 				log.finalise();

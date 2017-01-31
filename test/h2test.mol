@@ -1,4 +1,5 @@
-basis, sto-3g
+basis, default, avqz
+memory, 4000
 rhf,
 !uhf,
 mp2,

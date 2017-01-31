@@ -74,8 +74,6 @@ IntegralEngine::IntegralEngine(Molecule& m) : molecule(m)
 	if(molecule.getBasis().hasECPS()) {
 		naints = naints + compute_ecp_ints(shells);
 	}
-	
-	naints.print(); std::cout << std::endl << std::endl; 
   
 	molecule.getLog().print("One electron integrals complete\n");
 	molecule.getLog().localTime();
@@ -653,8 +651,6 @@ Matrix IntegralEngine::compute_schwarz_ints( const std::vector<libint2::Shell> &
 		bf1 += n1; 
 	}
 	
-	ecps.print();
-	std::cout << std::endl << std::endl;
 	return ecps;
  }
  

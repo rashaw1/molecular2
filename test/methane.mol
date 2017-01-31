@@ -9,4 +9,4 @@ H, -1.18377, -1.18377, 1.18377
 geomend
 scf,converge,1e-4
 rhf,
-mp2,
+!mp2,

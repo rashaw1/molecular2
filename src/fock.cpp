@@ -33,7 +33,6 @@ Fock::Fock(IntegralEngine& ints, Molecule& m) : integrals(ints), molecule(m)
 	
 	// Make the core hamiltonian matrix
 	formHCore();
-	hcore.print(); std::cout << "\n";
 
 	// Form the orthogonalising matrix and get initial density guess
 	try {

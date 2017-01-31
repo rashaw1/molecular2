@@ -1,4 +1,4 @@
-basis, default, cc-pvdz
+basis, default, avtz
 geom,
 O, 0.0, -0.143226, 0.0
 H, 1.63803684, 1.1365488, 0.0
@@ -7,4 +7,4 @@ geomend
 scf,converge,1e-8
 nthreads, 2
 rhf,
-ccsd(t),
+!ccsd(t),
