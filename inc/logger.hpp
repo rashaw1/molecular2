@@ -74,10 +74,10 @@
 #include <iostream>
 #include "basis.hpp"
 #include "atom.hpp"
+#include "molecule.hpp"
 #include <vector>
 
 // Declare forward dependencies
-class Molecule;
 class BF;
 class PBF;
 class Matrix;
@@ -93,6 +93,7 @@ private:
   std::ostream& errstream;
   Error* errs;
   std::vector<Atom> atoms;
+  std::vector<Fragment> fragments;
   std::vector<std::string> cmds;
   int nerr, ncmd, charge, multiplicity, natoms;
   boost::timer::cpu_timer timer;
@@ -101,7 +102,7 @@ private:
   // User defined constants
   double PRECISION, THRINT, CONVERGE,  memory;
   int MAXITER, nthreads;
-  bool directing, twoprinting, diising, basisprint;
+  bool directing, twoprinting, diising, basisprint, fragmented;
 public:
   // Conversion factors
   static const double RTOCM;
@@ -126,10 +127,12 @@ public:
   void setDirect(bool d) { directing = d; }
   bool twoprint() const { return twoprinting; }
   bool diis() const { return diising; }
+  bool frags() const { return fragmented; }
   bool bprint() const { return basisprint; }
   std::ofstream& getIntFile() { return intfile; }
   double getMemory() const { return memory; }
   Atom getAtom(int i) const { return atoms[i]; }
+  Fragment& getFragment(int i) { return fragments[i]; }
   int nextCmd(); // Return next directive 
   double precision() const { return PRECISION; }
   double thrint() const { return THRINT; }

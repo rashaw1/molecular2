@@ -55,6 +55,7 @@ int FileReader::findToken(std::string t)
 	else if (t == "ccsd") { rval = 21; }
 	else if (t == "ccsd(t)") { rval = 22; }
 	else if (t == "ecp") { rval = 23; }
+	else if (t == "fragments") { rval = 24; }
 	return rval;
 }
 
@@ -76,6 +77,7 @@ void FileReader::readParameters()
 	bprint = false;
 	diis = true;
 	angstrom = false;
+	fragments = false;
 	ecp = false;
 	basis[0] = "sto-3g";
 
@@ -274,6 +276,29 @@ void FileReader::readParameters()
 						token2.erase(std::remove(token2.begin(), token2.end(), ' '), token2.end());
 						int q = getAtomCharge(token);
 						basis[-q] = token2;
+					}
+					break;
+				}
+				case 24: { // Fragment definitions
+					fragments = true;
+					std::getline(input, line);
+					line.erase(std::remove(line.begin(), line.end(), ' '), line.end());
+					while(line != "fragmentsend") {
+						pos = line.find(',');
+						std::vector<int> f;
+						while (pos != std::string::npos) {
+							token = line.substr(0, pos);
+							f.push_back(std::stoi(token));
+							line.erase(0, pos+1);
+							pos = line.find(',');
+						}
+						f.push_back(std::stoi(line));
+						if (f.size() > 0) {
+							f[0] -= 1;
+							frags.push_back(f);
+						}
+						std::getline(input, line);
+						line.erase(std::remove(line.begin(), line.end(), ' '), line.end());	
 					}
 					break;
 				}

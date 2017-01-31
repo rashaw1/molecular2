@@ -33,7 +33,8 @@ private:
   int charge, multiplicity, maxiter, natoms, nthreads;
   int geomstart, geomend;
   double precision, thrint, memory, converge;
-  bool direct, twoprint, diis, bprint, angstrom, ecp;
+  bool direct, twoprint, diis, bprint, angstrom, ecp, fragments;
+  std::vector<std::vector <int>> frags;
   std::string intfile;
   std::map<int, std::string> basis;
   std::vector<std::string> geometry;
@@ -49,6 +50,7 @@ public:
   int getMultiplicity() const { return multiplicity; }
   int getMaxIter() const { return maxiter; }
   int getNAtoms() const { return natoms; }
+  std::vector<std::vector <int>>& getFrags() { return frags; }
   std::map<int, std::string> getBasis() const { return basis;}
   std::string getIntFile() const { return intfile; }
   std::vector<std::string> getCmds() const { return commands; }
@@ -57,6 +59,7 @@ public:
   bool getDIIS() const { return diis; }
   bool getBPrint() const { return bprint; }
   bool getECP() const { return ecp; }
+  bool getFragments() const { return fragments; }
   bool getAngstrom() const { return angstrom; }
   double getMemory() const { return memory; }
   double getPrecision() const { return precision; }

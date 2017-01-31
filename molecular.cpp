@@ -149,6 +149,46 @@ int main (int argc, char* argv[])
 					cmd = log.nextCmd();
 				}
 				
+				Fragment& m1 = log.getFragment(0);
+				m1.buildShellBasis();
+				m1.calcEnuc();
+				Fragment& m2 = log.getFragment(1);
+				m2.buildShellBasis();
+				m2.calcEnuc();
+				IntegralEngine i1(m1);
+				IntegralEngine i2(m2);
+				Fock f1(i1, m1);
+				SCF h1(m1, f1);
+				Fock f2(i2, m2);
+				SCF h2(m2, f2);
+				
+				h1.rhf();
+				h2.rhf(); 
+				
+				Matrix S = integral.getOverlap();
+				Eigen::MatrixXd s_(S.nrows(), S.ncols());
+				for (int i = 0; i < S.nrows(); i++)
+					for (int j = 0; j < S.ncols(); j++)
+						s_(i, j) = S(i, j);
+				Eigen::MatrixXd sinv = s_.inverse();
+				Eigen::MatrixXd T(S.nrows(), S.ncols());
+				Matrix& CPA = f1.getCP();
+				Matrix& CPB = f2.getCP();
+				int offset = CPA.nrows();
+				for (int i = 0; i < offset; i++)
+					for (int j = 0; j < offset; j++)
+						T(i, j) = CPA(i, j);
+				for (int i = offset; i < S.nrows(); i++)
+					for (int j = offset; j < S.ncols(); j++)
+						T(i, j) = CPB(i-offset, j-offset);
+				s_ = T.transpose() * s_ * T; 
+				s_ = s_.inverse();
+				s_ = T * s_ * T.transpose();
+				for (int i = 0; i < S.nrows(); i++)
+					for (int j = 0; j < S.ncols(); j++)
+						S(i, j) = s_(i, j) - sinv(i, j);
+				S.print();
+				
 				// Finalise the run
 				libint2::finalize();
 				log.finalise();

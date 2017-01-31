@@ -1,3 +1,6 @@
-ERROR: MEMERR
-Message: Not enough memory for ERIs.
-Error after 0.017433 seconds
+ERROR: READIN
+Message: Command 2 not found.
+Error after 0.000174648 seconds
+ERROR: NOATOMS
+Message: Nothing to see here.
+Error after 0.000195936 seconds

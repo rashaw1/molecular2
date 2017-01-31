@@ -62,17 +62,18 @@ class Vector;
 class Molecule
 {
 private:
-  Basis bfset;
   ECPBasis ecpset;
 protected:
+  Basis bfset;
   Atom* atoms;
   Logger& log;
   int charge, nel, multiplicity, natoms;
+  bool parent;
   double enuc;
 public:
   // Constructors and destructor
-  virtual void init(); // An initialisation function
-  Molecule(Logger& logger, int q = 0); // Need the log for input, q is charge
+  void init(); // An initialisation function
+  Molecule(Logger& logger, int q = 0, bool doInit = true); // Need the log for input, q is charge
   Molecule(const Molecule& other); // Copy constructor
   ~Molecule(); // Deletes the atom array
   
@@ -114,9 +115,10 @@ class Fragment : public Molecule
 private:
 	std::vector<Atom> frag_atoms; 
 public:
-	Fragment(Logger& logger, Atom* as, int q = 0, int mult = 1); 
+	Fragment(Logger& logger, Atom* as, int nat, int q = 0, int mult = 1); 
 	Fragment(const Fragment& other);
-	void init(Atom* as, int q, int mult);
+	~Fragment();
+	void init(Atom* as, int nat, int q, int mult);
 };
 
 #endif

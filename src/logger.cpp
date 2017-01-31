@@ -65,6 +65,7 @@ Logger::Logger(std::ifstream& in, std::ofstream& out, std::ostream& e) : infile(
 	basisprint = input.getBPrint();
 	directing = input.getDirect();
 	diising = input.getDIIS();
+	fragmented = input.getFragments();
 	cmds = input.getCmds();
 
 	if ((twoprinting)) { 
@@ -143,6 +144,16 @@ Logger::Logger(std::ifstream& in, std::ofstream& out, std::ostream& e) : infile(
 				Error e4("INPUT", "Missing coordinate.");
 				error(e4);
 			}					
+		}
+		
+		// Deal with fragments
+		if (fragmented) {
+			std::vector<std::vector <int>>& frags = input.getFrags();
+			for (auto f : frags)
+				if(f.size() > 3) {
+					fragments.push_back(Fragment(*this, &atoms[f[0]], f[1] - f[0], f[2], f[3]));
+					std::cout << f[0] << " " << f[1] << " " << f[2] << " " << f[3] << std::endl;
+				}
 		}
     
 		// Next, the basis set

@@ -26,6 +26,7 @@ void Molecule::init()
 	// Set the data variables
 	charge = log.getCharge();
 	multiplicity = log.getMultiplicity();
+	parent = true;
 
 	// Get the basis set     
 	bfset = log.getBasis();
@@ -56,22 +57,30 @@ void Molecule::init()
 	}
 }
 
-void Fragment::init(int q, int mult, Atom* as)
+void Fragment::init(Atom* as, int nat, int q, int mult)
 {
 	charge = q;
+	parent = false;
 	multiplicity = mult;
 	atoms = as; 
-	if (as.size() <= 0) {
+	natoms = nat;
+	if (nat <= 0) {
 		Error e("FRAGINIT", "There are no atoms in this fragment!");
 		log.error(e);
+	} else {
+		bfset = log.getBasis();
+		
+		nel = 0;
+		for (int i = 0; i < natoms; i++)
+			nel += atoms[i].getCharge();
 	}
 }
 
 // Constructor
-Molecule::Molecule(Logger& logger, int q) : log(logger)
+Molecule::Molecule(Logger& logger, int q, bool doInit) : log(logger)
 {
 	// Set the log and then initialise
-	init();
+	if(doInit) init();
 }
 
 // Copy constructor
@@ -84,18 +93,19 @@ Molecule::Molecule(const Molecule& other) : log(other.log)
 // Destructor
 Molecule::~Molecule()
 {
-	if(log.getNatoms()!=0){
+	if(log.getNatoms()!=0 && parent){
 		delete [] atoms;
 	}
 }
 
-Fragment::Fragment(Logger& logger, Atom* as, int q, int mult) : log(logger) {
-	init(as, q, mult); 
+Fragment::Fragment(Logger& logger, Atom* as, int nat, int q, int mult) : Molecule(logger, q, false)  {
+	init(as, nat, q, mult); 
 }
 
-Fragment::Fragment(const Fragment& other) : log(other.log) {
-	init(other.atoms, other.charge, other.multiplicity);
+Fragment::Fragment(const Fragment& other) : Molecule(other.log, other.charge, false) {
+	init(other.atoms, other.natoms, other.charge, other.multiplicity);
 }
+Fragment::~Fragment() { }
 
 
 // Routines
@@ -152,11 +162,11 @@ void Molecule::calcEnuc()
 	enuc = 0.0;
 
 	// Outer loop over all atoms
-	for (int i = 0; i < log.getNatoms(); i++) {
+	for (int i = 0; i < natoms; i++) {
 		zi = atoms[i].getEffectiveCharge();
 		// Inner loop over all atoms with index
 		// greater than i, to avoid double counting
-		for (int j = i+1; j < log.getNatoms(); j++){
+		for (int j = i+1; j < natoms; j++){
 			enuc += (zi*atoms[j].getEffectiveCharge())/dist(i, j);
 		}
 	}
