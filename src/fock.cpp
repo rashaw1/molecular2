@@ -755,11 +755,35 @@ std::vector<EMatrix> Fock::compute_2body_fock_deriv(const std::vector<Atom> &ato
 	return GG;
 }
 
-FockFragment::FockFragment(IntegralEngine& ints, Molecule& m) : Fock(ints, m)
-{
+FockFragment::FockFragment(IntegralEngine& ints, Molecule& m, int _start, int _end) : Fock(ints, m), start(_start), end(_end) { 
+	Matrix S = ints.getOverlap();
+	Sxx = Eigen::MatrixXd::Zero(S.nrows(), S.nrows());
+	for (int i = 0; i < S.nrows(); i++)
+		for (int j = 0; j <= i; j++)
+			Sxx(i, j) = Sxx(j, i) = S(i, j);
 }
 
 FockFragment::FockFragment(const FockFragment& other) : Fock(other) {
-
+	Sxx = other.Sxx;
+	start = other.start;
+	end = other.end;
 }
 
+void FockFragment::buildFock(Eigen::MatrixXd& qfq, Eigen::MatrixXd& qfp, Eigen::MatrixXd& pfp) 
+{
+	int nbfs = end - start; 
+	
+	Eigen::MatrixXd Fx = qfp.block(start, start, nbfs, nbfs) * Sxx; 
+	Fx = Fx + Fx.transpose() + qfq.block(start, start, nbfs, nbfs) + Sxx * pfp.block(start, start, nbfs, nbfs) * Sxx; 
+	
+	Eigen::GeneralizedSelfAdjointEigenSolver<Eigen::MatrixXd> es(Fx, Sxx);
+	CP.resize(nbfs, nbfs);
+	eps.resize(nbfs);
+	for (int i = 0; i < nbfs; i++) {
+		eps[i] = es.eigenvalues()[0];
+		for (int j = 0; j < nbfs; j++)
+			CP(i, j) = es.eigenvectors()(i, j);
+	}
+	std::cout << es.eigenvalues() << std::endl; 
+			
+}

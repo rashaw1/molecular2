@@ -24,8 +24,8 @@ private:
 	std::vector<IntegralEngine> ints; 
 	DIISEngine diis;
 	double dimer_energy, e_frz, e_pol, e_ct, e_int; 
+	double delta_e, delta_d;
 	std::vector<double> monomer_energies;
-	Matrix Sinv; 
 	int nfrags; 
 	Eigen::MatrixXd P; 
 public:
@@ -37,7 +37,7 @@ public:
 	std::vector<double>& getMonomerEnergies() { return monomer_energies; }
 	
 	void rscf();
-	void makeDens();
+	void compute();
 };
 
 #endif

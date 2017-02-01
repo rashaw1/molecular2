@@ -144,13 +144,16 @@ int main (int argc, char* argv[])
 							log.result("Total Energy = ", hf.getEnergy() + ccobj.getEnergy() + ccobj.getETriples(), "Hartree");
 							break;
 						}
+						case 9: { // ALMO SCF 
+							ALMOSCF almo(mol, focker); 
+							almo.rscf(); 
+							break;
+						}
 						default: { }
 					}
 					log.flush();
 					cmd = log.nextCmd();
 				}
-				
-				ALMOSCF almo(mol, focker); 
 				
 				// Finalise the run
 				libint2::finalize();

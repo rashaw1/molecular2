@@ -239,6 +239,13 @@ int Logger::nextCmd()
 				cmds.erase(q);
 			} 
 			if (p != cmds.end()) cmds.erase(p);
+		} else if (token == "ALMO") {
+			if (!fragmented) {
+				Error e("ALMO", "ALMO requested but no fragments given");
+				error(e);
+			} else {
+				rval = 9; 
+			}
 		}
 		ncmd++;
 	}

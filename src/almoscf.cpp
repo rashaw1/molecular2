@@ -33,9 +33,10 @@ ALMOSCF::ALMOSCF(Molecule& m, Fock& f) : molecule(m), focker(f)
 		std::vector<libint2::Shell>& shells = frags[i].getBasis().getIntShells();
 
 		int f_nbfs = ints[nf].nbasis(shells);
-		ints.push_back(IntegralEngine(frags[i], focker.getIntegrals(), start, start+f_nbfs));
+		IntegralEngine new_engine(frags[i], focker.getIntegrals(), start, start+f_nbfs);
+		ints.push_back(new_engine);
+		fragments.push_back(FockFragment(ints[nf], frags[i], start, start+f_nbfs));
 		start += f_nbfs;
-		fragments.push_back(FockFragment(ints[nf], frags[i]));
 		
 		SCF hf(frags[i], fragments[fragments.size()-1]);
 		hf.rhf();
@@ -43,16 +44,13 @@ ALMOSCF::ALMOSCF(Molecule& m, Fock& f) : molecule(m), focker(f)
 
 		nf++;
 	}
-
-	molecule.getLog().title("ALMO Calculation");
-	molecule.getLog().print("Making initial density...\n");
-	makeDens(); 
-	molecule.getLog().localTime();
+	
+	P = Eigen::MatrixXd::Zero(focker.getHCore().nrows(), focker.getHCore().nrows());
 	
 }
 
 // Routines
-void ALMOSCF::makeDens() {
+void ALMOSCF::compute() {
 
 	// Make inverse overlap metric
 	Matrix sigma = focker.getS();
@@ -62,6 +60,7 @@ void ALMOSCF::makeDens() {
 	int nbfs = sigma.nrows();
 	int nocc = focker.getMolecule().getNel() / 2;
 	
+	Eigen::MatrixXd P_old = P; 
 	Eigen::MatrixXd S = Eigen::MatrixXd::Zero(nbfs, nbfs);
 	Eigen::MatrixXd H = Eigen::MatrixXd::Zero(nbfs, nbfs);
 	for (int i = 0; i < nbfs; i++) {
@@ -89,6 +88,8 @@ void ALMOSCF::makeDens() {
 	P = Tocc.transpose() * S * Tocc;
 	P = Tocc * P.inverse() * Tocc.transpose(); 
 	
+	delta_d = (P - P_old).norm(); 
+	
 	// Build Fock matrix
 	Eigen::MatrixXd F(nbfs, nbfs);
 	IntegralEngine& integrals = focker.getIntegrals();
@@ -102,11 +103,19 @@ void ALMOSCF::makeDens() {
 		}
 	}
 	
-	double energy = (P * (H + F)).trace() + focker.getMolecule().getEnuc();
-	//for (auto en : monomer_energies) energy -= en; 
-	std::cout << energy << std::endl;  
+	double new_dimer_energy = (P * (H + F)).trace() + focker.getMolecule().getEnuc();
+	delta_e = new_dimer_energy - dimer_energy;
+	dimer_energy = new_dimer_energy;
 	
+	Eigen::MatrixXd Q = - S * P; 
+	for (int i = 0; i < nbfs; i++) Q(i, i) += 1.0; 
+	Eigen::MatrixXd QFQ = Q * F;
+	Eigen::MatrixXd QFP = QFQ * P; 
+	QFQ = QFQ * Q.transpose(); 
+	Eigen::MatrixXd PFP = P * F * P; 
 	
+	for (auto f : fragments)
+		f.buildFock(QFQ, QFP, PFP);
 	
 }
 
@@ -118,6 +127,24 @@ void ALMOSCF::calcE()
 
 void ALMOSCF::rscf()
 {
-
+	molecule.getLog().title("ALMO Calculation");
+	
+	molecule.getLog().initIteration(); 
+	delta_d = 1.0; delta_e = 1.0; 
+	bool converged = false;
+	int iter = 0;
+	while (!converged && iter < molecule.getLog().maxiter()) {
+		compute(); 
+		molecule.getLog().iteration(iter, dimer_energy, delta_e, delta_d);
+		converged = (fabs(delta_e) < molecule.getLog().converge()) && (fabs(delta_d) < molecule.getLog().converge());
+	}
+	
+	if (converged) {
+		double energy = dimer_energy;
+		for (auto en : monomer_energies) energy -= en; 
+		molecule.getLog().result("ALMO Interaction Energy", energy * Logger::TOKCAL, "kcal / mol"); 
+	} else {
+		molecule.getLog().result("ALMO SCF failed to converge");
+	}
 }
 

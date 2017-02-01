@@ -75,15 +75,6 @@ IntegralEngine::IntegralEngine(Molecule& m) : molecule(m)
 	if(molecule.getBasis().hasECPS()) {
 		naints = naints + compute_ecp_ints(shells);
 	}
-	
-	buildTransMat();
-	//transmat.print(); std::cout << std::endl;
-	std::cout << "SINTS" << std::endl;
-	makeSpherical(sints).print(1e-6); std::cout << std::endl;
-	std::cout << std::endl << "TINTS" << std::endl;
-	makeSpherical(tints).print(1e-6); std::cout << std::endl;
-	std::cout << std::endl << "NAINTS" << std::endl;
-	makeSpherical(naints).print(1e-6); std::cout << std::endl;
   
 	molecule.getLog().print("One electron integrals complete\n");
 	molecule.getLog().localTime();

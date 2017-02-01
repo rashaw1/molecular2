@@ -56,6 +56,7 @@ int FileReader::findToken(std::string t)
 	else if (t == "ccsd(t)") { rval = 22; }
 	else if (t == "ecp") { rval = 23; }
 	else if (t == "fragments") { rval = 24; }
+	else if (t == "almo") { rval = 25; }
 	return rval;
 }
 
@@ -300,6 +301,10 @@ void FileReader::readParameters()
 						std::getline(input, line);
 						line.erase(std::remove(line.begin(), line.end(), ' '), line.end());	
 					}
+					break;
+				}
+				case 25: { //ALMO SCF
+					commands.push_back("ALMO"); 
 					break;
 				}
 				default: { // Unkown command issued
