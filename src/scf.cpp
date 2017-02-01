@@ -63,7 +63,7 @@ Vector SCF::calcErr()
 {
   Matrix& F = focker.getFockAO();
   Matrix& D = focker.getDens();
-  Matrix S = focker.getIntegrals().getOverlap();
+  Matrix S = focker.getS();
   Matrix& orthog = focker.getOrthog();
 
   Vector err = calcErr(F, D, S, orthog);

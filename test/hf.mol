@@ -1,0 +1,7 @@
+basis, default, cc-pvdz
+geom,
+H, 0, 0, 0
+F, 2.0, 0, 0
+geomend
+nthreads, 2
+rhf,

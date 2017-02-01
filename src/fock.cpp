@@ -27,16 +27,16 @@ typedef Eigen::DiagonalMatrix<double, Eigen::Dynamic, Eigen::Dynamic>
 	DiagonalMatrix;
 
 // Constructor
-Fock::Fock(IntegralEngine& ints, Molecule& m) : integrals(ints), molecule(m)
+Fock::Fock(IntegralEngine& ints, Molecule& m, int start, int finish) : integrals(ints), molecule(m)
 {
 	Eigen::setNbThreads(m.getLog().getNThreads());
 	
 	// Make the core hamiltonian matrix
-	formHCore();
+	formHCore(start, finish);
 
 	// Form the orthogonalising matrix and get initial density guess
 	try {
-		formOrthog();
+		formOrthog(start, finish);
 	} catch (Error e) {
 		molecule.getLog().error(e);
 	}
@@ -61,19 +61,60 @@ Fock::Fock(IntegralEngine& ints, Molecule& m) : integrals(ints), molecule(m)
 
 }
 
+Fock::Fock(const Fock& other) : integrals(other.integrals), molecule(other.molecule) {
+	hcore = other.hcore;
+	jkints = other.jkints;
+	jints = other.jints;
+	kints = other.kints;
+	orthog = other.orthog;
+	fockm = other.fockm;
+	focka = other.focka;
+	CP = other.CP;
+	forces = other.forces;
+	hessian = other.hessian;
+	eps = other.eps;
+	focks = other.focks;
+	dens = other.dens;
+	direct = other.direct;
+	twoints = other.twoints;
+	fromfile = other.fromfile;
+	diis = other.diis;
+	nbfs = other.nbfs;
+	MAX = other.MAX; 
+}
+
 // Form the core hamiltonian matrix
-void Fock::formHCore()
+void Fock::formHCore(int start, int finish)
 {
 	// The core Hamiltonian matrix is defined to be
 	// the sum of the kinetic and nuclear attraction
 	// matrices
-	hcore = integrals.getKinetic() + integrals.getNucAttract();
-	nbfs = hcore.nrows();
+	if (finish == -1) {
+		hcore = integrals.getKinetic() + integrals.getNucAttract();
+		nbfs = hcore.nrows();
+	} else { 
+		nbfs = finish - start;
+		hcore.assign(nbfs, nbfs, 0.0);
+		for (int i = start; i < finish; i++)
+			for (int j = start; j <= i; j++) {
+				hcore(i-start, j-start) = integrals.getKinetic(i, j) + integrals.getNucAttract(i, j); 
+				hcore(j-start, i-start) = hcore(i-start, j-start);
+			}
+	}
 }
 
-void Fock::formOrthog()
+void Fock::formOrthog(int start, int finish)
 {
-	Matrix S = integrals.getOverlap();
+	Matrix S(nbfs, nbfs);
+	if (finish == -1)
+	 	S = integrals.getOverlap();
+	else {
+		for (int i = start; i < finish; i++)
+			for (int j = start; j <= i; j++) {
+				S(i-start, j-start) = integrals.getOverlap(i, j);
+				S(j-start, i-start) = S(i-start, j-start);
+			}
+	}
 	Eigen::MatrixXd temp(S.nrows(), S.nrows());
 	for (int i = 0; i < S.nrows(); i++){
 		for (int j = 0; j < S.nrows(); j++){
@@ -188,9 +229,9 @@ void Fock::makeDens(int nocc)
 void Fock::makeJK()
 {
 	if (twoints){
-		formJK(); 
+		formJK(dens); 
 	} else if (direct) {
-		formJKdirect();
+		formJKdirect(integrals.getPrescreen(), dens);
 	} else {
 		try {
 			formJKfile();
@@ -201,7 +242,7 @@ void Fock::makeJK()
 }
 
 // Form the 2J-K matrix, given that twoints is stored in memory
-void Fock::formJK()
+void Fock::formJK(Matrix& P)
 {
 	jints.assign(nbfs, nbfs, 0.0);
 	kints.assign(nbfs, nbfs, 0.0);
@@ -209,8 +250,8 @@ void Fock::formJK()
 		for (int v = 0; v < nbfs ; v++){
 			for (int s = 0; s < nbfs; s++){
 				for (int l = 0; l < nbfs; l++){
-					jints(u, v) += dens(s, l)*integrals.getERI(u, v, s, l);
-					kints(u, v) += dens(s, l)*integrals.getERI(u, l, s, v);
+					jints(u, v) += P(s, l)*integrals.getERI(u, v, s, l);
+					kints(u, v) += P(s, l)*integrals.getERI(u, l, s, v);
 				}
 			}
 		}
@@ -218,7 +259,7 @@ void Fock::formJK()
 	jkints = jints - 0.5*kints;
 }
 // Form JK using integral direct methods
-void Fock::formJKdirect()
+void Fock::formJKdirect(const Matrix& Schwarz, Matrix& P)
 {
 	using libint2::Shell;
 	using libint2::Engine;
@@ -228,9 +269,8 @@ void Fock::formJKdirect()
 	const auto n = integrals.nbasis(shells);
 	jints.assign(n, n, 0.0);
 	kints.assign(n, n, 0.0);
-	const Matrix& D = dens; 
+	const Matrix& D = P; 
 	
-	const Matrix& Schwarz = integrals.getPrescreen();
 	const auto do_schwarz_screen = Schwarz.ncols() != 0 && Schwarz.nrows() != 0;
 	EMatrix D_shblk_norm = integrals.compute_shellblock_norm(shells, D);
 	auto fock_precision = molecule.getLog().precision();
@@ -729,4 +769,80 @@ std::vector<EMatrix> Fock::compute_2body_fock_deriv(const std::vector<Atom> &ato
 	}
 
 	return GG;
+}
+
+FockFragment::FockFragment(int _start, int _finish, int _offset, Matrix& S, IntegralEngine& ints, Molecule& m) : Fock(ints, m, _start, _finish), start(_start), finish(_finish)
+{
+	int size = finish - start;
+	shell_offset = _offset;
+	Sxx.assign(size, size, 0.0);
+	for (int i = start; i < finish; i++) {
+		for (int j = start; j <= i; j++) {
+			Sxx(i-start, j-start) = S(i, j);
+			Sxx(j-start, i-start) = S(i, j);
+		}
+	}
+	diis = false;
+}
+
+FockFragment::FockFragment(const FockFragment& other) : Fock(other.integrals, other.molecule, other.start, other.finish) {
+	start = other.start;
+	finish = other.finish;
+	shell_offset = other.shell_offset;
+	Sxx = other.Sxx; 
+}
+
+void FockFragment::makeFock(Matrix& sfs) {
+	focka.assign(nbfs, nbfs, 0.0);
+	for (int i = start; i < finish; i++)
+		for (int j = start; j <= i; j++)
+			focka(i-start, j-start) = focka(j-start, i-start) = sfs(i, j);
+	focka = Sxx * focka * Sxx; 
+	
+	if (diis) { // Archive for averaging
+		if (iter >= MAX) {
+			focks.erase(focks.begin());
+		}
+		focks.push_back(focka);
+		iter++;
+	}		
+}
+
+void FockFragment::makeJK()
+{
+	if (twoints){
+		formJK(dens); 
+	} else if (direct) {
+		Matrix& fullSchwarz = integrals.getPrescreen();
+		std::vector<libint2::Shell>& shells = molecule.getBasis().getIntShells();
+		Matrix Schwarz(shells.size(), shells.size());
+		for (int i = 0; i < shells.size(); i++)
+			for (int j = 0; j < shells.size(); j++)
+				Schwarz(i, j) = fullSchwarz(i+shell_offset, j+shell_offset); 
+		formJKdirect(Schwarz, dens);
+	} else {
+		try {
+			formJKfile();
+		} catch (Error e) {
+			molecule.getLog().error(e);
+		}
+	}
+}
+
+// Form the 2J-K matrix, given that twoints is stored in memory
+void FockFragment::formJK(Matrix& P)
+{
+	jints.assign(nbfs, nbfs, 0.0);
+	kints.assign(nbfs, nbfs, 0.0);
+	for (int u = 0; u < nbfs; u++){
+		for (int v = 0; v < nbfs ; v++){
+			for (int s = 0; s < nbfs; s++){
+				for (int l = 0; l < nbfs; l++){
+					jints(u, v) += P(s, l)*integrals.getERI(start + u, start + v, start + s, start + l);
+					kints(u, v) += P(s, l)*integrals.getERI(start + u, start + l, start + s, start + v);
+				}
+			}
+		}
+	}
+	jkints = jints - 0.5*kints;
 }

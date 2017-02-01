@@ -133,6 +133,7 @@ public:
   double getMemory() const { return memory; }
   Atom getAtom(int i) const { return atoms[i]; }
   Fragment& getFragment(int i) { return fragments[i]; }
+  std::vector<Fragment>& getFragments() { return fragments; }
   int nextCmd(); // Return next directive 
   double precision() const { return PRECISION; }
   double thrint() const { return THRINT; }
