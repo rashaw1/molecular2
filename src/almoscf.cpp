@@ -11,27 +11,13 @@
 #include "almoscf.hpp"
 #include "scf.hpp"
 #include "logger.hpp"
-#include "integrals.hpp"
 #include <cmath>
-#include <Eigen/Dense>
 #include "mvector.hpp"
 #include <libint2.hpp>
 
 // Constructor
 ALMOSCF::ALMOSCF(Molecule& m, Fock& f) : molecule(m), focker(f) 
-{
-	// Build Sinv
-	Matrix S = focker.getIntegrals().getOverlap();
-	Eigen::MatrixXd s_(S.nrows(), S.ncols());
-	for (int i = 0; i < S.nrows(); i++)
-		for (int j = 0; j<= i; j++)
-			s_(i, j) = s_(j, i) = S(i, j);
-	s_ = s_.inverse();
-	Sinv.assign(S.nrows(), S.ncols(), 0.0);
-	for (int i = 0; i < S.nrows(); i++) 
-		for (int j = 0; j <= i; j++)
-			Sinv(i, j) = Sinv(j, i) = s_(i, j);
-	
+{	
 	// Zero out energies
 	dimer_energy = e_frz = e_pol = e_ct = e_int = 0.0;
 	
@@ -39,53 +25,90 @@ ALMOSCF::ALMOSCF(Molecule& m, Fock& f) : molecule(m), focker(f)
 	std::vector<Fragment>& frags = molecule.getLog().getFragments(); 
 	nfrags = frags.size();
 	int start = 0;
-	int shell_offset = 0; 
-	Matrix T(S.nrows(), S.nrows(), 0.0);
-	Matrix tx;
-	Matrix ty;
-	for (auto f : frags) {
+	int nf = 0;
+	for (int i = 0; i < frags.size(); i++) {
 		
-		f.buildShellBasis();
-		f.calcEnuc();
-		std::vector<libint2::Shell>& shells = f.getBasis().getIntShells();
+		frags[i].buildShellBasis();
+		frags[i].calcEnuc();
+		std::vector<libint2::Shell>& shells = frags[i].getBasis().getIntShells();
+
+		int f_nbfs = ints[nf].nbasis(shells);
+		ints.push_back(IntegralEngine(frags[i], focker.getIntegrals(), start, start+f_nbfs));
+		start += f_nbfs;
+		fragments.push_back(FockFragment(ints[nf], frags[i]));
 		
-		int f_nbfs = focker.getIntegrals().nbasis(shells);
-		fragments.push_back(FockFragment(start, start+f_nbfs, shell_offset, S, focker.getIntegrals(), f));
-		shell_offset += shells.size(); 
-		
-		SCF hf(f, fragments[fragments.size()-1]);
+		SCF hf(frags[i], fragments[fragments.size()-1]);
 		hf.rhf();
 		monomer_energies.push_back(hf.getEnergy()); 
 
-		Matrix& cp = fragments[fragments.size()-1].getCP();
-		if (start == 0) tx = fragments[fragments.size()-1].getCP();
-		else ty = fragments[fragments.size()-1].getCP();
-		for (int i = 0; i < cp.nrows(); i++)
-			for (int j = 0; j < cp.ncols(); j++)
-				T(i+start, j+start) = cp(i, j);
-		start += f_nbfs;
+		nf++;
 	}
 
-	T = T.transpose() * S * T;
-	Eigen::MatrixXd tst(T.nrows(), T.ncols());
-	for (int i = 0; i < T.nrows(); i++)
-		for (int j = 0; j < T.nrows(); j++)
-			tst(i, j) = T(i, j);
-	tst = tst.inverse();
-
-	T.assign(tx.ncols(), ty.ncols(), 0.0);
-	for (int i = 0; i < tx.ncols(); i++)
-		for (int j = tx.ncols(); j < tx.ncols() + ty.ncols(); j++)
-			T(i, j-tx.ncols()) = tst(i, j);
-	(tx * T * ty.transpose()).print(); std::cout << std::endl;
-	for (int i = 0; i < tx.ncols(); i++)
-		for (int j = tx.ncols(); j < tx.ncols() + ty.ncols(); j++)
-			T(i, j - tx.ncols()) = Sinv(i, j);
-	T.print(); std::cout << std::endl;
+	molecule.getLog().title("ALMO Calculation");
+	molecule.getLog().print("Making initial density...\n");
+	makeDens(); 
+	molecule.getLog().localTime();
 	
 }
 
 // Routines
+void ALMOSCF::makeDens() {
+
+	// Make inverse overlap metric
+	Matrix sigma = focker.getS();
+	Matrix& hcore = focker.getHCore();
+	
+	//Build T matrix
+	int nbfs = sigma.nrows();
+	int nocc = focker.getMolecule().getNel() / 2;
+	
+	Eigen::MatrixXd S = Eigen::MatrixXd::Zero(nbfs, nbfs);
+	Eigen::MatrixXd H = Eigen::MatrixXd::Zero(nbfs, nbfs);
+	for (int i = 0; i < nbfs; i++) {
+		for (int j = 0; j <= i; j++) {
+			S(i, j) = S(j, i) = sigma(i, j); 
+			H(i, j) = H(j, i) = hcore(i, j);
+		}
+	}
+	
+	Eigen::MatrixXd Tocc = Eigen::MatrixXd::Zero(nbfs, nocc); 
+	int row_offset = 0; int col_offset = 0; 
+	for (auto f : fragments) {
+		Matrix& f_cp = f.getCP(); 
+		int f_nocc = f.getMolecule().getNel() / 2;
+		int f_nbfs = f.getHCore().nrows(); 
+		
+		for (int col = 0; col < f_nocc; col++)
+			for (int row = 0; row < f_nbfs; row++)
+				Tocc(row+row_offset, col+col_offset) = f_cp(row, col); 
+		
+		row_offset += f_nbfs; 
+		col_offset += f_nocc; 
+	}
+	
+	P = Tocc.transpose() * S * Tocc;
+	P = Tocc * P.inverse() * Tocc.transpose(); 
+	
+	// Build Fock matrix
+	Eigen::MatrixXd F(nbfs, nbfs);
+	IntegralEngine& integrals = focker.getIntegrals();
+	for (int i = 0; i < nbfs; i++) {
+		for (int j = 0; j < nbfs; j++) {
+			F(i, j) = H(i, j);
+			
+			for (int r = 0; r < nbfs; r++)
+				for (int s = 0; s < nbfs; s++)
+					F(i, j) += (2*integrals.getERI(i, j, r, s) - integrals.getERI(i, s, r, j)) * P(s, r); 
+		}
+	}
+	
+	double energy = (P * (H + F)).trace() + focker.getMolecule().getEnuc();
+	//for (auto en : monomer_energies) energy -= en; 
+	std::cout << energy << std::endl;  
+	
+	
+	
+}
 
 // Calculate the scf energy
 void ALMOSCF::calcE()

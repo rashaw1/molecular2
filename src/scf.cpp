@@ -39,7 +39,8 @@ void SCF::calcE()
 double SCF::calcE(const Matrix& hcore, const Matrix& dens, const Matrix& fock) 
 {
   one_E = 0.5*(dens*hcore).trace();
-  two_E = 0.5*(dens*fock).trace();
+  two_E = 0.5*(dens*fock).trace() - one_E;
+  one_E *= 2.0; 
   return (one_E+two_E);
 }
 

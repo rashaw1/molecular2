@@ -80,10 +80,13 @@ private:
 	Matrix tints;
 	Matrix naints;
 	Matrix prescreen;
+	Matrix transmat; 
 	Vector sizes;
 	S8EvenTensor4 twoints;
 public:
 	IntegralEngine(Molecule& m); //Constructor
+	IntegralEngine(Molecule& m, const IntegralEngine& i, int start, int finish); 
+	IntegralEngine(const IntegralEngine& other);
 	~IntegralEngine();
 
 	// Accessors
@@ -94,6 +97,7 @@ public:
 	Matrix getKinetic() const { return tints; }
 	double getNucAttract(int i, int j) const { return naints(i, j); }
 	Matrix getNucAttract() const { return naints; }
+	Matrix& getTransMat() { return transmat; }
 	double getERI(int i, int j, int k, int l) const;
 	S8EvenTensor4 getERI() const { return twoints; }
 	Matrix& getPrescreen() { return prescreen; }
@@ -102,7 +106,8 @@ public:
 	// Intrinsic routines
 	void printERI(std::ostream& output, int NSpher) const;
 	double makeContracted(Vector& c1, Vector& c2, Vector& ints) const;
-	Matrix makeSpherical(const Matrix& ints, const Vector& lnums) const;
+	Matrix makeSpherical(const Matrix& ints) const;
+	void buildTransMat(); 
 
 	size_t nbasis(const std::vector<libint2::Shell>& shells);
 	size_t max_nprim(const std::vector<libint2::Shell>& shells);

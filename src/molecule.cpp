@@ -71,7 +71,7 @@ void Fragment::init(Atom* as, int nat, int q, int mult)
 		bfset = log.getBasis();
 		
 		nel = 0;
-		for (int i = 0; i < natoms; i++)
+		for (int i = 0; i < natoms; i++) 
 			nel += atoms[i].getCharge();
 	}
 }

@@ -55,7 +55,7 @@ protected:
   bool direct, twoints, fromfile, diis;
   int nbfs, iter, MAX;
 public:
-  Fock(IntegralEngine& ints, Molecule& m, int start = 0, int finish = -1);
+  Fock(IntegralEngine& ints, Molecule& m);
   Fock(const Fock& other);
   IntegralEngine& getIntegrals() { return integrals; }
   Molecule& getMolecule() { return molecule; }
@@ -71,8 +71,8 @@ public:
   virtual Matrix getS() { return integrals.getOverlap(); }
   Matrix& getDens() { return dens; }
   void setDIIS(bool d) { diis = d; } 
-  void formHCore(int start = 0, int finish = -1);
-  void formOrthog(int start = 0, int finish = -1);
+  void formHCore();
+  void formOrthog();
   void transform(bool first = false);
   void diagonalise();
   virtual void makeJK();
@@ -94,16 +94,9 @@ public:
 
 class FockFragment : public Fock 
 {
-private:
-	int start, finish, shell_offset;
-	Matrix Sxx; 
 public:
-	FockFragment(int _start, int _finish, int _offset, Matrix& S, IntegralEngine& ints, Molecule& m);
+	FockFragment(IntegralEngine& ints, Molecule& m);
 	FockFragment(const FockFragment& other);
-	virtual void makeFock(Matrix& sfs);
-	virtual void makeJK();
-	virtual void formJK(Matrix& P);
-	virtual Matrix getS() { return Sxx; }
 };
 
 #endif

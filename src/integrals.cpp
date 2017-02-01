@@ -29,6 +29,7 @@
 #include "tensor4.hpp"
 #include "ecp.hpp"
 #include "ecpint.hpp"
+#include "multiarr.hpp"
 #include "gshell.hpp"
 
 #include <cmath>
@@ -74,6 +75,15 @@ IntegralEngine::IntegralEngine(Molecule& m) : molecule(m)
 	if(molecule.getBasis().hasECPS()) {
 		naints = naints + compute_ecp_ints(shells);
 	}
+	
+	buildTransMat();
+	//transmat.print(); std::cout << std::endl;
+	std::cout << "SINTS" << std::endl;
+	makeSpherical(sints).print(1e-6); std::cout << std::endl;
+	std::cout << std::endl << "TINTS" << std::endl;
+	makeSpherical(tints).print(1e-6); std::cout << std::endl;
+	std::cout << std::endl << "NAINTS" << std::endl;
+	makeSpherical(naints).print(1e-6); std::cout << std::endl;
   
 	molecule.getLog().print("One electron integrals complete\n");
 	molecule.getLog().localTime();
@@ -110,12 +120,56 @@ IntegralEngine::IntegralEngine(Molecule& m) : molecule(m)
 			printERI(molecule.getLog().getIntFile(), M);
 		}	
 	} 
+}
+
+IntegralEngine::IntegralEngine(Molecule& m, const IntegralEngine& ints, int start, int finish) : molecule(m)
+{
+	int nbfs = finish - start; 
 	
-	//std::cout << "\n\n";
-	//sints.print();
-	//std::cout << "\n\n";
-	//tints.print(); std::cout << "\n";
-	//naints.print(); std::cout << "\n";
+	int ones = (nbfs*(nbfs+1));
+	sizes.resize(4);
+	sizes[0] = ones;
+	sizes[1] = (ones*(ones+1));
+	sizes[2] = ones;
+	sizes[3] = (ones*(ones+1));
+	
+	sints.assign(nbfs, nbfs, 0.0);
+	tints.assign(nbfs, nbfs, 0.0);
+	for (int i = 0; i < nbfs; i++) 
+		for (int j = 0; j < nbfs; j++) {
+			sints(i, j) = ints.getOverlap(i+start, j+start);
+			tints(i, j) = ints.getKinetic(i+start, j+start);
+		}
+		
+	auto &shells = molecule.getBasis().getIntShells();
+	std::vector<Atom> atoms;
+	for (int i = 0; i < molecule.getNAtoms(); i++) atoms.push_back(molecule.getAtom(i));
+	naints = compute_1body_ints(shells, libint2::Operator::nuclear, atoms);
+	
+	if(molecule.getBasis().hasECPS()) {
+		naints = naints + compute_ecp_ints(shells);
+	}
+	
+	prescreen = compute_schwarz_ints<>(shells);
+	
+	if ( !molecule.getLog().direct() ) {
+		twoints.assign(nbfs, 0.0);
+		for (int i = 0; i < nbfs; i++)
+			for (int j = 0; j <= i; j++)
+				for (int k = 0; k <= i; k++)
+					for (int l = 0; l <= k; l++)
+						twoints(i, j, k, l) = ints.getERI(i+start, j+start, k+start, l+start);
+	}
+}
+
+IntegralEngine::IntegralEngine(const IntegralEngine& other) : molecule(other.molecule) {
+	sints = other.sints;
+	tints = other.tints;
+	transmat = other.transmat; 
+	naints = other.naints;
+	prescreen = other.prescreen;
+	sizes = other.sizes;
+	twoints = other.twoints;
 }
 
 IntegralEngine::~IntegralEngine() {
@@ -200,106 +254,64 @@ double IntegralEngine::makeContracted(Vector& c1, Vector& c2, Vector& ints) cons
 // Sphericalise a matrix of 1e- integrals (ints)
 // where the cols have angular momenta lnums.
 // Returns matrix of integrals in canonical order
-Matrix IntegralEngine::makeSpherical(const Matrix& ints, const Vector& lnums) const
+Matrix IntegralEngine::makeSpherical(const Matrix& ints) const
 {
 	// Calculate the size of matrix needed
-	int scount = 0, pcount = 0, dcount = 0, fcount = 0, gcount = 0; 
-	for (int i = 0; i < lnums.size(); i++){
-		switch((int)(lnums(i))){
-			case 1: { pcount++; break; } // p-type
-			case 2: { dcount++; break; } // d-type
-			case 3: { fcount++; break; } // f-type
-			case 4: { gcount++; break; } // g-type
-			default: { scount++; } // Assume s-type
-		}
+	return transmat * ints * transmat.transpose(); 
+}
+
+
+void IntegralEngine::buildTransMat() 
+{
+	auto &shells = molecule.getBasis().getIntShells();
+	
+	int natoms = molecule.getNAtoms();
+	int ncart = nbasis(shells); // No. of cartesian basis functions
+	int nspher = 0; // No. of spherical basis functions
+	for (int i = 0; i < natoms; i++){
+		nspher += molecule.getAtom(i).getNSpherical();
 	}
-
-	// Number of spherical basis functions
-	int M = scount + pcount + 5*(dcount/6) + 7*(fcount/10) + 9*(gcount/15); 
-	// Number of cartesian basis functions.
-	int N = lnums.size();
-
-	// Declare the matrix to return the transformed integrals in
-	Matrix retInts;
-
-	// Construct a reduced list of lnums, and
-	// corresponding m-quantum numbers
-	Vector slnums(M); Vector smnums(M);
-	int j=0, k = 0; // Counter for slnums
-	while(j < N){
-		switch((int)(lnums(j))){
-			case 1: { // p-type 
-				slnums[k] = 1; smnums[k] = 1;
-				slnums[++k] = 1; smnums[k] = -1;
-				slnums[++k] = 1; smnums[k++] = 0; 
-				j += 3;
-				break;
-			} 
+	
+	transmat.assign(nspher, ncart, 0.0);
+	int row = 0; int col_offset = 0; 
+	for (auto s : shells) {
+		int lam = s.contr[0].l; 
+		switch(lam) {
+			case 0: { // s-type
+				transmat(row++, col_offset) = 1.0;
+				break; 
+			}
+			case 1: { // l-type 
+				transmat(row++, col_offset) = 1.0;
+				transmat(row++, col_offset+1) = 1.0;
+				transmat(row++, col_offset+2) = 1.0;
+				break; 
+			}
 			case 2: { // d-type
-				slnums[k] = 2; smnums[k] = 0;
-				slnums[++k] = 2; smnums[k] = -2;
-				slnums[++k] = 2; smnums[k] = 1;
-				slnums[++k] = 2; smnums[k] = 2;
-				slnums[++k] = 2; smnums[k++] = -1;
-				j += 6;
+				transmat(row, col_offset) = -0.5;
+				transmat(row, col_offset + 3) = -0.5;
+				transmat(row++, col_offset + 5) = 1.0;
+				transmat(row++, col_offset + 1) = 1.0; 
+				transmat(row++, col_offset + 2) = 1.0;
+				transmat(row, col_offset) = 0.5*std::sqrt(3.0);
+				transmat(row++, col_offset + 3) = -0.5*std::sqrt(3.0); 
+				transmat(row++, col_offset + 4) = 1.0;
 				break;
 			}
 			case 3: { // f-type
-				slnums[k] = 3; smnums[k] = 0;
-				slnums[++k] = 3; smnums[k] = -1;
-				slnums[++k] = 3; smnums[k] = 1;
-				slnums[++k] = 3; smnums[k] = -2;
-				slnums[++k] = 3; smnums[k] = 2;
-				slnums[++k] = 3; smnums[k] = -3;
-				slnums[++k] = 3; smnums[k++] = 3;
-				j+=10;
 				break;
 			}
 			case 4: { // g-type
-				slnums[k] = 4; smnums[k] = 0;
-				slnums[++k] = 4; smnums[k] = -1;
-				slnums[++k] = 4; smnums[k] = 1;
-				slnums[++k] = 4; smnums[k] = -2;
-				slnums[++k] = 4; smnums[k] = 2;
-				slnums[++k] = 4; smnums[k] = -3;
-				slnums[++k] = 4; smnums[k] = 3;
-				slnums[++k] = 4; smnums[k] = -4;
-				slnums[++k] = 4; smnums[k++] = 4;
-				j += 15;
 				break;
 			}
-			default: { // assume s-type
-				slnums[k] = 0; smnums[k++] = 0;
-				j++;
+			case 5: { // h-type
+				break;
 			}
+			
 		}
+ 		col_offset += (lam+1)*(lam+2)/2;
 	}
-
-	// Make the transformation matrix
-	Matrix trans(M, N, 0.0);
-	// Loop through all the slnums, looking up the coefficients
-	// as needed. 
-	j = 0; // Column counter
-	int m = 0; // m-counter
-	for(int i = 0; i < M; i++){
-		// Get the coefficients
-		formTransMat(trans, i, j, (int)(slnums(i)), (int)(smnums(i)));
-		if (m == 2*slnums(i)){ // Increment j by a suitable amount
-			switch((int)(slnums(i))){
-				case 1: { j+=3; break;}
-				case 2: { j+=6; break;}
-				case 3: { j+=10; break;}
-				case 4: { j+=15; break;}
-				default: { j+=1; }
-			}
-			m = 0;
-		} else { m++; }
-	}
-
-	// Now transform the integral matrix
-	retInts = trans*ints;
-	retInts = retInts*(trans.transpose());
-	return retInts;
+	
 }
 
 size_t IntegralEngine::nbasis(const std::vector<libint2::Shell>& shells) {
