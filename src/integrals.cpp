@@ -54,11 +54,11 @@ IntegralEngine::IntegralEngine(Molecule& m) : molecule(m)
 	int ones = (N*(N+1));
 	sizes.resize(4);
 	sizes[0] = ones;
-	sizes[1] = (ones*(ones+1));
+	sizes[1] = (ones*(ones+1))/4;
   
 	ones = (M*(M+1));
 	sizes[2] = ones;
-	sizes[3] = (ones*(ones+1));
+	sizes[3] = (ones*(ones+1))/4;
 
 	molecule.getLog().title("INTEGRAL GENERATION");
   
@@ -120,9 +120,9 @@ IntegralEngine::IntegralEngine(Molecule& m, const IntegralEngine& ints, int star
 	int ones = (nbfs*(nbfs+1));
 	sizes.resize(4);
 	sizes[0] = ones;
-	sizes[1] = (ones*(ones+1));
+	sizes[1] = (ones*(ones+1))/4;
 	sizes[2] = ones;
-	sizes[3] = (ones*(ones+1));
+	sizes[3] = (ones*(ones+1))/4;
 	
 	sints.assign(nbfs, nbfs, 0.0);
 	tints.assign(nbfs, nbfs, 0.0);

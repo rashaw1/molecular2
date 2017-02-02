@@ -251,7 +251,7 @@ void Vector::print(double PRECISION) const
     if (fabs(v[i]) > PRECISION){
       val = v[i];
     } else { val = 0.0; }
-    std::cout << std::setprecision(10) << std::setw(14) << val;
+    std::cout << std::setprecision(8) << std::setw(14) << val;
 	if (i % 10 == 9) std::cout << std::endl;
   }
   std::cout << "\n";

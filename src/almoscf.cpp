@@ -84,7 +84,7 @@ void ALMOSCF::compute() {
 		row_offset += f_nbfs; 
 		col_offset += f_nocc; 
 	}
-	
+
 	P = Tocc.transpose() * S * Tocc;
 	P = Tocc * P.inverse() * Tocc.transpose(); 
 	
@@ -114,8 +114,8 @@ void ALMOSCF::compute() {
 	QFQ = QFQ * Q.transpose(); 
 	Eigen::MatrixXd PFP = P * F * P; 
 	
-	for (auto f : fragments)
-		f.buildFock(QFQ, QFP, PFP);
+	for (int i = 0; i < fragments.size(); i++)
+		fragments[i].buildFock(QFQ, QFP, PFP);
 	
 }
 
@@ -135,7 +135,7 @@ void ALMOSCF::rscf()
 	int iter = 0;
 	while (!converged && iter < molecule.getLog().maxiter()) {
 		compute(); 
-		molecule.getLog().iteration(iter, dimer_energy, delta_e, delta_d);
+		molecule.getLog().iteration(iter++, dimer_energy, delta_e, delta_d);
 		converged = (fabs(delta_e) < molecule.getLog().converge()) && (fabs(delta_d) < molecule.getLog().converge());
 	}
 	

@@ -776,7 +776,7 @@ void FockFragment::buildFock(Eigen::MatrixXd& qfq, Eigen::MatrixXd& qfp, Eigen::
 	Eigen::MatrixXd Fx = qfp.block(start, start, nbfs, nbfs) * Sxx; 
 	Fx = Fx + Fx.transpose() + qfq.block(start, start, nbfs, nbfs) + Sxx * pfp.block(start, start, nbfs, nbfs) * Sxx; 
 	
-	Eigen::GeneralizedSelfAdjointEigenSolver<Eigen::MatrixXd> es(Fx, Sxx);
+	Eigen::GeneralizedSelfAdjointEigenSolver<Eigen::MatrixXd> es(Fx, Sxx); 
 	CP.resize(nbfs, nbfs);
 	eps.resize(nbfs);
 	for (int i = 0; i < nbfs; i++) {
@@ -784,6 +784,5 @@ void FockFragment::buildFock(Eigen::MatrixXd& qfq, Eigen::MatrixXd& qfp, Eigen::
 		for (int j = 0; j < nbfs; j++)
 			CP(i, j) = es.eigenvectors()(i, j);
 	}
-	std::cout << es.eigenvalues() << std::endl; 
 			
 }
