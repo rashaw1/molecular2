@@ -101,7 +101,7 @@ IntegralEngine::IntegralEngine(Molecule& m) : molecule(m)
 		
 		molecule.getLog().print("Two electron integrals completed.\n");
 		std::string mem = "Approximate memory usage = ";
-		mem += std::to_string(M*M*M*M*sizeof(double)/(1024.0*1024.0));
+		mem += std::to_string(ests(3));
 		mem += " MB\n";
 		molecule.getLog().print(mem);
 		molecule.getLog().localTime();

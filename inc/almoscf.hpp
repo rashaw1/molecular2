@@ -23,16 +23,18 @@ private:
 	std::vector<FockFragment> fragments; 
 	std::vector<IntegralEngine> ints; 
 	DIISEngine diis;
-	double dimer_energy, e_frz, e_pol, e_ct, e_int; 
+	double dimer_energy, e_frz, e_pol, e_ct, e_int, e_pert_2, e_pert_4; 
 	double delta_e, delta_d;
 	std::vector<double> monomer_energies;
-	int nfrags; 
-	Eigen::MatrixXd P; 
+	std::vector<Eigen::MatrixXd> focks; 
+	int nfrags, MAX; 
+	Eigen::MatrixXd P, F; 
 public:
 	// Constructor
 	ALMOSCF(Molecule& m, Fock& f);
 	// Routines
-	void calcE();
+	void perturb(bool order4 = false);
+	void setFragments(bool unrestricted = false);
 	double getDimerEnergy() const { return dimer_energy; } 
 	std::vector<double>& getMonomerEnergies() { return monomer_energies; }
 	

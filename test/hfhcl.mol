@@ -1,5 +1,5 @@
-basis, default, cc-pvdz
-!integral,direct
+basis, default, avdz
+memory,4000
 geom,angstrom
 H, 0, 0, 0
 Cl, 1.3, 0, 0

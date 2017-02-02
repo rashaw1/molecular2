@@ -96,8 +96,8 @@ class FockFragment : public Fock
 {
 private:
 	int start, end;
-	Eigen::MatrixXd Sxx; 
 public:
+	Eigen::MatrixXd Sxx; 
 	FockFragment(IntegralEngine& ints, Molecule& m, int start, int end);
 	FockFragment(const FockFragment& other);
 	void buildFock(Eigen::MatrixXd& qfq, Eigen::MatrixXd& qfp, Eigen::MatrixXd& pfp); 
