@@ -15,8 +15,6 @@
 #include <cmath>
 #include "mathutil.hpp"
 #include "error.hpp"
-#include "mvector.hpp"
-#include "matrix.hpp"
 #include <boost/math/special_functions/gamma.hpp>
 #include <boost/math/special_functions/erf.hpp>
 #include <boost/math/constants/constants.hpp>
@@ -70,7 +68,7 @@ void fact2Array(int i, double *values) {
 Vector boys(double x, int mmax, int mmin, double PRECISION)
 {
   // Initialise return array
-  Vector rvec(mmax - mmin + 1, 0.0); // +1 as need to include both mmax and mmin
+  Vector rvec = Vector::Zero(mmax - mmin + 1); // +1 as need to include both mmax and mmin
 
   if(x < PRECISION) { // x ~ 0, so no need for recursion
 
@@ -305,17 +303,16 @@ Vector lmultiply(const Vector& v, const Matrix& mat)
 {
   // Assume left multiplication implies transpose                                                                                                                   
   int n = v.size();
-  int cols = mat.ncols();
-  int rows = mat.nrows();
+  int cols = mat.cols();
+  int rows = mat.rows();
   Vector rVec(cols); // Return vector should have dimension cols                                                                                                    
   // For this to work we require n = rows                                                                                                                           
   if (n != rows) {
     throw(Error("VECMATMULT", "Vector and matrix are wrong sizes to multiply."));
   } else { // Do the multiplication                                                                                                                                 
     for (int i = 0; i < cols; i++){
-      Vector temp(rows); // Get each column of the matrix                                                                                                           
-      temp = mat.colAsVector(i);
-      rVec[i] = inner(v, temp);
+      Vector temp = mat.col(i);
+      rVec[i] = v.dot(temp);
     }
   }
   return rVec;
@@ -325,17 +322,16 @@ Vector lmultiply(const Vector& v, const Matrix& mat)
 Vector rmultiply(const Matrix& mat, const Vector& v)
 {
   int n = v.size();
-  int cols = mat.ncols();
-  int rows = mat.nrows();
+  int cols = mat.cols();
+  int rows = mat.rows();
   Vector rVec(rows); // Return vector should have dimension rows                                                                                                    
   // For this to work we require n = cols                                                                                                                           
   if (n != cols) {
     throw(Error("MATVECMULT", "Vector and matrix are wrong sizes to multiply."));
   } else { // Do the multiplication                                                                                                                                 
     for (int i = 0; i < rows; i++){
-      Vector temp(cols);
-      temp = mat.rowAsVector(i);
-      rVec[i] = inner(v, temp);
+      Vector temp = mat.row(i);
+      rVec[i] = v.dot(temp);
     }
   }
   return rVec;

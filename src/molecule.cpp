@@ -11,11 +11,8 @@
 #include <iostream>
 #include "logger.hpp"
 #include "molecule.hpp"
-#include "matrix.hpp"
-#include "mvector.hpp"
 #include "error.hpp"
 #include "basisreader.hpp"
-#include "solvers.hpp"
 #include <cmath>
 #include <vector>
 #include <libint2.hpp>
@@ -116,7 +113,7 @@ Fragment::~Fragment() { }
 void Molecule::rotate(const Matrix& U)
 {
 	// Check if 3 x 3
-	if(U.nrows() == 3 && U.ncols() == 3){
+	if(U.rows() == 3 && U.cols() == 3){
 		for (int i = 0; i < log.getNatoms(); i++){
 			atoms[i].rotate(U); // Do the rotation
 		}
@@ -177,7 +174,7 @@ Vector Molecule::com() const
 {
 	// Coordinate vector of centre of mass, set to all
 	// zeroes for summations
-	Vector c(3, 0.0); 
+	Vector c = Vector::Zero(3);
   
 	// Loop over all atoms
 	double sum = 0.0;
@@ -201,11 +198,10 @@ Vector Molecule::com() const
 Vector Molecule::getInertia(bool shift) 
 {
 	Vector v(3); // To return the moments in
-	Matrix inertia(3, 3, 0.0); // To contain the elements
+	Matrix inertia = Matrix::Zero(3, 3); // To contain the elements
 
 	// We must translate to centre of mass coordinates
-	Vector c(3);
-	c = -1.0*com();
+	Vector c = -1.0*com();
 	translate(c(0), c(1), c(2));
 
 	// Loop over all atoms
@@ -234,27 +230,11 @@ Vector Molecule::getInertia(bool shift)
 	inertia(2, 1) = inertia(1, 2);
     
 	// Now we diagonalise, only need eigenvalues
-	bool success;
-	if(shift){
-		Matrix U; 
-		// U is the unitary transformation matrix
-		// i.e. the eigenvectors of I
-		success = symqr(inertia, v, U, log.precision());
-		if (success) {
-			rotate(U);
-		}
-	} else {
-		// only calculate the eigenvalues
-		success = symqr(inertia, v, log.precision());
-	}
-
-	if(!success){
-		v[0] = v[1] = v[2] = 0.0;
-		Error e("INERTIA", "Inertia matrix failed to diagonalise.");
-		log.error(e);
-	}
-
-	v.sort();
+	EigenSolver es(inertia);
+	v = es.eigenvalues();
+	if(shift)
+		rotate(es.eigenvectors());
+	
 	return v;
 }
 
@@ -263,9 +243,8 @@ Vector Molecule::getInertia(bool shift)
 // dist2 gives the square of this distance
 double Molecule::dist2(int i, int j) const
 {
-	Vector dvec(3);
-	dvec = atoms[j].getCoords() - atoms[i].getCoords(); 
-	return inner(dvec, dvec);
+	Vector dvec = atoms[j].getCoords() - atoms[i].getCoords(); 
+	return dvec.dot(dvec);
 }
 
 double Molecule::dist(int i, int j) const {
@@ -277,9 +256,8 @@ double Molecule::bondAngle(int i, int j, int k) const
 {
 	// Get the differences of the position vectors
 	// and calculate the angle between them
-	Vector rij(3); Vector rjk(3);
-	rij = atoms[j].getCoords();
-	rjk = rij;
+	Vector rij = atoms[j].getCoords();
+	Vector rjk = rij;
 	rij = rij - atoms[i].getCoords();
 	rjk = atoms[k].getCoords() - rjk;
 	return angle(rij, rjk); // Vector class friend function
@@ -291,23 +269,21 @@ double Molecule::oopAngle(int i, int j, int k, int l) const
 	// [(elj x elk).eli]/sin(anglejlk)
 	// and sin(anglejlk) = ||ejl x elk||
 	// therefore start by forming the unit vectors
-	Vector elk(3); Vector elj(3); Vector eli(3);
-	Vector co(3);
-	co = atoms[l].getCoords();
-	elk = atoms[k].getCoords() - co;
-	elj = atoms[j].getCoords() - co;
-	eli = atoms[i].getCoords() - co;
+	Vector co = atoms[l].getCoords();
+	Vector elk = atoms[k].getCoords() - co;
+	Vector elj = atoms[j].getCoords() - co;
+	Vector eli = atoms[i].getCoords() - co;
+  
+  	co = cross(elj, elk);
+	double sinangle = co.norm();
   
 	// Normalise
-	elk = (1.0/pnorm(elk, 2))*elk;
-	elj = (1.0/pnorm(elj, 2))*elj;
-	eli = (1.0/pnorm(eli, 2))*eli;
-
-	// Get the sine
-	double sinangle = pnorm(cross(elj, elk), 2);
+	elk.normalize();
+	elj.normalize();
+	eli.normalize();
   
 	// Do the triple product and divide by the sine
-	return triple(elj, elk, eli)/sinangle;
+	return (cross(elj, elk)).dot(eli)/sinangle;
 }
 
 double Molecule::torsionAngle(int i, int j, int k, int l) const
@@ -316,26 +292,25 @@ double Molecule::torsionAngle(int i, int j, int k, int l) const
 	// [(eij x ejk).(ejk x ekl)]/[sin(ijk)*sin(jkl)]
 
 	// Form the identity vectors
-	Vector eij(3); Vector ejk(3); Vector ekl(3);
-	Vector jv(3); Vector kv(3);
-	jv = atoms[j].getCoords(); kv = atoms[k].getCoords();
-	eij = jv - atoms[i].getCoords();
-	ejk = kv - jv;
-	ekl = atoms[l].getCoords() - kv;
+	Vector jv = atoms[j].getCoords();
+	Vector kv = atoms[k].getCoords();
+	Vector eij = jv - atoms[i].getCoords();
+	Vector ejk = kv - jv;
+	Vector ekl = atoms[l].getCoords() - kv;
   
 	// Normalise
-	eij = (1.0/pnorm(eij, 2))*eij;
-	ejk = (1.0/pnorm(ejk, 2))*ejk;
-	ekl = (1.0/pnorm(ekl, 2))*ekl;
+	eij.normalize();
+	ejk.normalize();
+	ekl.normalize();
 
 	// Get angles and cross products
-	double sinijk = pnorm(cross(eij, ejk), 2);
-	double sinjkl = pnorm(cross(ejk, ekl), 2);
+	double sinijk = (cross(eij, ejk)).norm();
+	double sinjkl = (cross(ejk, ekl)).norm();
 	jv = cross(eij, ejk);
 	kv = cross(ejk, ekl);
  
 	// Return the inner product over the product of angles
-	return inner(jv, kv)/(sinijk*sinjkl);
+	return jv.dot(kv)/(sinijk*sinjkl);
 }
 
 // Compute the rotational type and constants of the molecule
@@ -348,8 +323,7 @@ std::string Molecule::rType()
 		rstring = "diatomic";
 	} else {
 		// Calculate the principal moments of inertia
-		Vector I(3);
-		I = getInertia(false);
+		Vector I = getInertia(false);
 
 		// All moments are >= 0, so no need to use fabs
 		// Linear if Ic = Ib > Ia = 0
@@ -374,8 +348,7 @@ std::string Molecule::rType()
 Vector Molecule::rConsts(int units)
 {
 	// First get the principal moments of inertia
-	Vector I(3);
-	I = getInertia(false);
+	Vector I = getInertia(false);
   
 	double K;
 	// Choose units

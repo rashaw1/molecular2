@@ -4,15 +4,11 @@
 #define ALMOSCFHEADERDEF
 
 #include "fock.hpp"
-#include "matrix.hpp"
+#include "eigen_wrapper.hpp"
 #include "molecule.hpp"
 #include "diis.hpp"
 #include <vector>
 #include "integrals.hpp"
-#include <Eigen/Dense>
-
-// Declare forward dependencies
-class Vector;
 
 // Begin class
 class ALMOSCF
@@ -26,9 +22,8 @@ private:
 	double dimer_energy, e_frz, e_pol, e_ct, e_int, e_pert_2, e_pert_4; 
 	double delta_e, delta_d;
 	std::vector<double> monomer_energies;
-	std::vector<Eigen::MatrixXd> focks; 
 	int nfrags, MAX; 
-	Eigen::MatrixXd P, F; 
+	Matrix P; 
 public:
 	// Constructor
 	ALMOSCF(Molecule& m, Fock& f);

@@ -75,13 +75,12 @@
 #include "basis.hpp"
 #include "atom.hpp"
 #include "molecule.hpp"
+#include "eigen_wrapper.hpp"
 #include <vector>
 
 // Declare forward dependencies
 class BF;
 class PBF;
-class Matrix;
-class Vector;
 class Error;
 
 // Begin class declaration

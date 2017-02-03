@@ -52,11 +52,10 @@
 #include <string>
 #include "bf.hpp"
 #include "ecp.hpp"
+#include "eigen_wrapper.hpp"
 
 // Declare forward dependcies
 class Logger;
-class Matrix;
-class Vector;
 
 // Begin class definition
 class Molecule

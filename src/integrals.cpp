@@ -87,7 +87,7 @@ IntegralEngine::IntegralEngine(Molecule& m) : molecule(m)
 	}
 	
 	prescreen = compute_schwarz_ints<>(shells);
-	if (prescreen.nrows() < 10) { 
+	if (prescreen.rows() < 10) { 
 		molecule.getLog().print("Forming the two electron repulsion integrals.\n");
 		molecule.getLog().print("PRESCREENING MATRIX:\n");
 		molecule.getLog().print(prescreen);
@@ -124,13 +124,10 @@ IntegralEngine::IntegralEngine(Molecule& m, const IntegralEngine& ints, int star
 	sizes[2] = ones;
 	sizes[3] = (ones*(ones+1))/4;
 	
-	sints.assign(nbfs, nbfs, 0.0);
-	tints.assign(nbfs, nbfs, 0.0);
-	for (int i = 0; i < nbfs; i++) 
-		for (int j = 0; j < nbfs; j++) {
-			sints(i, j) = ints.getOverlap(i+start, j+start);
-			tints(i, j) = ints.getKinetic(i+start, j+start);
-		}
+	Matrix S = ints.getOverlap();
+	sints = S.block(start, start, nbfs, nbfs); 
+	Matrix T = ints.getKinetic();
+	tints = T.block(start, start, nbfs, nbfs);
 		
 	auto &shells = molecule.getBasis().getIntShells();
 	std::vector<Atom> atoms;
@@ -263,7 +260,7 @@ void IntegralEngine::buildTransMat()
 		nspher += molecule.getAtom(i).getNSpherical();
 	}
 	
-	transmat.assign(nspher, ncart, 0.0);
+	transmat = Matrix::Zero(nspher, ncart);
 	int row = 0; int col_offset = 0; 
 	for (auto s : shells) {
 		int lam = s.contr[0].l; 
@@ -404,12 +401,7 @@ const std::vector<Atom>& atoms)
 		}
 	}
   
-	Matrix ret(n, n);
-	for (int i = 0; i < n; ++i) {
-		for (int j = 0; j < n; ++j)
-			ret(i, j) = result(i, j);
-	}
-	return ret;
+	return result;
 }
 
 S8EvenTensor4 IntegralEngine::compute_eris(const std::vector<libint2::Shell>& shells) {
@@ -486,10 +478,7 @@ S8EvenTensor4 IntegralEngine::compute_eris(const std::vector<libint2::Shell>& sh
 EMatrix IntegralEngine::compute_shellblock_norm(const std::vector<libint2::Shell> &shells, const Matrix& A) {
 	const auto nsh = shells.size();
 	EMatrix Ash(nsh, nsh);
-	EMatrix EA(A.nrows(), A.ncols()); 
-	for (int i = 0; i < A.nrows(); ++i) {
-		for (int j = 0; j < A.ncols(); ++j) EA(i, j) = A(i, j);
-	}
+	EMatrix EA = A;
 	
 	auto shell2bf = map_shell_to_basis_function(shells);
 	for (size_t s1 = 0; s1 != nsh; ++s1) {
@@ -514,7 +503,7 @@ Matrix IntegralEngine::compute_schwarz_ints( const std::vector<libint2::Shell> &
      const auto nsh2 = bs2.size();
      const auto bs1_equiv_bs2 = (&bs1 == &bs2);
 
-     Matrix K(nsh1, nsh2, 0.0);
+     Matrix K = Matrix::Zero(nsh1, nsh2);
 
      // construct the 2-electron repulsion integrals engine
      using libint2::Engine;
@@ -605,8 +594,7 @@ Matrix IntegralEngine::compute_schwarz_ints( const std::vector<libint2::Shell> &
  
  Matrix IntegralEngine::compute_ecp_ints(const std::vector<libint2::Shell>& shells, int deriv_order) {
  	const auto n = nbasis(shells);
-	Matrix ecps(n, n, 0.0);
-	std::cout << n << std::endl;
+	Matrix ecps = Matrix::Zero(n, n);
 	
 	// Initialise ecp integral engine
 	molecule.getLog().print("\nIntialising ECP integral calculations...\n");
@@ -641,8 +629,8 @@ Matrix IntegralEngine::compute_schwarz_ints( const std::vector<libint2::Shell> &
 			
 			Matrix shellPairInts = ecpint.compute_pair(shellA, shellB);
 			//shellPairInts.print(); std::cout << "\n\n";
-			for (int i = bf1; i < bf1 + shellPairInts.nrows(); i++) {
-				for (int j = bf2; j < bf2 + shellPairInts.ncols(); j++) {
+			for (int i = bf1; i < bf1 + shellPairInts.rows(); i++) {
+				for (int j = bf2; j < bf2 + shellPairInts.cols(); j++) {
 					ecps(i, j) = shellPairInts(i-bf1, j-bf2);
 					ecps(j, i) = ecps(i, j);
 				}

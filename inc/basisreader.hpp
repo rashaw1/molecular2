@@ -28,9 +28,9 @@
 #include <string>
 #include <fstream>
 #include <map>
+#include "eigen_wrapper.hpp"
 
 // Declare forward dependencies
-class Vector;
 class BF;
 class Basis;
 class ECP;
@@ -48,10 +48,10 @@ public:
   int readNbfs(int q);
   BF readBF(int q, int i);
   ECP readECP(int q, ECPBasis& ecpset, double *pos);
-  Vector readShells(int q);
-  Vector readLnums(int q);
-  Vector readShells(Vector& qs);
-  Vector readLnums(Vector& qs);
+  iVector readShells(int q);
+  iVector readLnums(int q);
+  iVector readShells(iVector& qs);
+  iVector readLnums(iVector& qs);
  
   void readShellBasis(Basis& b, int q, double *pos, int atom);
 };

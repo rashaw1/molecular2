@@ -24,10 +24,9 @@
 #define FOCKHEADERDEF
 
 // Includes
-#include "matrix.hpp"
 #include "integrals.hpp"
 #include "molecule.hpp"
-#include "mvector.hpp"
+#include "eigen_wrapper.hpp"
 #include <vector>
 
 // Forward declarations
@@ -68,8 +67,19 @@ public:
   Matrix& getJK() { return jkints; }
   Matrix& getJ() { return jints; } 
   Matrix& getK() { return kints; }
-  virtual Matrix getS() { return integrals.getOverlap(); }
   Matrix& getDens() { return dens; }
+  virtual Matrix& getS() { return integrals.getOverlap(); }
+  Matrix getHCore() const { return hcore; }
+  Matrix getFockAO() const { return focka; }
+  Matrix getFockMO() const { return fockm; }
+  Matrix getOrthog() const { return orthog; }
+  Matrix getCP() const { return CP; }
+  Vector getEps() const { return eps; }
+  Matrix getJK() const { return jkints; }
+  Matrix getJ() const { return jints; } 
+  Matrix getK() const { return kints; }
+  virtual Matrix getS() const { return integrals.getOverlap(); }
+  Matrix getDens() const { return dens; }
   void setDIIS(bool d) { diis = d; } 
   void formHCore();
   void formOrthog();
@@ -97,10 +107,10 @@ class FockFragment : public Fock
 private:
 	int start, end;
 public:
-	Eigen::MatrixXd Sxx; 
+	Matrix Sxx; 
 	FockFragment(IntegralEngine& ints, Molecule& m, int start, int end);
 	FockFragment(const FockFragment& other);
-	void buildFock(Eigen::MatrixXd& qfq, Eigen::MatrixXd& qfp, Eigen::MatrixXd& pfp); 
+	void buildFock(Matrix& qfq, Matrix& qfp, Matrix& pfp); 
 };
 
 #endif

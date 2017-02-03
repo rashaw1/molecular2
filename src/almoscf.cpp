@@ -12,10 +12,7 @@
 #include "scf.hpp"
 #include "logger.hpp"
 #include <cmath>
-#include "mvector.hpp"
 #include <libint2.hpp>
-#include <Eigen/Cholesky>
-#include <Eigen/Eigenvalues>
 
 // Constructor
 ALMOSCF::ALMOSCF(Molecule& m, Fock& f) : molecule(m), focker(f) 
@@ -24,7 +21,7 @@ ALMOSCF::ALMOSCF(Molecule& m, Fock& f) : molecule(m), focker(f)
 	dimer_energy = e_frz = e_pol = e_ct = e_int = 0.0;
 	MAX = 6;
 	diis.init(MAX, m.getLog().diis());
-	P = Eigen::MatrixXd::Zero(focker.getHCore().nrows(), focker.getHCore().nrows());
+	P = Matrix::Zero(focker.getHCore().rows(), focker.getHCore().rows());
 }
 
 void ALMOSCF::setFragments(bool unrestricted)
@@ -59,33 +56,20 @@ void ALMOSCF::setFragments(bool unrestricted)
 void ALMOSCF::compute() {
 
 	// Make inverse overlap metric
-	Matrix sigma = focker.getS();
-	Matrix& hcore = focker.getHCore();
+	Matrix& S = focker.getS();
+	Matrix P_old = P; 
 	
 	//Build T matrix
-	int nbfs = sigma.nrows();
+	int nbfs = S.rows();
 	int nocc = focker.getMolecule().getNel() / 2;
 	
-	Eigen::MatrixXd P_old = P; 
-	Eigen::MatrixXd S = Eigen::MatrixXd::Zero(nbfs, nbfs);
-	Eigen::MatrixXd H = Eigen::MatrixXd::Zero(nbfs, nbfs);
-	for (int i = 0; i < nbfs; i++) {
-		for (int j = 0; j <= i; j++) {
-			S(i, j) = S(j, i) = sigma(i, j); 
-			H(i, j) = H(j, i) = hcore(i, j);
-		}
-	}
-	
-	Eigen::MatrixXd Tocc = Eigen::MatrixXd::Zero(nbfs, nocc); 
+	Matrix Tocc = Matrix::Zero(nbfs, nocc); 
 	int row_offset = 0; int col_offset = 0; 
 	for (auto f : fragments) {
-		Matrix& f_cp = f.getCP(); 
 		int f_nocc = f.getMolecule().getNel() / 2;
-		int f_nbfs = f.getHCore().nrows(); 
+		int f_nbfs = f.getHCore().rows(); 
 		
-		for (int col = 0; col < f_nocc; col++)
-			for (int row = 0; row < f_nbfs; row++)
-				Tocc(row+row_offset, col+col_offset) = f_cp(row, col); 
+		Tocc.block(row_offset, col_offset, f_nbfs, f_nocc) = f.getCP().block(0, 0, f_nbfs, f_nocc);
 		
 		row_offset += f_nbfs; 
 		col_offset += f_nocc; 
@@ -96,68 +80,51 @@ void ALMOSCF::compute() {
 	
 	delta_d = (P - P_old).norm(); 
 	
+	Matrix P_2 = 2.0 * P; 
 	// Build Fock matrix
-	F = Eigen::MatrixXd::Zero(nbfs, nbfs);
-	IntegralEngine& integrals = focker.getIntegrals();
-	for (int i = 0; i < nbfs; i++) {
-		for (int j = 0; j < nbfs; j++) {
-			F(i, j) = H(i, j);
-			
-			for (int r = 0; r < nbfs; r++)
-				for (int s = 0; s < nbfs; s++)
-					F(i, j) += (2*integrals.getERI(i, j, r, s) - integrals.getERI(i, s, r, j)) * P(s, r); 
-		}
-	}
+	if (molecule.getLog().direct())
+		focker.formJKdirect(focker.getIntegrals().getPrescreen(), P_2);
+	else 
+		focker.formJK(P_2); 
 	
-	if (molecule.getLog().diis()) { // Archive for averaging
-		if (focks.size() == MAX) {
-			focks.erase(focks.begin());
-		}
-		focks.push_back(F);
-	}		
+	focker.makeFock(); 
+	Matrix& F = focker.getFockAO(); 
 	
 	// Calculate errors
-	Eigen::MatrixXd Q = - S * P; 
+	Matrix Q = - S * P; 
 	for (int i = 0; i < nbfs; i++) Q(i, i) += 1.0; 
-	Eigen::MatrixXd QFP = Q * F; 
+	Matrix QFP = Q * F; 
 	if (molecule.getLog().diis()) {
 		QFP = QFP * P; 
 		
 		std::vector<Vector> errs; 
 		int offset = 0;
 		for (int i = 0; i < fragments.size(); i++) {
-			int f_nbfs = fragments[i].getHCore().nrows();
-			Eigen::MatrixXd e = QFP.block(offset, offset, f_nbfs, f_nbfs) * fragments[i].Sxx;
+			int f_nbfs = fragments[i].getHCore().rows();
+			Matrix e = QFP.block(offset, offset, f_nbfs, f_nbfs) * fragments[i].Sxx;
 			e = (e - e.transpose()).eval(); 
-			
-			Matrix new_err(f_nbfs, f_nbfs, 0.0);
-			for (int i = 0; i < f_nbfs; i++)  
-				for (int j = 0; j <= i; j++)
-					new_err(i, j) = new_err(j, i) = e(i, j);
-			errs.push_back(Vector(new_err, true)); 
+
+			Vector new_err(Eigen::Map<Vector>(e.data(), e.cols()*e.rows()));
+			errs.push_back(new_err); 
 			
 			offset += f_nbfs; 
 		}
 		
 		Vector weights = diis.compute(errs);
-		if (focks.size() > 2) {
-			// Average the fock matrices according to the weights
-			offset = focks.size() - weights.size();
-			F = Eigen::MatrixXd::Zero(nbfs, nbfs);
-			for (int i = offset; i < focks.size(); i++)
-				 F = F + weights[i-offset]*focks[i]; 
-		}
+		focker.average(weights);
+		F = focker.getFockAO();
 		 
 		QFP = Q * F; 
 	} 
 	
+	Matrix& H = focker.getHCore();
 	double new_dimer_energy = (P * (H + F)).trace() + focker.getMolecule().getEnuc();
 	delta_e = new_dimer_energy - dimer_energy;
 	dimer_energy = new_dimer_energy;
 	
-	Eigen::MatrixXd QFQ = QFP * Q.transpose();
+	Matrix QFQ = QFP * Q.transpose();
 	QFP = QFP * P; 
-	Eigen::MatrixXd PFP = P * F * P; 
+	Matrix PFP = P * F * P; 
 	
 	for (int i = 0; i < fragments.size(); i++)
 		fragments[i].buildFock(QFQ, QFP, PFP);
@@ -167,26 +134,21 @@ void ALMOSCF::compute() {
 // Calculate the perturbative correction
 void ALMOSCF::perturb(bool order4)
 {
-	int nbfs = focker.getHCore().nrows(); 
+	int nbfs = focker.getHCore().rows(); 
 	int nocc = focker.getMolecule().getNel() / 2;
 	int nvirt = nbfs - nocc;
 	
-	Eigen::MatrixXd T = Eigen::MatrixXd::Zero(nbfs, nocc); 
-	Eigen::MatrixXd V = Eigen::MatrixXd::Zero(nbfs, nvirt);
+	Matrix T = Eigen::MatrixXd::Zero(nbfs, nocc); 
+	Matrix V = Eigen::MatrixXd::Zero(nbfs, nvirt);
 	int row_offset = 0; int occ_col_offset = 0; int virt_col_offset = 0;
 	for (auto f : fragments) {
 		Matrix& f_cp = f.getCP(); 
 		int f_nocc = f.getMolecule().getNel() / 2;
-		int f_nbfs = f.getHCore().nrows(); 
+		int f_nbfs = f.getHCore().rows(); 
 		int f_nvirt = f_nbfs - f_nocc; 
 		
-		for (int col = 0; col < f_nocc; col++)
-			for (int row = 0; row < f_nbfs; row++)
-				T(row+row_offset, col+occ_col_offset) = f_cp(row, col); 
-		
-		for (int col = f_nocc; col < f_nbfs; col++)
-			for (int row = 0; row < f_nbfs; row++)
-				V(row+row_offset, col+virt_col_offset-f_nocc) = f_cp(row, col);
+		T.block(row_offset, occ_col_offset, f_nbfs, f_nocc) = f_cp.block(0, 0, f_nbfs, f_nocc); 
+		V.block(row_offset, virt_col_offset, f_nbfs, f_nvirt) = f_cp.block(0, f_nocc, f_nbfs, f_nvirt);
 		
 		row_offset += f_nbfs; 
 		occ_col_offset += f_nocc; 
@@ -194,39 +156,40 @@ void ALMOSCF::perturb(bool order4)
 	}
 	
 	// Form MO overlap matrix
-	Eigen::MatrixXd sigma(nbfs, nbfs);
-	Eigen::MatrixXd CMI = Eigen::MatrixXd::Zero(nbfs, nbfs);
-	Matrix S = focker.getS();
-	for (int i = 0; i < nbfs; i++) 
-		for (int j = 0; j <= i; j++) 
-			CMI(i, j) = CMI(j, i) = S(i, j);
-	sigma.block(0, 0, nocc, nocc) = T.transpose() * CMI * T; 
-	sigma.block(nocc, 0, nvirt, nocc) = V.transpose() * CMI * T;
-	sigma.block(nocc, nocc, nvirt, nvirt) = V.transpose() * CMI * V; 
-	Eigen::LLT<Eigen::MatrixXd> llt(sigma); 
-	Eigen::MatrixXd C0 = llt.matrixL();
+	Matrix& S = focker.getS();
+	Matrix sigma(nbfs, nbfs);
+	sigma.block(0, 0, nocc, nocc) = T.transpose() * S * T; 
+	sigma.block(nocc, 0, nvirt, nocc) = V.transpose() * S * T;
+	sigma.block(nocc, nocc, nvirt, nvirt) = V.transpose() * S * V;
+	 
+	// Cholesky decompose
+	LLT llt(sigma); 
+	Matrix C0 = llt.matrixL();
 	C0 = C0.inverse();
+	
+	Matrix CMI(nbfs, nbfs);
 	CMI.block(0, 0, nbfs, nocc) = T;
 	CMI.block(0, nocc, nbfs, nvirt) = V;
 	C0 = CMI * C0.transpose(); 
 	
+	Matrix& F = focker.getFockAO();
 	sigma = C0.transpose() * F * C0; 
-	Eigen::MatrixXd F0occ = sigma.block(0, 0, nocc, nocc);
-	Eigen::MatrixXd F0virt = sigma.block(nocc, nocc, nvirt, nvirt); 
-	Eigen::MatrixXd Fov = sigma.block(0, nocc, nocc, nvirt); 
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es_occ(F0occ);
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es_virt(F0virt);
+	Matrix F0occ = sigma.block(0, 0, nocc, nocc);
+	Matrix F0virt = sigma.block(nocc, nocc, nvirt, nvirt); 
+	Matrix Fov = sigma.block(0, nocc, nocc, nvirt); 
+	EigenSolver es_occ(F0occ);
+	EigenSolver es_virt(F0virt);
 	T = es_occ.eigenvectors();
 	V = es_virt.eigenvectors(); 
 	Fov = T.transpose() * Fov * V; 
-	Eigen::VectorXd eps_i = es_occ.eigenvalues(); 
-	Eigen::VectorXd eps_a = es_virt.eigenvalues();
+	Vector eps_i = es_occ.eigenvalues(); 
+	Vector eps_a = es_virt.eigenvalues();
 	
 	if (order4) {
 		e_pert_2 = 0.0; 
 		e_pert_4 = 0.0;
 		
-		Eigen::MatrixXd Fvo = V.transpose() * sigma.block(nocc, 0, nvirt, nocc) * T;
+		Matrix Fvo = V.transpose() * sigma.block(nocc, 0, nvirt, nocc) * T;
 		for (int i = 0; i < nocc; i++) {
 			double sum1 = 0.0, sum2 = 0.0;
 			for (int a = 0; a < nvirt; a++) {

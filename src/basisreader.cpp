@@ -10,7 +10,6 @@
  
 #include "basisreader.hpp"
 #include "ioutil.hpp"
-#include "mvector.hpp"
 #include "bf.hpp"
 #include "ecp.hpp"
 #include "error.hpp"
@@ -59,7 +58,7 @@ void BasisReader::closeFile()
 int BasisReader::readNbfs(int q)
 {
 	int nbfs = 0;
-	Vector shells = readShells(q);
+	iVector shells = readShells(q);
 	for (int i = 0; i < shells.size(); i++){
 		nbfs += shells(i);
 	}
@@ -74,7 +73,7 @@ BF BasisReader::readBF(int q, int i)
 
 	std::string delim = ",";
 	int l1 = 0, l2 = 0, l3 = 0; // Angular momenta
-	Vector c; Vector e; Vector ids; // Coeffs, exps, and prim ids
+	Vector c; Vector e; iVector ids; // Coeffs, exps, and prim ids
 
 	// Check it's open
 	if (input.is_open()){
@@ -1082,9 +1081,9 @@ BF BasisReader::readBF(int q, int i)
 
 // Return a vector of the number of basis functions in each shell
 // where the length of the vector is the number of shells
-Vector BasisReader::readShells(int q)
+iVector BasisReader::readShells(int q)
 {
-	Vector shells(5); // Can't cope with higher than f functions, so 5 is max!	  
+	iVector shells(10); // Can't cope with higher than l functions, so 10 is max!	  
 	// Open the file
 	openFile(q);
   
@@ -1113,6 +1112,10 @@ Vector BasisReader::readShells(int q)
 				else if (temp == "d") { lmult = 6; }
 				else if (temp == "f") { lmult = 10; }
 				else if (temp == "g") { lmult = 15; }
+				else if (temp == "h") { lmult = 21; }
+				else if (temp == "i") { lmult = 28; }
+				else if (temp == "k") { lmult = 36; }
+				else if (temp == "l") { lmult = 45; }
 
 				std::getline(input, line);
 				while (line.at(0) == 'c'){
@@ -1130,7 +1133,7 @@ Vector BasisReader::readShells(int q)
 	}
 
 	// resize the return vector
-	shells.resizeCopy(counter);
+	shells.conservativeResize(counter);
   
 	// Close the file
 	closeFile();
@@ -1140,9 +1143,9 @@ Vector BasisReader::readShells(int q)
 
 // Return a vector with the l-angular momentum quantum numbers of each
 // shell belonging to atom q.
-Vector BasisReader::readLnums(int q)
+iVector BasisReader::readLnums(int q)
 {
-	Vector lnums(5); // See readShells
+	iVector lnums(10); // See readShells
 	// Open the file
 	openFile(q);
   
@@ -1169,6 +1172,10 @@ Vector BasisReader::readLnums(int q)
 				else if (temp == "d") { lmult = 2; }
 				else if (temp == "f") { lmult = 3; }
 				else if (temp == "g") { lmult = 4; }
+				else if (temp == "h") { lmult = 5; }
+				else if (temp == "i") { lmult = 6; }
+				else if (temp == "k") { lmult = 7; }
+				else if (temp == "l") { lmult = 8; }
 
 				lnums[counter] = lmult;
 				counter++;
@@ -1182,7 +1189,7 @@ Vector BasisReader::readLnums(int q)
 	}
 
 	// resize the return vector
-	lnums.resizeCopy(counter);
+	lnums.conservativeResize(counter);
   
 	// Close the file
 	closeFile();
@@ -1191,16 +1198,16 @@ Vector BasisReader::readLnums(int q)
 }
 
 // Now do these for a complete set of qs
-Vector BasisReader::readShells(Vector& qs)
+iVector BasisReader::readShells(iVector& qs)
 {
-	Vector shells;
-	Vector temp;
+	iVector shells;
+	iVector temp;
 	shells = readShells(qs(0));
 	for (int i = 1; i < qs.size(); i++){
 		int s = shells.size();
 		temp = readShells(qs(i));
 		int t = temp.size();
-		shells.resizeCopy(s+t);
+		shells.conservativeResize(s+t);
 		for (int j = 0; j < t; j++) {
 			shells[j+s] = temp[j];
 		}
@@ -1208,16 +1215,16 @@ Vector BasisReader::readShells(Vector& qs)
 	return shells;
 }
 
-Vector BasisReader::readLnums(Vector& qs)
+iVector BasisReader::readLnums(iVector& qs)
 {
-	Vector lnums;
-	Vector temp;
+	iVector lnums;
+	iVector temp;
 	lnums = readLnums(qs(0));
 	for (int i = 1; i < qs.size(); i++){
 		int l = lnums.size();
 		temp = readLnums(qs(i));
 		int t = temp.size();
-		lnums.resizeCopy(l+t);
+		lnums.conservativeResize(l+t);
 		for (int j = 0; j < t; j++){
 			lnums[j+l] = temp[j];
 		}

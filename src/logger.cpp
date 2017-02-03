@@ -18,8 +18,6 @@
 #include "molecule.hpp"
 #include "bf.hpp"
 #include "pbf.hpp"
-#include "matrix.hpp"
-#include "mvector.hpp"
 #include "error.hpp"
 #include "ioutil.hpp"
 #include "filereader.hpp"
@@ -91,7 +89,7 @@ Logger::Logger(std::ifstream& in, std::ofstream& out, std::ostream& e) : infile(
 
 		std::string delimiter = ","; // Define the separation delimiter
 		std::size_t position; int q; Vector coords(3); double m;
-		Vector qs(natoms); // Hold the qs of all the atoms, for finding unique qs laterv
+		iVector qs(natoms); // Hold the qs of all the atoms, for finding unique qs laterv
 		double multiplier = (input.getAngstrom() ? TOBOHR : 1.0); // Convert to bohr from angstrom?
 		for (int i = 0; i < natoms; i++){
 			temp = input.getGeomLine(i); // Get a line from the geometry
@@ -156,8 +154,8 @@ Logger::Logger(std::ifstream& in, std::ofstream& out, std::ostream& e) : infile(
     
 		// Next, the basis set
 		// First find all the unique qs
-		Vector tempqs(natoms);
-		tempqs = qs.sorted();
+		iVector tempqs = qs;
+		std::sort(qs.data(), qs.data()+qs.size(), [](int lhs, int rhs){ return rhs > lhs; });
 		qs[0] = tempqs(0);
 		int k = 1;
 		for (int i = 1; i < natoms; i++){
@@ -168,7 +166,7 @@ Logger::Logger(std::ifstream& in, std::ofstream& out, std::ostream& e) : infile(
 		}
 		// k is now the number of unique qs, and all these unique qs are stored in qs
 		// resize to get rid of extra weight
-		qs.resizeCopy(k);
+		qs.conservativeResize(k);
 		// Find the basis name and initialise the basis set
 		bnames = input.getBasis();
 		Basis b(bnames, qs, input.getECP());
@@ -275,9 +273,8 @@ void Logger::print(const Vector& v, int digits, bool vertical) const
 void Logger::print(const Matrix& m, int digits) const
 {
 	// Print out row by row
-	Vector temp(m.ncols());
-	for (int i = 0; i < m.nrows(); i++){
-		temp = m.rowAsVector(i);
+	for (int i = 0; i < m.rows(); i++){
+		Vector temp = m.row(i);
 		print (temp, digits, false);
 	}
 }
@@ -310,10 +307,10 @@ void Logger::print(Basis& b, bool full) const
 	int nbfs = b.getNBFs(); // Store number of cgbfs and prims
 	int nprims = 0;
 
-	Vector qs = b.getCharges();
+	iVector qs = b.getCharges();
 	// Sort the qs and get rid of duplicates
-	qs.sort();
-	Vector qtemp(qs.size());
+	std::sort(qs.data(), qs.data()+qs.size(), [](int lhs, int rhs){ return rhs > lhs; });
+	iVector qtemp(qs.size());
 	qtemp[0] = qs(0);
 	int k = 1;
 	for (int i = 1; i < qs.size(); i++){
@@ -323,16 +320,12 @@ void Logger::print(Basis& b, bool full) const
 		}
 	}
 	qs = qtemp;
-	qs.resizeCopy(k);
+	qs.conservativeResize(k);
 
 	// Now sum over all basis functions to get the number of prims
-	Vector c(3); c[0] = 0.0; c[1] = 0.0; c[2] = 0.0;
-	BF bftemp(c, 0, 0, 0, c, c);
+	for (int i = 0; i < nbfs; i++)
+		nprims += b.getBF(i).getNPrims();
 
-	for (int i = 0; i < nbfs; i++){
-		bftemp = b.getBF(i);
-		nprims += bftemp.getNPrims();
-	}
 
 	// Start printing
 	title("Basis Set");
@@ -350,7 +343,7 @@ void Logger::print(Basis& b, bool full) const
   
 	// loop over the atom types
 	outfile << std::setprecision(2);
-	Vector subshells; Vector sublnums; 
+	iVector subshells; iVector sublnums; 
 	for (int i = 0; i < k; i++){
 		int nc = 0; int np = 0;
 		outfile << std::setw(8) << getAtomName(qs(i));
@@ -390,7 +383,7 @@ void Logger::print(Basis& b, bool full) const
 		outfile << std::setw(18) << "Exponent\n";
 		outfile << std::string(58, '.') << "\n";
 		// Loop over all the basis functions
-		Vector subshell; Vector sublnums; 
+		iVector subshell; iVector sublnums; 
 		Vector coeffs; Vector exps;
 		std::string filler = "";
 		for (int i = 0; i < k; i++){
@@ -402,7 +395,7 @@ void Logger::print(Basis& b, bool full) const
 			for (int r = 0; r < subshell.size(); r++){ 
 				// Loop over bfs
 				for (int s = 0; s < subshell[r]; s++){
-					bftemp = b.getBF(qs(i), s+sum);
+					BF& bftemp = b.getBF(qs(i), s+sum);
 					coeffs = bftemp.getCoeffs();
 					exps = bftemp.getExps();
 
@@ -429,8 +422,7 @@ void Logger::print(Basis& b, bool full) const
 void Logger::print(const Atom& a) const
 {
 	int q = a.getCharge();
-	Vector c(3);
-	c = a.getCoords();
+	Vector c = a.getCoords();
 	outfile << std::fixed << std::setprecision(6);
 	outfile << std::setw(10) << getAtomName(q);
 	outfile << std::setw(10) << a.getEffectiveCharge();
@@ -515,9 +507,8 @@ void Logger::print(Molecule& mol, bool inertia) const
 	outfile << std::setw(10) << "Mass" << std::setw(10) << "#CGBFs"; 
 	outfile << std::setw(30) << "Coordinates" << "\n";
 	outfile << std::string(70, '.') << "\n";
-	for (int i = 0; i < mol.getNAtoms(); i++){
+	for (int i = 0; i < mol.getNAtoms(); i++)
 		print(mol.getAtom(i));
-	}
 }
 
 // Print out a contracted gaussian basis function, in the form:
@@ -527,10 +518,8 @@ void Logger::print(Molecule& mol, bool inertia) const
 void Logger::print(BF& bf) const
 {
 	// Get information
-	Vector coef;
-	coef = bf.getCoeffs();
-	Vector exp;
-	exp = bf.getExps();
+	Vector coef = bf.getCoeffs();
+	Vector exp = bf.getExps();
 	int lx = bf.getLx(); int ly = bf.getLy(); int lz = bf.getLz();
   
 	// Work out the orbital type

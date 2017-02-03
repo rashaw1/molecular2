@@ -2,7 +2,7 @@
 #define CCHEADERDEF
 
 #include "tensor4.hpp"
-#include "matrix.hpp"
+#include "eigen_wrapper.hpp"
 #include "mp2.hpp"
 #include "diis.hpp"
 #include <vector>
@@ -39,8 +39,8 @@ public:
 	void calculateTriples();
 	void calculateError(Matrix& newSingles, S4OddTensor4& newDoubles);
 	void compute();
-  double getEnergy() const { return energy; }
-  double getETriples() const { return triples_energy; }
+  	double getEnergy() const { return energy; }
+  	double getETriples() const { return triples_energy; }
 };
 
 #endif 

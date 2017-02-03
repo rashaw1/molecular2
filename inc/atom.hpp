@@ -38,12 +38,11 @@
 #define ATOMHEADERDEF
 
 // Includes
-#include "mvector.hpp"
+#include "eigen_wrapper.hpp"
 #include "bf.hpp"
 #include "basis.hpp"
 
 // Declare forward dependencies
-class Matrix;
 class PBF;
 class ECPBasis;
 
@@ -53,7 +52,7 @@ class Atom
 private:
   BF* bfs;
   int charge, core, nbfs, nshells;
-  Vector shells, lnums;
+  iVector shells, lnums;
   double x, y, z, mass;
   double *pos; 
 public:
@@ -75,8 +74,8 @@ public:
   double getX() const { return x; }
   double getY() const { return y; }
   double getZ() const { return z; }
-  Vector getShells() const { return shells; }
-  Vector getLnums() const { return lnums; }
+  iVector getShells() const { return shells; }
+  iVector getLnums() const { return lnums; }
   BF& getBF(int i) { return bfs[i]; } // Return bf i - no bounds check
   BF& getShellBF(int shell, int i);
   PBF& getShellPrim(int shell, int i);

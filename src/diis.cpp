@@ -8,9 +8,7 @@
 
 #include "diis.hpp"
 #include <iostream>
-#include "matrix.hpp"
 #include <cmath>
-#include <Eigen/Eigenvalues>
 
 DIISEngine::DIISEngine() { }
 
@@ -18,7 +16,7 @@ void DIISEngine::init(int _maxDiis, bool _useDiis, double _damp) {
 	maxDiis = _maxDiis > 0 ? _maxDiis : 8;
 	useDiis = _useDiis;
 	damping_factor = _damp;
-	lastB = Eigen::MatrixXd::Zero(1, 1);
+	lastB = Matrix::Zero(1, 1);
 }
 
 Vector DIISEngine::compute(std::vector<Vector> &errors) {
@@ -40,12 +38,12 @@ Vector DIISEngine::compute(std::vector<Vector> &errors) {
 			for (int j = 0; j < e.size(); j++) newErr[i++] = e[j];
 		}
 		errs.push_back(newErr);
-		if (iter == 1) lastB(0, 0) = inner(newErr, newErr);
+		if (iter == 1) lastB(0, 0) = newErr.dot(newErr);
 		
 		if (iter > 1) {
 			
 			int lim = (iter < maxDiis ? iter : maxDiis);			
-			Eigen::MatrixXd B(lim+1, lim+1); // Error norm matrix
+			Matrix B(lim+1, lim+1); // Error norm matrix
 			B(lim, lim) = 0.0;
 
 			// The elements of B are <e_i | e_j >
@@ -60,7 +58,7 @@ Vector DIISEngine::compute(std::vector<Vector> &errors) {
 			}
 			
 			for (int i = 0; i < lim; i++) {
-				B(lim-1, i) = inner(errs[i], errs[lim-1]);
+				B(lim-1, i) = errs[i].dot(errs[lim-1]);
 				B(i, lim-1) = B(lim-1, i);
 			}
 			B(lim, lim-1) = -1.0;
@@ -76,7 +74,7 @@ Vector DIISEngine::compute(std::vector<Vector> &errors) {
 				rank = weights[weights.size() - 1];
 			}
 			
-			weights.resizeCopy(weights.size()-2);
+			weights.conservativeResize(weights.size()-2);
 		}
 
 	}
@@ -85,14 +83,14 @@ Vector DIISEngine::compute(std::vector<Vector> &errors) {
 	return weights;
 }
 
-Vector DIISEngine::solve(Eigen::MatrixXd &B, int start) {
+Vector DIISEngine::solve(Matrix &B, int start) {
 	
 	int size = B.rows() - start; 
 	double norm = 1.0;
 	double scale = 1.0 + damping_factor;
 	if (B(start, start) > 1e-10) norm = 1.0/B(start,start);
 
-	Eigen::MatrixXd newB(size, size);
+	Matrix newB(size, size);
 	for (int i = 0; i < size-1; i++) {
 		newB(i, i) = B(i+start, i+start) * scale;
 		for (int j = i; j < size-1; j++) {
@@ -104,10 +102,10 @@ Vector DIISEngine::solve(Eigen::MatrixXd &B, int start) {
 	newB(size-1, size-1) = 0.0;
 	
 	// Solve the linear system of equations for the weights
-	Eigen::VectorXd w = Eigen::VectorXd::Zero(size); 
+	Vector w = Vector::Zero(size); 
 	w[size-1] = -1.0;
 	
-	Eigen::FullPivLU<Eigen::MatrixXd> lu(newB);
+	FullLU lu(newB);
 	w = lu.solve(w);
 	
 	Vector weights(size+1);

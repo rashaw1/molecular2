@@ -23,13 +23,12 @@
 #define SCFHEADERDEF
 
 #include "fock.hpp"
-#include "matrix.hpp"
+#include "eigen_wrapper.hpp"
 #include "molecule.hpp"
 #include "diis.hpp"
 
 // Declare forward dependencies
 class IntegralEngine;
-class Vector;
 
 // Begin class
 class SCF
@@ -46,7 +45,7 @@ public:
   void calcE();
 	double getEnergy() const { return energy; } 
   double calcE(const Matrix& hcore, const Matrix& dens, const Matrix& fock); 
-  Vector calcErr(const Matrix& F, const Matrix& D, Matrix S, const Matrix& orthog);
+  Vector calcErr(const Matrix& F, const Matrix& D, const Matrix& S, const Matrix& orthog);
   Vector calcErr();
   bool testConvergence(double val);
   void rhf();

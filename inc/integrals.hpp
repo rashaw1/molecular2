@@ -52,8 +52,7 @@
 #define INTEGRALSHEADERDEF
 
 // Includes
-#include "matrix.hpp"
-#include "mvector.hpp"
+#include "eigen_wrapper.hpp"
 #include "molecule.hpp"
 #include <iostream>
 #include "tensor4.hpp"
@@ -61,10 +60,8 @@
 #include <vector>
 #include <array>
 #include <unordered_map>
-#include <Eigen/Dense>
 #include <iostream>
 
-typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> EMatrix;
 using shellpair_list_t = std::unordered_map<size_t, std::vector<size_t>>;
 
 // Declare forward dependencies
@@ -81,7 +78,7 @@ private:
 	Matrix naints;
 	Matrix prescreen;
 	Matrix transmat; 
-	Vector sizes;
+	iVector sizes;
 	S8EvenTensor4 twoints;
 public:
 	IntegralEngine(Molecule& m); //Constructor
@@ -92,10 +89,13 @@ public:
 	// Accessors
 	Vector getEstimates() const;
 	double getOverlap(int i, int j) const { return sints(i, j); }
+	Matrix& getOverlap() { return sints; }
 	Matrix getOverlap() const { return sints; }
 	double getKinetic(int i, int j) const { return tints(i, j); }
+	Matrix& getKinetic() { return tints; }
 	Matrix getKinetic() const { return tints; }
 	double getNucAttract(int i, int j) const { return naints(i, j); }
+	Matrix& getNucAttract() { return naints; }
 	Matrix getNucAttract() const { return naints; }
 	Matrix& getTransMat() { return transmat; }
 	double getERI(int i, int j, int k, int l) const;

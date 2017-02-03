@@ -2,7 +2,6 @@
 
 #include "ecpint.hpp"
 #include "gshell.hpp"
-#include "matrix.hpp"
 #include <iostream>
 #include <functional>
 #include <algorithm>
@@ -886,7 +885,7 @@ void ECPIntegral::compute_shell_pair(ECP &U, GaussianShell &shellA, GaussianShel
 
 Matrix ECPIntegral::compute_pair(GaussianShell &shellA, GaussianShell &shellB) {
 	TwoIndex<double> tempValues;
-	Matrix values(shellA.ncartesian(), shellB.ncartesian(), 0.0);
+	Matrix values = Matrix::Zero(shellA.ncartesian(), shellB.ncartesian());
 	for (int i = 0; i < basis.getN(); i++) {
 		 compute_shell_pair(basis.getECP(i), shellA, shellB, tempValues);
 		 for (int na = 0; na < shellA.ncartesian(); na++) {

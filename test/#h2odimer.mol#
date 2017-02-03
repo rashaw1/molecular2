@@ -1,4 +1,4 @@
-dz
+z
 memory,4000
 geom,angstrom
 O,       -1.464,   0.099,   0.300
@@ -14,3 +14,4 @@ fragments,
 fragmentsend
 nthreads, 2
 almo,
+!rhf,

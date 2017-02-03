@@ -16,7 +16,7 @@
 #include <array>
 
 // Constructors and destructors
-Basis::Basis(std::map<int, std::string> ns, Vector& atoms, bool _ecps) : names(ns), maxl(0), ecps(_ecps)
+Basis::Basis(std::map<int, std::string> ns, iVector& atoms, bool _ecps) : names(ns), maxl(0), ecps(_ecps)
 {
   BasisReader input(ns); // Make a basis reading object
   auto it = ns.find(0);
@@ -26,7 +26,7 @@ Basis::Basis(std::map<int, std::string> ns, Vector& atoms, bool _ecps) : names(n
   int natoms = atoms.size(); // Get how many different atoms there are
   // Now determine how many basis functions are needed
   int nbfs = 0;
-  Vector qnbfs(natoms); // Store the nbfs for each atom
+  iVector qnbfs(natoms); // Store the nbfs for each atom
   for (int i = 0; i < natoms; i++){
     qnbfs[i] = input.readNbfs(atoms(i));
     nbfs += qnbfs(i);
@@ -150,11 +150,11 @@ int Basis::getShellSize(int q) const
 }
 
 // Return the subset of shells corresponding to q
-Vector Basis::getShells(int q) const
+iVector Basis::getShells(int q) const
 {
   int position = findShellPosition(q);
   int size = getShellSize(q);
-  Vector s(size);
+  iVector s(size);
 
   // Fill in the values
   for (int i = 0; i < size; i++){
@@ -164,11 +164,11 @@ Vector Basis::getShells(int q) const
 }
 
 // Find th subset of lnums corresponding to atom with atomic number q
-Vector Basis::getLnums(int q) const
+iVector Basis::getLnums(int q) const
 {
   int position = findShellPosition(q);
   int size = getShellSize(q);
-  Vector l(size);
+  iVector l(size);
   // Fill in the values
   for (int i = 0; i < size; i++){
     l[i] = lnums[position+i];
@@ -189,7 +189,7 @@ void Basis::addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std:
 		contr_arr.push_back(newC);
 	}
 	
-	std::array<libint2::real_t, 3> O = { pos[0], pos[1], pos[2] };
+	std::array<libint2::real_t, 3> O = { {pos[0], pos[1], pos[2]} };
 
 	intShells.push_back(Shell(exps, contr_arr, O));
 	shellAtomList.push_back(atom);

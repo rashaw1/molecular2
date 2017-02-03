@@ -10,7 +10,7 @@
 
 #include "bf.hpp"
 
-BF::BF(Vector& c, int l1, int l2, int l3, Vector& exps, Vector& indices)
+BF::BF(Vector& c, int l1, int l2, int l3, Vector& exps, iVector& indices)
 {
   coeffs = c;
   ids = indices;

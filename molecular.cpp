@@ -73,8 +73,10 @@ int main (int argc, char* argv[])
 				log.localTime();
 				log.flush();
 				
-				// Make an integral engine
+				// Make an integral engine and set up Eigen
 				libint2::initialize();
+				Eigen::setNbThreads(mol.getLog().getNThreads());
+				
 				IntegralEngine integral(mol);
 
 				// All calculations will need some form of HF

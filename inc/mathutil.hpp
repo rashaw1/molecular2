@@ -25,9 +25,7 @@
 #ifndef MATHUTILHEADERDEF
 #define MATHUTILHEADERDEF
 
-// Declare forward dependencies
-class Vector;
-class Matrix;
+#include "eigen_wrapper.hpp"
 
 // Functions to calculate the factorial and double factorial of an integer i
 unsigned long int fact(int i);

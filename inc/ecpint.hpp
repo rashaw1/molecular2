@@ -18,11 +18,11 @@ REFERENCES:
 #include "gaussquad.hpp"
 #include "ecp.hpp"
 #include "bessel.hpp"
+#include "eigen_wrapper.hpp"
 
 //namespace psi {
 
 class GaussianShell;
-class Matrix;
 
 /** 
 * Calculates real spherical harmonics S_lm(theta, phi) for all l, m up to lmax

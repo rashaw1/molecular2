@@ -42,7 +42,7 @@
 #define BASISHEADERDEF
 
 // Includes
-#include "mvector.hpp"
+#include "eigen_wrapper.hpp"
 #include <string>
 #include <libint2.hpp>
 #include <vector>
@@ -59,9 +59,9 @@ private:
   BF* bfs;
   std::string name;
   std::map<int, std::string> names;
-  Vector charges;
-  Vector shells;
-  Vector lnums;
+  iVector charges;
+  iVector shells;
+  iVector lnums;
   int maxl;
   bool ecps; 
   std::vector<libint2::Shell> intShells;
@@ -72,13 +72,13 @@ public:
   // Need to specify the name of the basis, n, and a list of the 
   // distinct atoms that are needed (as a vector of atomic numbers)
   Basis() : name("Undefined") { } // Default constructor
-  Basis(std::map<int, std::string> ns, Vector& atoms, bool _ecps = false);
+  Basis(std::map<int, std::string> ns, iVector& atoms, bool _ecps = false);
   ~Basis(); // Destructor
   // Accessors
   int getNBFs() const { return charges.size(); }
   std::string getName() const { return name; }
   std::string getName(int q) const;
-  Vector getCharges() const { return charges; }
+  iVector getCharges() const { return charges; }
   int findPosition(int q) const;
   int findShellPosition(int q) const;
   bool hasECPS() const { return ecps; }
@@ -87,10 +87,10 @@ public:
   int getSize(int q) const;
   int getMaxL() const { return maxl; }
   int getShellSize(int q) const;
-  Vector getShells(int q) const;
+  iVector getShells(int q) const;
   int getShellAtom(int i) const { return shellAtomList[i]; }
   std::vector<libint2::Shell>& getIntShells() { return intShells; }
-  Vector getLnums(int q) const;
+  iVector getLnums(int q) const;
   
   void addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std::vector <libint2::real_t>> &coeffs, double *pos, int atom);
   

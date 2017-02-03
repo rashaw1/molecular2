@@ -19,17 +19,12 @@
 #include "tensor4.hpp"
 #include <iostream>
 #include <cmath>
-#include <Eigen/Eigenvalues>
 #include <libint2.hpp>
 #include "logger.hpp"
-
-typedef Eigen::DiagonalMatrix<double, Eigen::Dynamic, Eigen::Dynamic>
-	DiagonalMatrix;
 
 // Constructor
 Fock::Fock(IntegralEngine& ints, Molecule& m) : integrals(ints), molecule(m)
 {
-	Eigen::setNbThreads(m.getLog().getNThreads());
 	
 	// Make the core hamiltonian matrix
 	formHCore();
@@ -91,39 +86,25 @@ void Fock::formHCore()
 	// the sum of the kinetic and nuclear attraction
 	// matrices
 	hcore = integrals.getKinetic() + integrals.getNucAttract();
-	nbfs = hcore.nrows();
+	nbfs = hcore.rows();
 
 }
 
 void Fock::formOrthog()
 {
 
-	Matrix S = integrals.getOverlap();
-	Eigen::MatrixXd temp(S.nrows(), S.nrows());
-	for (int i = 0; i < S.nrows(); i++){
-		for (int j = 0; j < S.nrows(); j++){
-			temp(i, j) = S(i, j);
-		}
-	}
-	Matrix U(S.nrows(), S.nrows(), 0.0); Vector lambda(S.nrows(), 0.0);
+	Matrix& S = integrals.getOverlap();
+	
 	// Diagonalise the overlap matrix into lambda and U,
 	// so that U(T)SU = lambda
 	// We can now form S^(-1/2) - the orthogonalising matrix
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(temp);
-	temp = es.eigenvectors();
-	for (int i = 0; i < S.nrows(); i++){
-		for (int j = 0; j < S.nrows(); j++){
-			U(i, j) = temp(i, j);
-		}
-	}
-	temp = es.eigenvalues().asDiagonal();
-	for (int i = 0; i < S.nrows(); i++)
-		lambda[i] = temp(i, i);
+	EigenSolver es(S);
+	Matrix U = es.eigenvectors();
+	Vector lambda = es.eigenvalues(); 
   
-	orthog.assign(nbfs, nbfs, 0.0);
-	for (int i = 0; i < nbfs; i++) {
+	orthog = Matrix::Zero(nbfs, nbfs);
+	for (int i = 0; i < nbfs; i++)
 		orthog(i, i) = 1.0/(std::sqrt(lambda(i)));
-	}
   
 	// S^-1/2  = U(lambda^-1/2)U(T)
 	orthog = U * orthog * U.transpose();
@@ -132,7 +113,7 @@ void Fock::formOrthog()
 void Fock::average(Vector &w) {
 	if (diis && iter > 2) {
 		// Average the fock matrices according to the weights
-		focka.assign(nbfs, nbfs, 0.0);
+		focka = Matrix::Zero(nbfs, nbfs);
 		int offset = focks.size() - w.size();
 		for (int i = offset; i < focks.size(); i++) {
 			focka = focka + w[i-offset]*focks[i]; 
@@ -155,42 +136,9 @@ void Fock::transform(bool first)
 // Diagonalise the MO fock matrix to get CP and eps
 void Fock::diagonalise() 
 {
-	Eigen::MatrixXd temp(fockm.nrows(), fockm.nrows());
-	for (int i = 0; i < fockm.nrows(); i++){
-		for (int j = 0; j < fockm.nrows(); j++){
-			temp(i, j) = fockm(i, j);
-		}
-	}
-
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(temp);
-	temp = es.eigenvectors();
-	CP.assign(fockm.nrows(), fockm.nrows(), 0.0); eps.assign(fockm.nrows(), 0.0);
-	for(int i = 0; i < fockm.nrows(); i++){
-		for (int j = 0; j < fockm.nrows(); j++){
-			CP(i, j) = temp(i, j);
-		}
-	}
-  
-	temp = es.eigenvalues().asDiagonal();
-	for (int i = 0; i < fockm.nrows(); i++)
-		eps[i] = temp(i, i);
-
-	// Sort the eigenvalues and eigenvectors
-	// using a selection sort
-	int k;
-	for (int i = 0; i < nbfs; i++){
-		k=i;
-		// Find the smallest element
-		for (int j = i+1; j < nbfs; j++)
-			if (eps(j) < eps(k)) { k=j; }
-    
-		// Swap rows of eps and columns of CP
-		eps.swap(i, k);
-		CP.swapCols(i, k);
-	}
-
-	// Form the initial SCF eigenvector matrix
-	CP = orthog*CP;
+	EigenSolver es(fockm);
+	CP = orthog * es.eigenvectors();
+	eps = es.eigenvalues();
 }
 
 // Construct the density matrix from CP, 
@@ -198,15 +146,7 @@ void Fock::diagonalise()
 void Fock::makeDens(int nocc)
 {
 	// Form the density matrix
-	dens.assign(nbfs, nbfs, 0.0);
-	for (int u = 0; u < nbfs; u++){
-		for (int v = 0; v < nbfs; v++){
-			for (int t = 0; t < nocc; t++){
-				dens(u, v) += CP(u, t)*CP(v,t);
-			}
-		}
-	}
-	dens = 2.0*dens;
+	dens = 2.0 * CP.block(0, 0, nbfs, nocc) * CP.transpose().block(0, 0, nocc, nbfs); 
 }
 
 // Make the JK matrix, depending on how two electron integrals are stored/needed
@@ -228,8 +168,8 @@ void Fock::makeJK()
 // Form the 2J-K matrix, given that twoints is stored in memory
 void Fock::formJK(Matrix& P)
 {
-	jints.assign(nbfs, nbfs, 0.0);
-	kints.assign(nbfs, nbfs, 0.0);
+	jints = Matrix::Zero(nbfs, nbfs);
+	kints = Matrix::Zero(nbfs, nbfs);
 	for (int u = 0; u < nbfs; u++){
 		for (int v = 0; v < nbfs ; v++){
 			for (int s = 0; s < nbfs; s++){
@@ -242,8 +182,9 @@ void Fock::formJK(Matrix& P)
 	}
 	jkints = jints - 0.5*kints;
 }
+
 // Form JK using integral direct methods
-void Fock::formJKdirect(const Matrix& Schwarz, Matrix& P)
+void Fock::formJKdirect(const Matrix& Schwarz, Matrix& D)
 {
 	using libint2::Shell;
 	using libint2::Engine;
@@ -251,11 +192,10 @@ void Fock::formJKdirect(const Matrix& Schwarz, Matrix& P)
 	
 	std::vector<Shell>& shells = molecule.getBasis().getIntShells();
 	const auto n = integrals.nbasis(shells);
-	jints.assign(n, n, 0.0);
-	kints.assign(n, n, 0.0);
-	const Matrix& D = P; 
+	jints = Matrix::Zero(n, n);
+	kints = Matrix::Zero(n, n);
 	
-	const auto do_schwarz_screen = Schwarz.ncols() != 0 && Schwarz.nrows() != 0;
+	const auto do_schwarz_screen = Schwarz.cols() != 0 && Schwarz.rows() != 0;
 	EMatrix D_shblk_norm = integrals.compute_shellblock_norm(shells, D);
 	auto fock_precision = molecule.getLog().precision();
 	auto maxnprim =  integrals.max_nprim(shells);
@@ -339,10 +279,10 @@ void Fock::formJKdirect(const Matrix& Schwarz, Matrix& P)
 			}
 		}
 	}
-
+	
 	// symmetrize the result
-	jints = 0.25 * (jints + jints.transpose());
-	kints = 0.25 * (kints + kints.transpose());
+	jints = 0.25 * (jints + jints.transpose()).eval();
+	kints = 0.25 * (kints + kints.transpose()).eval();
 	jkints = jints - 0.5*kints;
 }
 
@@ -382,42 +322,31 @@ void Fock::simpleAverage(Matrix& D0, double weight)
 }
 
 void Fock::compute_forces(const std::vector<Atom> &atoms, int nocc) {
-	std::cout << "Here" << std::endl << std::flush;
 	using libint2::Shell;
 	using libint2::Operator;
 
 	std::vector<Shell>& shells = molecule.getBasis().getIntShells();
-	EMatrix D(dens.nrows(), dens.ncols());
-	for (int i = 0; i < dens.nrows(); ++i) {
-		for (int j = 0; j < dens.ncols(); ++j) D(i, j) = dens(i, j);
-	}
 	
-	Matrix F1(atoms.size(), 3, 0.0);
-	Matrix F_Pulay(atoms.size(), 3, 0.0);
+	Matrix F1 = Matrix::Zero(atoms.size(), 3);
+	Matrix F_Pulay = Matrix::Zero(atoms.size(), 3);
 	
 	// One-body contributions to forces
-	std::cout << "Kinetic and potential.. " << std::endl << std::flush;
 	auto T1 = integrals.compute_1body_ints_deriv<Operator::kinetic>(1, shells, atoms);
 	auto V1 = integrals.compute_1body_ints_deriv<Operator::nuclear>(1, shells, atoms);
 	for (auto atom = 0, i = 0; atom != atoms.size(); ++atom) {
 		for (auto xyz = 0; xyz != 3; ++xyz, ++i) {
-			auto force = 2 * (T1[i] + V1[i]).cwiseProduct(D).sum();
+			auto force = 2 * (T1[i] + V1[i]).cwiseProduct(dens).sum();
 			F1(atom, xyz) += force;
 		}
 	}
-	std::cout << "done." << std::endl << std::flush;
 	
 	// Pulay force
 	EMatrix evals_occ = EMatrix::Zero(nocc, nocc);
 	for (int i = 0; i < nocc; ++i) evals_occ(i, i) = eps[i];
-	EMatrix C_occ(nocc, nocc);
-	for (int i = 0; i < nocc; ++i){ 
-		for (int j = 0; j < nocc; ++j) C_occ(i, j) = CP(i, j);
-	}
+	EMatrix C_occ = CP.block(0, 0, dens.rows(), nocc); 
 	EMatrix W = C_occ * evals_occ * C_occ.transpose();
-	std::cout << "Overlap.. " << std::endl << std::flush;
+
 	auto S1 = integrals.compute_1body_ints_deriv<Operator::overlap>(1, shells, atoms);
-	std::cout << "done." << std::endl << std::flush;
 	for (auto atom = 0, i = 0; atom != atoms.size(); ++atom) {
 		for (auto xyz = 0; xyz != 3; ++xyz, ++i) {
 			auto force = 2 * S1[i].cwiseProduct(W).sum();
@@ -426,18 +355,18 @@ void Fock::compute_forces(const std::vector<Atom> &atoms, int nocc) {
 	}
 	
 	// Two-body contrtibutions to forces
-	Matrix F2(atoms.size(), 3, 0.0);
-	auto G1 = compute_2body_fock_deriv<1>(atoms, D);
+	Matrix F2 = Matrix::Zero(atoms.size(), 3);
+	auto G1 = compute_2body_fock_deriv<1>(atoms, dens);
 	for (auto atom = 0, i = 0; atom != atoms.size(); ++atom) {
 		for (auto xyz = 0; xyz != 3; ++xyz, ++i) {
 			// identity prefactor since E(HF) = trace(H + F, D) = trace(2H + G, D)
-			auto force = G1[i].cwiseProduct(D).sum();
+			auto force = G1[i].cwiseProduct(dens).sum();
 			F2(atom, xyz) += force;
 		}
 	}
 	
 	// Compute nuclear repulsion forces
-	Matrix FN(atoms.size(), 3, 0.0);
+	Matrix FN = Matrix::Zero(atoms.size(), 3);
 	for (auto a1 = 1; a1 != atoms.size(); ++a1) {
 		const auto& atom1 = atoms[a1];
 		for (auto a2 = 0; a2 < a1; ++a2) {
@@ -466,7 +395,7 @@ void Fock::compute_forces(const std::vector<Atom> &atoms, int nocc) {
 	}
 	
 	forces = F1 + F_Pulay + F2 + FN;
-	forces.print();
+	std::cout << forces << std::endl;
 }
 
 void Fock::compute_hessian(const std::vector<Atom> &atoms, int nocc) {
@@ -477,20 +406,15 @@ void Fock::compute_hessian(const std::vector<Atom> &atoms, int nocc) {
 	using libint2::Operator;
 
 	std::vector<Shell>& shells = molecule.getBasis().getIntShells();
-	EMatrix D(dens.nrows(), dens.ncols());
-	for (int i = 0; i < dens.nrows(); ++i) {
-		for (int j = 0; j < dens.ncols(); ++j) D(i, j) = dens(i, j);
-	}
-	
-	Matrix H1(ncoords, ncoords, 0.0);
-	Matrix H_Pulay(ncoords, ncoords, 0.0);
+	Matrix H1 = Matrix::Zero(ncoords, ncoords);
+	Matrix H_Pulay = Matrix::Zero(ncoords, ncoords);
 	
 	// One-body contributions to the hessian
 	auto T2 = integrals.compute_1body_ints_deriv<Operator::kinetic>(2, shells, atoms);
 	auto V2 = integrals.compute_1body_ints_deriv<Operator::nuclear>(2, shells, atoms);
 	for (auto row = 0, i = 0; row != ncoords; ++row) {
 		for (auto col = row; col != ncoords; ++col, ++i) {
-			auto hess = 2 * (T2[i] + V2[i]).cwiseProduct(D).sum();
+			auto hess = 2 * (T2[i] + V2[i]).cwiseProduct(dens).sum();
 			H1(row, col) += hess;
 		}
 	}
@@ -498,10 +422,7 @@ void Fock::compute_hessian(const std::vector<Atom> &atoms, int nocc) {
 	// Pulay hessian
 	EMatrix evals_occ = EMatrix::Zero(nocc, nocc);
 	for (int i = 0; i < nocc; ++i) evals_occ(i, i) = eps[i];
-	EMatrix C_occ(nocc, nocc);
-	for (int i = 0; i < nocc; ++i){ 
-		for (int j = 0; j < nocc; ++j) C_occ(i, j) = CP(i, j);
-	}
+	EMatrix C_occ = CP.block(0, 0, dens.rows(), nocc); 
 	EMatrix W = C_occ * evals_occ * C_occ.transpose();
 	auto S2 = integrals.compute_1body_ints_deriv<Operator::overlap>(2, shells, atoms);
 	for (auto row = 0, i = 0; row != ncoords; ++row) {
@@ -512,18 +433,18 @@ void Fock::compute_hessian(const std::vector<Atom> &atoms, int nocc) {
 	}
 	
 	// Two-body contributions to the hessian
-	Matrix H2(ncoords, ncoords, 0.0);
-	auto G2 = compute_2body_fock_deriv<2>(atoms, D);
+	Matrix H2 = Matrix::Zero(ncoords, ncoords);
+	auto G2 = compute_2body_fock_deriv<2>(atoms, dens);
 	for (auto row = 0, i = 0; row != ncoords; ++row) {
 		for (auto col = row; col != ncoords; ++col, ++i) {
 			// identity prefactor since E(HF) = trace(H + F, D) = trace(2H + G, D)
-			auto hess = G2[i].cwiseProduct(D).sum();
+			auto hess = G2[i].cwiseProduct(dens).sum();
 			H2(row, col) += hess;
 		}
 	}
 	
 	// Nuclear repulsion hessian
-	Matrix HN(ncoords, ncoords, 0.0);
+	Matrix HN = Matrix::Zero(ncoords, ncoords);
 	for (auto a1 = 1; a1 != atoms.size(); ++a1) {
 		const auto& atom1 = atoms[a1];
 		for (auto a2 = 0; a2 < a1; ++a2) {
@@ -567,9 +488,7 @@ void Fock::compute_hessian(const std::vector<Atom> &atoms, int nocc) {
 		}
 	}
 	hessian = H1 + H_Pulay + H2 + HN;
-	std::cout << "\n\n";
-	hessian.print();
-	std::cout << "\n\n";
+	std::cout << hessian << std::endl; 
 }
 
 template <unsigned deriv_order>
@@ -590,7 +509,7 @@ std::vector<EMatrix> Fock::compute_2body_fock_deriv(const std::vector<Atom> &ato
 	
 	std::vector<EMatrix> G(nderiv, EMatrix::Zero(n, n));
 	
-	const auto do_schwarz_screen = Schwarz.ncols() != 0 && Schwarz.nrows() != 0;
+	const auto do_schwarz_screen = Schwarz.cols() != 0 && Schwarz.rows() != 0;
 	EMatrix D_shblk_norm = integrals.compute_shellblock_norm(shells, dens);
 	auto fock_precision = molecule.getLog().precision();
 	auto maxnprim =  integrals.max_nprim(shells);
@@ -756,11 +675,7 @@ std::vector<EMatrix> Fock::compute_2body_fock_deriv(const std::vector<Atom> &ato
 }
 
 FockFragment::FockFragment(IntegralEngine& ints, Molecule& m, int _start, int _end) : Fock(ints, m), start(_start), end(_end) { 
-	Matrix S = ints.getOverlap();
-	Sxx = Eigen::MatrixXd::Zero(S.nrows(), S.nrows());
-	for (int i = 0; i < S.nrows(); i++)
-		for (int j = 0; j <= i; j++)
-			Sxx(i, j) = Sxx(j, i) = S(i, j);
+	Sxx = ints.getOverlap();
 }
 
 FockFragment::FockFragment(const FockFragment& other) : Fock(other) {
@@ -773,16 +688,11 @@ void FockFragment::buildFock(Eigen::MatrixXd& qfq, Eigen::MatrixXd& qfp, Eigen::
 {
 	int nbfs = end - start; 
 	
-	Eigen::MatrixXd Fx = qfp.block(start, start, nbfs, nbfs) * Sxx; 
-	Fx = Fx + Fx.transpose() + qfq.block(start, start, nbfs, nbfs) + Sxx * pfp.block(start, start, nbfs, nbfs) * Sxx; 
+	focka = qfp.block(start, start, nbfs, nbfs) * Sxx; 
+	focka = focka + focka.transpose() + qfq.block(start, start, nbfs, nbfs) + Sxx * pfp.block(start, start, nbfs, nbfs) * Sxx; 
 	
-	Eigen::GeneralizedSelfAdjointEigenSolver<Eigen::MatrixXd> es(Fx, Sxx); 
-	CP.resize(nbfs, nbfs);
-	eps.resize(nbfs);
-	for (int i = 0; i < nbfs; i++) {
-		eps[i] = es.eigenvalues()[0];
-		for (int j = 0; j < nbfs; j++)
-			CP(i, j) = es.eigenvectors()(i, j);
-	}
+	GeneralizedEigenSolver es(focka, Sxx); 
+	CP = es.eigenvectors();
+	eps = es.eigenvalues(); 
 			
 }

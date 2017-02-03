@@ -1,7 +1,6 @@
 
 #include "cc.hpp"
 #include "logger.hpp"
-#include "mvector.hpp"
 #include "fock.hpp"
 #include "molecule.hpp"
 #include "integrals.hpp"
@@ -24,7 +23,7 @@ CCSD::CCSD(MP2& _mp2, bool _triples, bool _doDiis) : mp2(_mp2), doDiis(_doDiis),
 void CCSD::build_fock() {
 	// Transform hcore to MO basis
 	Matrix hcore_spatial = mp2.getFock().getCP().transpose() * mp2.getFock().getHCore() * mp2.getFock().getCP();
-	Matrix hcore(N, N, 0.0);
+	Matrix hcore = Matrix::Zero(N, N);
 	for (int p = 0; p < N; p++)
 		for (int q = p; q < N; q++) {
 			hcore(p, q) = hcore_spatial(p/2, q/2) * (p%2 == q%2);
@@ -34,7 +33,7 @@ void CCSD::build_fock() {
 	S8OddTensor4& spinInts = mp2.getSpinInts();
 	
 	// Assign the spin-Fock matrix
-	spinFock.assign(N, N, 0.0);
+	spinFock = Matrix::Zero(N, N);
 	// Build 
 	for (int p = 0; p < N; p++) {
 		for (int q = p; q < N; q++) {
@@ -60,7 +59,7 @@ void CCSD::build_fock() {
 
 void CCSD::build_guess() {
 	// Assign singles amplitudes as zero
-	singles.assign(nocc, N-nocc, 0.0);
+	singles = Matrix::Zero(nocc, N-nocc);
 	
 	// Assign and build doubles amplitudes
 	S8OddTensor4& spinInts = mp2.getSpinInts();
@@ -220,7 +219,7 @@ void CCSD::build_amplitudes(Matrix& F, Tensor4& W, S4OddTensor4& tau, S4OddTenso
 	S8OddTensor4& spinInts = mp2.getSpinInts();
 	
 	// Build new singles amplitudes
-	Matrix newSingles(nocc, N-nocc, 0.0);
+	Matrix newSingles = Matrix::Zero(nocc, N-nocc);
 	for (int i = 0; i < nocc; i++) {
 		for (int a = nocc; a < N; a++) {
 			newSingles(i, a-nocc) = spinFock(i, a);
@@ -324,7 +323,7 @@ void CCSD::calculateError(Matrix& newSingles, S4OddTensor4& newDoubles) {
 	Matrix ds = newSingles - singles;
 	S4OddTensor4 dd = newDoubles -  doubles;
 	
-	delta_singles = fnorm(ds);
+	delta_singles = ds.norm();
 	delta_doubles = fnorm(dd);
 	if (doDiis) {
 		// Save amplitudes
@@ -337,11 +336,12 @@ void CCSD::calculateError(Matrix& newSingles, S4OddTensor4& newDoubles) {
 		
 		// Compute error vector
 		std::vector<Vector> errs;
-		errs.push_back(Vector(ds, false));
-		errs.push_back(Vector(dd, Tensor4::ODD_4));
+		Vector new_err(Eigen::Map<Vector>(ds.data(), ds.cols()*ds.rows()));
+		errs.push_back(new_err);
+		errs.push_back(tensorToVector(dd, Tensor4::ODD_4));
 		Vector weights = diis.compute(errs);
 		if (iter > 2) {
-			newSingles.assign(nocc, N-nocc, 0.0);
+			newSingles = Matrix::Zero(nocc, N-nocc);
 			newDoubles.assign(nocc, N-nocc, 0.0);
 			int offset = singles_cache.size() - weights.size();
 			for (int i = offset; i < singles_cache.size(); i++) {
@@ -458,7 +458,7 @@ void CCSD::compute()
 	bool converged = false; 
 	int MAXITER = log.maxiter();
 	iter = 1;
-	Matrix F(N, N, 0.0);
+	Matrix F = Matrix::Zero(N, N);
 	Tensor4 W(N, N, N, N, 0.0);
 	S4OddTensor4 tau(nocc, N-nocc, 0.0);
 	S4OddTensor4 tautilde(nocc, N-nocc, 0.0);

@@ -12,7 +12,6 @@
 // Includes
 #include "atom.hpp"
 #include "pbf.hpp"
-#include "matrix.hpp"
 #include <iostream>
 #include "ecp.hpp"
 
@@ -117,8 +116,8 @@ int Atom::getNShellPrims(int shell) const
 
   // Make a list of the ids of all prims on all bfs
   // in this shell
-  Vector ids(nP);
-  Vector temp;
+  iVector ids(nP);
+  iVector temp;
   int k = 0;
 
   for (int i = start; i < end; i++){
@@ -130,8 +129,8 @@ int Atom::getNShellPrims(int shell) const
   }
 
   // Resize and sort
-  ids.resizeCopy(k);
-  ids.sort();
+  ids.conservativeResize(k);
+  std::sort(ids.data(), ids.data()+ids.size(), [](int lhs, int rhs){ return rhs > lhs; });
 
   // Count unique entries
   int count = 1;
@@ -166,7 +165,7 @@ PBF& Atom::getShellPrim(int shell, int i)
     bf += shells(j);
   }
   int pbf;
-  Vector pList;
+  iVector pList;
   // Loop until the prim with id i is found
   while(!found){
     bf++;

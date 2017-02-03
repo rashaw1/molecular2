@@ -30,7 +30,7 @@
 #define BFHEADERDEF
 
 // Includes
-#include "mvector.hpp"
+#include "eigen_wrapper.hpp"
 #include "pbf.hpp" 
  
 class BF
@@ -38,7 +38,7 @@ class BF
 private:
   PBF* pbfs;
   Vector coeffs;
-  Vector ids;
+  iVector ids;
   double norm;
   int lx, ly, lz;
 public:
@@ -47,13 +47,13 @@ public:
   // momentum quantum numbers, lx = l1, ly = l2, lz = l3,
   // and a vector of primitive exponents, exps
   BF() { } // Default constructor
-  BF(Vector& c, int l1, int l2, int l3, Vector& exps, Vector& indices);
+  BF(Vector& c, int l1, int l2, int l3, Vector& exps, iVector& indices);
   BF(const BF& other); // Copy constructor
   ~BF(); // Delete the pbfs
   // Accessors
   PBF& getPBF(int i) { return pbfs[i]; }
   int getNPrims() const { return coeffs.size(); }
-  Vector getPrimList() const { return ids; }
+  iVector getPrimList() const { return ids; }
   Vector getCoeffs() const { return coeffs; }
   Vector getExps() const; 
   double getCoeff(int i) const { return coeffs[i]; }

@@ -13,8 +13,7 @@
 
 // Includes
 #include <vector> 
-#include "mvector.hpp"
-#include <Eigen/Dense>
+#include "eigen_wrapper.hpp"
 
 class DIISEngine
 {
@@ -24,7 +23,7 @@ private:
 	std::vector<Vector> errs;
 	double damping_factor;
 	
-	Eigen::MatrixXd lastB;
+	Matrix lastB;
 public:
 	DIISEngine();
 	void init(int _maxDiis, bool _useDiis, double _damp = 0.02);
@@ -32,7 +31,7 @@ public:
 	void use(bool on) { useDiis = on; }
 	
 	Vector compute(std::vector<Vector> &errors);
-	Vector solve(Eigen::MatrixXd &B, int start);
+	Vector solve(Matrix &B, int start);
 };
 
 #endif
