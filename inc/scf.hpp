@@ -48,8 +48,8 @@ public:
   Vector calcErr(const Matrix& F, const Matrix& D, const Matrix& S, const Matrix& orthog);
   Vector calcErr();
   bool testConvergence(double val);
-  void rhf();
-  void uhf();
+  void rhf(bool print = true);
+  void uhf(bool print = false);
 };
 
 #endif

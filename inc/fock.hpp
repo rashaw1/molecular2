@@ -68,6 +68,8 @@ public:
   Matrix& getJ() { return jints; } 
   Matrix& getK() { return kints; }
   Matrix& getDens() { return dens; }
+  Matrix& getForces() { return forces; }
+  Matrix& getHessian() { return hessian; }
   virtual Matrix& getS() { return integrals.getOverlap(); }
   Matrix getHCore() const { return hcore; }
   Matrix getFockAO() const { return focka; }
@@ -78,6 +80,8 @@ public:
   Matrix getJK() const { return jkints; }
   Matrix getJ() const { return jints; } 
   Matrix getK() const { return kints; }
+  Matrix getForces() const { return forces; }
+  Matrix getHessian() const { return hessian; }
   virtual Matrix getS() const { return integrals.getOverlap(); }
   Matrix getDens() const { return dens; }
   void setDIIS(bool d) { diis = d; } 
@@ -86,8 +90,8 @@ public:
   void transform(bool first = false);
   void diagonalise();
   virtual void makeJK();
-  virtual void formJK(Matrix& P);
-  void formJKdirect(const Matrix& Schwarz, Matrix& P);
+  virtual void formJK(Matrix& P, double multiplier = 1.0);
+  void formJKdirect(const Matrix& Schwarz, Matrix& P, double multiplier = 1.0);
   void formJKfile();
   void makeFock();
   virtual void makeFock(Matrix& jbints);

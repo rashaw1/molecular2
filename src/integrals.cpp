@@ -38,7 +38,7 @@
 #include <thread>   
 
 // Constructor
-IntegralEngine::IntegralEngine(Molecule& m) : molecule(m)
+IntegralEngine::IntegralEngine(Molecule& m, bool print) : molecule(m)
 {
 	// Calculate sizes
 	int natoms = molecule.getNAtoms();
@@ -60,10 +60,11 @@ IntegralEngine::IntegralEngine(Molecule& m) : molecule(m)
 	sizes[2] = ones;
 	sizes[3] = (ones*(ones+1))/4;
 
-	molecule.getLog().title("INTEGRAL GENERATION");
-  
-	molecule.getLog().print("Forming the one electron integrals\n");
-  	
+	if (print) {
+		molecule.getLog().title("INTEGRAL GENERATION");
+		molecule.getLog().print("Forming the one electron integrals\n");
+  	}
+	
 	auto &shells = molecule.getBasis().getIntShells();
 	std::vector<Atom> atoms;
 	for (int i = 0; i < molecule.getNAtoms(); i++) atoms.push_back(molecule.getAtom(i));
@@ -76,18 +77,22 @@ IntegralEngine::IntegralEngine(Molecule& m) : molecule(m)
 		naints = naints + compute_ecp_ints(shells);
 	}
   
-	molecule.getLog().print("One electron integrals complete\n");
-	molecule.getLog().localTime();
-    
+  	if (print) {
+		molecule.getLog().print("One electron integrals complete\n");
+		molecule.getLog().localTime();
+	}
+	
 	Vector ests = getEstimates();
 	if ( molecule.getLog().getMemory() < ests(3) && !molecule.getLog().direct() ) {
 		Error e("MEMERR", "Not enough memory for ERIs.");
-		molecule.getLog().error(e);
-		molecule.getLog().setDirect(true);
+		if (print) {
+			molecule.getLog().error(e);
+			molecule.getLog().setDirect(true);
+		}
 	}
 	
 	prescreen = compute_schwarz_ints<>(shells);
-	if (prescreen.rows() < 10) { 
+	if (prescreen.rows() < 10 && print) { 
 		molecule.getLog().print("Forming the two electron repulsion integrals.\n");
 		molecule.getLog().print("PRESCREENING MATRIX:\n");
 		molecule.getLog().print(prescreen);
@@ -95,16 +100,18 @@ IntegralEngine::IntegralEngine(Molecule& m) : molecule(m)
 	}
 		
 	if ( molecule.getLog().direct() ){
-		molecule.getLog().print("Two electron integrals to be calculated on the fly.\n");
+		if(print) molecule.getLog().print("Two electron integrals to be calculated on the fly.\n");
 	} else { // Check memory requirements
 		twoints = compute_eris(shells);
 		
-		molecule.getLog().print("Two electron integrals completed.\n");
+		if(print) molecule.getLog().print("Two electron integrals completed.\n");
 		std::string mem = "Approximate memory usage = ";
 		mem += std::to_string(ests(3));
 		mem += " MB\n";
-		molecule.getLog().print(mem);
-		molecule.getLog().localTime();
+		if(print) {
+			molecule.getLog().print(mem);
+			molecule.getLog().localTime();
+		}
 		
 		if (molecule.getLog().twoprint()) {
 			molecule.getLog().print("Writing ERIs to file.\n");

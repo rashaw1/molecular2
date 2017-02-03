@@ -21,7 +21,6 @@ ALMOSCF::ALMOSCF(Molecule& m, Fock& f) : molecule(m), focker(f)
 	dimer_energy = e_frz = e_pol = e_ct = e_int = 0.0;
 	MAX = 6;
 	diis.init(MAX, m.getLog().diis());
-	P = Matrix::Zero(focker.getHCore().rows(), focker.getHCore().rows());
 }
 
 void ALMOSCF::setFragments(bool unrestricted)
@@ -53,41 +52,74 @@ void ALMOSCF::setFragments(bool unrestricted)
 }
 
 // Routines
-void ALMOSCF::compute() {
+void ALMOSCF::rcompute() {
 
 	// Make inverse overlap metric
 	Matrix& S = focker.getS();
+	Matrix& H = focker.getHCore();
 	Matrix P_old = P; 
 	
 	//Build T matrix
 	int nbfs = S.rows();
 	int nocc = focker.getMolecule().getNel() / 2;
-	
-	Matrix Tocc = Matrix::Zero(nbfs, nocc); 
-	int row_offset = 0; int col_offset = 0; 
-	for (auto f : fragments) {
-		int f_nocc = f.getMolecule().getNel() / 2;
-		int f_nbfs = f.getHCore().rows(); 
+	int i_offset = 0; int mu_offset = 0; 
+	Matrix sigma(nocc, nocc);
+	for (int i = 0; i < fragments.size(); i++) {
+		auto& f1 = fragments[i];
+		int f1_nocc = f1.getMolecule().getNel() / 2;
+		int f1_nbfs = f1.getHCore().rows(); 
 		
-		Tocc.block(row_offset, col_offset, f_nbfs, f_nocc) = f.getCP().block(0, 0, f_nbfs, f_nocc);
+		int j_offset = 0; int nu_offset = 0;
+		for (int j = 0; j <= i; j++) {
+			auto& f2 = fragments[j];
+			int f2_nocc = f2.getMolecule().getNel() / 2;
+			int f2_nbfs = f2.getHCore().rows(); 
+			
+			sigma.block(i_offset, j_offset, f1_nocc, f2_nocc) = f1.getCP().block(0, 0, f1_nbfs, f1_nocc).transpose() 
+				* S.block(mu_offset, nu_offset, f1_nbfs, f2_nbfs) * f2.getCP().block(0, 0, f2_nbfs, f2_nocc);
+			
+			j_offset += f2_nocc;
+			nu_offset += f2_nbfs;
+		}
 		
-		row_offset += f_nbfs; 
-		col_offset += f_nocc; 
+		mu_offset += f1_nbfs; 
+		i_offset += f1_nocc; 
 	}
-
-	P = Tocc.transpose() * S * Tocc;
-	P = Tocc * P.inverse() * Tocc.transpose(); 
+	sigma = sigma.selfadjointView<Eigen::Lower>();
+	sigma = sigma.inverse(); 
 	
+	i_offset = 0; mu_offset = 0;
+	for (int i = 0; i < fragments.size(); i++) {
+		auto& f1 = fragments[i];
+		int f1_nocc = f1.getMolecule().getNel() / 2;
+		int f1_nbfs = f1.getHCore().rows(); 
+		
+		int j_offset = 0; int nu_offset = 0;
+		for (int j = 0; j <= i; j++) {
+			auto& f2 = fragments[j];
+			int f2_nocc = f2.getMolecule().getNel() / 2;
+			int f2_nbfs = f2.getHCore().rows(); 
+			
+			P.block(mu_offset, nu_offset, f1_nbfs, f2_nbfs) = f1.getCP().block(0, 0, f1_nbfs, f1_nocc) 
+				* sigma.block(i_offset, j_offset, f1_nocc, f2_nocc) * f2.getCP().block(0, 0, f2_nbfs, f2_nocc).transpose();
+			
+			j_offset += f2_nocc;
+			nu_offset += f2_nbfs;
+		}
+		
+		mu_offset += f1_nbfs; 
+		i_offset += f1_nocc; 
+	}
+	P = P.selfadjointView<Eigen::Lower>();
 	delta_d = (P - P_old).norm(); 
 	
-	Matrix P_2 = 2.0 * P; 
 	// Build Fock matrix
 	if (molecule.getLog().direct())
-		focker.formJKdirect(focker.getIntegrals().getPrescreen(), P_2);
+		focker.formJKdirect(focker.getIntegrals().getPrescreen(), P, 2.0);
 	else 
-		focker.formJK(P_2); 
+		focker.formJK(P, 2.0);
 	
-	focker.makeFock(); 
+	focker.makeFock();
 	Matrix& F = focker.getFockAO(); 
 	
 	// Calculate errors
@@ -117,7 +149,6 @@ void ALMOSCF::compute() {
 		QFP = Q * F; 
 	} 
 	
-	Matrix& H = focker.getHCore();
 	double new_dimer_energy = (P * (H + F)).trace() + focker.getMolecule().getEnuc();
 	delta_e = new_dimer_energy - dimer_energy;
 	dimer_energy = new_dimer_energy;
@@ -128,6 +159,7 @@ void ALMOSCF::compute() {
 	
 	for (int i = 0; i < fragments.size(); i++)
 		fragments[i].buildFock(QFQ, QFP, PFP);
+	std::cout << "Done diagonalizations..." << molecule.getLog().getGlobalTime() << std::endl << std::endl;
 	
 }
 
@@ -219,6 +251,7 @@ void ALMOSCF::perturb(bool order4)
 
 void ALMOSCF::rscf()
 {
+	P = Matrix::Zero(focker.getHCore().rows(), focker.getHCore().rows());
 	molecule.getLog().title("ALMO Calculation");
 	
 	setFragments();
@@ -228,7 +261,7 @@ void ALMOSCF::rscf()
 	bool converged = false;
 	int iter = 0;
 	while (!converged && iter < molecule.getLog().maxiter()) {
-		compute(); 
+		rcompute(); 
 		molecule.getLog().iteration(iter++, dimer_energy, delta_e, delta_d);
 		converged = (fabs(delta_e) < molecule.getLog().converge()) && (fabs(delta_d) < molecule.getLog().converge());
 	}

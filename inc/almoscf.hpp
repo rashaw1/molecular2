@@ -16,7 +16,7 @@ class ALMOSCF
 private:
 	Molecule& molecule;
 	Fock& focker;
-	std::vector<FockFragment> fragments; 
+	std::vector<FockFragment> fragments;
 	std::vector<IntegralEngine> ints; 
 	DIISEngine diis;
 	double dimer_energy, e_frz, e_pol, e_ct, e_int, e_pert_2, e_pert_4; 
@@ -34,7 +34,7 @@ public:
 	std::vector<double>& getMonomerEnergies() { return monomer_energies; }
 	
 	void rscf();
-	void compute();
+	void rcompute();
 };
 
 #endif

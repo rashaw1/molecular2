@@ -166,7 +166,7 @@ void Fock::makeJK()
 }
 
 // Form the 2J-K matrix, given that twoints is stored in memory
-void Fock::formJK(Matrix& P)
+void Fock::formJK(Matrix& P, double multiplier)
 {
 	jints = Matrix::Zero(nbfs, nbfs);
 	kints = Matrix::Zero(nbfs, nbfs);
@@ -174,8 +174,8 @@ void Fock::formJK(Matrix& P)
 		for (int v = 0; v < nbfs ; v++){
 			for (int s = 0; s < nbfs; s++){
 				for (int l = 0; l < nbfs; l++){
-					jints(u, v) += P(s, l)*integrals.getERI(u, v, s, l);
-					kints(u, v) += P(s, l)*integrals.getERI(u, l, s, v);
+					jints(u, v) += multiplier * P(s, l)*integrals.getERI(u, v, s, l);
+					kints(u, v) += multiplier * P(s, l)*integrals.getERI(u, l, s, v);
 				}
 			}
 		}
@@ -184,7 +184,7 @@ void Fock::formJK(Matrix& P)
 }
 
 // Form JK using integral direct methods
-void Fock::formJKdirect(const Matrix& Schwarz, Matrix& D)
+void Fock::formJKdirect(const Matrix& Schwarz, Matrix& D, double multiplier)
 {
 	using libint2::Shell;
 	using libint2::Engine;
@@ -264,12 +264,12 @@ void Fock::formJKdirect(const Matrix& Schwarz, Matrix& D)
 
 									const auto value_scal_by_deg = value * s1234_deg;
 
-									jints(bf1,bf2) += D(bf3,bf4) * value_scal_by_deg;
-									jints(bf3,bf4) += D(bf1,bf2) * value_scal_by_deg;
-									kints(bf1,bf3) += 0.5 * D(bf2,bf4) * value_scal_by_deg;
-									kints(bf2,bf4) += 0.5 * D(bf1,bf3) * value_scal_by_deg;
-									kints(bf1,bf4) += 0.5 * D(bf2,bf3) * value_scal_by_deg;
-									kints(bf2,bf3) += 0.5 * D(bf1,bf4) * value_scal_by_deg;
+									jints(bf1,bf2) += multiplier * D(bf3,bf4) * value_scal_by_deg;
+									jints(bf3,bf4) += multiplier * D(bf1,bf2) * value_scal_by_deg;
+									kints(bf1,bf3) += 0.5 * multiplier * D(bf2,bf4) * value_scal_by_deg;
+									kints(bf2,bf4) += 0.5 * multiplier * D(bf1,bf3) * value_scal_by_deg;
+									kints(bf1,bf4) += 0.5 * multiplier * D(bf2,bf3) * value_scal_by_deg;
+									kints(bf2,bf3) += 0.5 * multiplier * D(bf1,bf4) * value_scal_by_deg;
 								}
 							}
 						}
@@ -395,7 +395,6 @@ void Fock::compute_forces(const std::vector<Atom> &atoms, int nocc) {
 	}
 	
 	forces = F1 + F_Pulay + F2 + FN;
-	std::cout << forces << std::endl;
 }
 
 void Fock::compute_hessian(const std::vector<Atom> &atoms, int nocc) {
@@ -488,7 +487,6 @@ void Fock::compute_hessian(const std::vector<Atom> &atoms, int nocc) {
 		}
 	}
 	hessian = H1 + H_Pulay + H2 + HN;
-	std::cout << hessian << std::endl; 
 }
 
 template <unsigned deriv_order>

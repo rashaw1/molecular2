@@ -84,7 +84,7 @@ bool SCF::testConvergence(double val)
 //       - Calculate the electronic energy
 //       - Make new density matrix - also gives orbitals
 //       - Test for convergence
-void SCF::rhf()
+void SCF::rhf(bool print)
 {
 	// Check the multiplicity and number of electrons
 	int nel = molecule.getNel();
@@ -97,8 +97,10 @@ void SCF::rhf()
 		Error e2("RHF", "Molecule is not a singlet state.");
 		molecule.getLog().error(e2);
 	} else { // All is fine
-		molecule.getLog().title("RHF SCF Calculation");
-		molecule.getLog().initIteration();
+		if (print) {
+			molecule.getLog().title("RHF SCF Calculation");
+			molecule.getLog().initIteration();
+		}
 		bool converged = false;
 		// Get initial guess
 		focker.transform(true); // Get guess of fock from hcore
@@ -114,7 +116,7 @@ void SCF::rhf()
 		errs.clear();
 
 		calcE();
-		molecule.getLog().iteration(0, energy, 0.0, 0.0);
+		if(print) molecule.getLog().iteration(0, energy, 0.0, 0.0);
 		focker.average(weights);
 		focker.transform(false);
 		int iter = 1;
@@ -135,7 +137,7 @@ void SCF::rhf()
       
 			calcE();
 			delta = fabs(energy-last_energy);
-			molecule.getLog().iteration(iter, energy, delta, dd);
+			if(print) molecule.getLog().iteration(iter, energy, delta, dd);
 			focker.average(weights);
 			focker.transform(false);
 			converged = testConvergence(dd);
@@ -144,15 +146,9 @@ void SCF::rhf()
 		}
 		focker.diagonalise();
 	
-		std::vector<Atom> atoms;
-		for (int i = 0; i < molecule.getNAtoms(); ++i) atoms.push_back(molecule.getAtom(i));
-
-		//focker.compute_forces(atoms, nel/2);
-		//focker.compute_hessian(atoms, nel/2);
-	
 		if (!converged) { 
 			molecule.getLog().result("SCF failed to converge.");
-		} else {
+		} else if (print) {
 			molecule.getLog().print("\nOne electron energy (Hartree) = " + std::to_string(one_E));
 			molecule.getLog().print("\nTwo electron energy (Hartree) = " + std::to_string(two_E));
 			molecule.getLog().print("\n");
@@ -163,7 +159,7 @@ void SCF::rhf()
 }
 
 // UHF
-void SCF::uhf()
+void SCF::uhf(bool print)
 {
 	// Make a second focker instance
 	Fock focker2(focker.getIntegrals(), molecule);
@@ -173,11 +169,13 @@ void SCF::uhf()
 	int nbeta = molecule.nbeta();
 
 	// Start logging
-	molecule.getLog().title("UHF SCF Calculation");
-	molecule.getLog().print("# alpha = " + std::to_string(nalpha));
-	molecule.getLog().print("# beta = " + std::to_string(nbeta));
-	molecule.getLog().print("\n");
-	molecule.getLog().initIteration();
+	if (print) {
+		molecule.getLog().title("UHF SCF Calculation");
+		molecule.getLog().print("# alpha = " + std::to_string(nalpha));
+		molecule.getLog().print("# beta = " + std::to_string(nbeta));
+		molecule.getLog().print("\n");
+		molecule.getLog().initIteration();
+	}
 	bool converged = false;
   
 	// Get initial guess                                                                                                                                                                      
@@ -228,7 +226,7 @@ void SCF::uhf()
 		dist = (focker.getDens() + focker2.getDens() - DA - DB).norm();
 		//dist = 0.5*(err1+err2-err1_last-err2_last);
     
-		molecule.getLog().iteration(iter, energy, delta, dist);
+		if(print) molecule.getLog().iteration(iter, energy, delta, dist);
 
 		if (delta < molecule.getLog().converge()/100.0 && dist < molecule.getLog().converge()) { converged = true; }
 		iter++;
@@ -236,7 +234,7 @@ void SCF::uhf()
 
 	focker.diagonalise();
 	focker2.diagonalise();
-	if (converged) {
+	if (converged && print) {
 		// Construct the orbital energies
 		molecule.getLog().print("\nALPHA ORBITALS");
 		molecule.getLog().orbitals(focker.getEps(), nalpha, true);

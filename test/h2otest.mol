@@ -1,12 +1,13 @@
-basis, default, cc-pvdz
+basis, default, sto-3g
 memory,4000
-geom,
-O, 0.0, -0.143226, 0.0
-H, 1.63803684, 1.1365488, 0.0
-H, -1.63803684, 1.1365488, 0.0
+geom, angstrom
+O,  0.00000, -0.07579, 0.00000
+H,  0.86681,  0.60144, 0.00000
+H, -0.86681,  0.60144, 0.00000
 geomend
-integral, direct
+!integral, direct
 !scf,converge,1e-8
 nthreads, 2
-rhf,
+!rhf,
+!mp2,
 !ccsd(t),

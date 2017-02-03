@@ -29,6 +29,7 @@
 #include "ecpint.hpp"
 #include "multiarr.hpp"
 #include <libint2.hpp>
+#include "optimiser.hpp"
 
 void runmp2(MP2& mp2obj, Logger& log, SCF& hf, bool calc); 
 
@@ -82,7 +83,8 @@ int main (int argc, char* argv[])
 				// All calculations will need some form of HF
 				Fock focker(integral, mol);
 				SCF hf(mol, focker);
-
+				
+				quadratic_scf(mol, focker);
 				// Run the commands given
 				int cmd = log.nextCmd();
 				while (cmd!=0) {

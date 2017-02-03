@@ -81,7 +81,7 @@ private:
 	iVector sizes;
 	S8EvenTensor4 twoints;
 public:
-	IntegralEngine(Molecule& m); //Constructor
+	IntegralEngine(Molecule& m, bool print = true); //Constructor
 	IntegralEngine(Molecule& m, const IntegralEngine& i, int start, int finish); 
 	IntegralEngine(const IntegralEngine& other);
 	~IntegralEngine();
