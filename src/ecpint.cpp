@@ -731,94 +731,80 @@ void ECPIntegral::type2(int lam, ECP& U, GaussianShell &shellA, GaussianShell &s
 	int L = LA + LB;	
 	int maxLBasis = data.maxLBasis;
 	
-	// Build radial integrals
-	int lparity = lam % 2;
-	int l1start,l2start;
-	ThreeIndex<double> radials(L+1, lam + LA + 1, lam + LB + 1);
+	ThreeIndex<double> radials(L+1, lam + LA + 1, lam + LB + 1); 
 	TwoIndex<double> temp;
-	for (int N1 = 0; N1 <= LA; N1++) {
-		l1start = 0;
-		
-		for (int N2 = 0; N2 <= LB; N2++) {
-			l2start = 0;
-			
-			radInts.type2(lam, l1start, lam + N1, l2start, lam + N2, N1 + N2, U, shellA, shellB, data, temp);
-			for (int l1 = l1start; l1 <= lam+N1; l1++) {
-				for (int l2 = l2start; l2 <= lam+N2; l2++) radials(N1 + N2, l1, l2) = temp(l1, l2);
-			}
-		}
+	for (int N = 0; N < L+1; N++) {
+		radInts.type2(lam, 0, lam + LA, 0, lam + LB, N, U, shellA, shellB, data, temp); 
+		for (int l1 = 0; l1 < lam + LA + 1; l1++)
+			for (int l2 = 0; l2 < lam + LB + 1; l2++)
+				radials(N, l1, l2) = temp(l1, l2); 
 	}
 	
-	// Loop over all basis functions in shell
 	std::vector<double> fac = facArray(2*(lam + maxLBasis) + 1);
 	std::vector<double> dfac = dfacArray(2*(lam + maxLBasis) + 1);
-	
-	// Unpack positions
 	double Ax = data.A[0]; double Ay = data.A[1]; double Az = data.A[2];
 	double Bx = data.B[0]; double By = data.B[1]; double Bz = data.B[2];
 	double Am = data.Am; double Bm = data.Bm;
-	
-	// Build spherical harmonics
 	double xA = Am > 0 ? Az / Am : 0.0;
 	double xB = Bm > 0 ? Bz / Bm : 0.0;
 	double phiA = atan2(Ay, Ax);
 	double phiB = atan2(By, Bx);
 	TwoIndex<double> SA = realSphericalHarmonics(lam+LA, xA, phiA, fac, dfac);
 	TwoIndex<double> SB = realSphericalHarmonics(lam+LB, xB, phiB, fac, dfac);
-
-	// Calculate chi_ab for all ab in shells
-	int z1, z2, ix, N1, N2;
-	double val, C;
-	int na = 0, nb = 0;
+	
+	int z1, z2;
+	double C, val1, val2;
+	int na = 0; 
 	for (int x1 = LA; x1 >= 0; x1--) {
-		for (int y1 = LA-x1; y1 >= 0; y1--) {
-			z1 = LA - x1 - y1;
-			nb = 0;
+		for (int r1 = LA-x1; r1 >= 0; r1--) {
+			z1 = LA - x1 - r1; 
 			
+			int nb = 0;
 			for (int x2 = LB; x2 >= 0; x2--) {
-				for (int y2 = LB-x2; y2 >= 0; y2--) {
-					z2 = LB - x2 - y2;
+				for (int y2 = LB - x2; y2 >= 0; y2--) {
+					z2 = LB - x2 - y2; 
 					
-					for (int k1 = 0; k1 <= x1; k1++) {
-						for (int k2 = 0; k2 <= x2; k2++) {
-							for (int l1 = 0; l1 <= y1; l1++) {
+					for (int alpha_x = 0; alpha_x <= x1; alpha_x++) {
+						for (int alpha_y = 0; alpha_y <= r1; alpha_y++) {
+							for (int alpha_z = 0; alpha_z <= z1; alpha_z++) {
+								int alpha = alpha_x + alpha_y + alpha_z; 
 								
-								for (int l2 = 0; l2 <= y2; l2++) {
-									for (int m1 = 0; m1 <= z1; m1++) {
-										for (int m2 = 0; m2 <= z2; m2++){
-											C = CA(0, na, k1, l1, m1) * CB(0, nb, k2, l2, m2);
+								for (int beta_x = 0; beta_x <= x2; beta_x++) {
+									for (int beta_y = 0; beta_y <= y2; beta_y++) {
+										for (int beta_z = 0; beta_z <= z2; beta_z++) {
+											int beta = beta_x + beta_y + beta_z; 
+											int N = alpha + beta; 
+											C = CA(0, na, alpha_x, alpha_y, alpha_z) * CB(0, nb, beta_x, beta_y, beta_z); 
 											
-											N1 = k1 + l1 + m1;
-											N2 = k2 + l2 + m2;
-											l1start = 0;
-											l2start = 0;
-											ix = N1 + N2;
-											// Sum over rho/kappa/sigma/tau
-											for (int rho = l1start; rho <= lam + N1; rho++) {
-												for (int sigma = -rho; sigma <= rho; sigma++) {
-													for (int kappa = l2start; kappa <= lam + N2; kappa++) {
-														for (int tau = -kappa; tau <= kappa; tau++) {
-															val = C * SA(rho, rho+sigma) * SB(kappa, kappa+tau) * radials(ix, rho, kappa);
+											for (int lam1 = 0; lam1 <= lam + alpha; lam1++) {
+												for (int lam2 = 0; lam2 <= lam + beta; lam2++) {
+													val1 = prefac * C * radials(N, lam1, lam2);
+													
+													for (int mu1 = -lam1; mu1 <= lam1; mu1++) {
+														for (int mu2 = -lam2; mu2 <= lam2; mu2++) {
 															
-															for (int mu = -lam; mu <= lam; mu++)
-															 	values(na, nb, lam+mu) += val * angInts.getIntegral(k1, l1, m1, lam, mu, rho, sigma) * angInts.getIntegral(k2, l2, m2, lam, mu, kappa, tau);
+															val2 = val1 * SA(lam1, lam1+mu1) * SB(lam2, lam2+mu2);
+															
+															for (int mu = -lam; mu <= lam; mu++) 
+																values(na, nb, lam+mu) += val2 * angInts.getIntegral(alpha_x, alpha_y, alpha_z, lam, mu, lam1, mu1) * angInts.getIntegral(beta_x, beta_y, beta_z, lam, mu, lam2, mu2);
+							
 														}
 													}
 												}
 											}
+											
 										}
 									}
 								}
 							}
 						}
 					}
-				
-					for (int mu = -lam; mu <= lam; mu++) values(na, nb, lam+mu) *= prefac;
+					
 					nb++;
 				}
 			}
 			
-			na++;
+			na++; 
 		}
 	}
 }
