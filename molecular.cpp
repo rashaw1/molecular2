@@ -84,7 +84,6 @@ int main (int argc, char* argv[])
 				Fock focker(integral, mol);
 				SCF hf(mol, focker);
 				
-				quadratic_scf(mol, focker);
 				// Run the commands given
 				int cmd = log.nextCmd();
 				while (cmd!=0) {

@@ -73,6 +73,7 @@ IntegralEngine::IntegralEngine(Molecule& m, bool print) : molecule(m)
 	tints = compute_1body_ints(shells, libint2::Operator::kinetic);
 	naints = compute_1body_ints(shells, libint2::Operator::nuclear, atoms);
 	
+	buildTransMat();
 	if(molecule.getBasis().hasECPS()) {
 		naints = naints + compute_ecp_ints(shells);
 	}
@@ -286,11 +287,11 @@ void IntegralEngine::buildTransMat()
 				transmat(row, col_offset) = -0.5;
 				transmat(row, col_offset + 3) = -0.5;
 				transmat(row++, col_offset + 5) = 1.0;
-				transmat(row++, col_offset + 1) = 1.0; 
-				transmat(row++, col_offset + 2) = 1.0;
+				transmat(row++, col_offset + 1) = std::sqrt(3.0); 
+				transmat(row++, col_offset + 2) = std::sqrt(3.0);
 				transmat(row, col_offset) = 0.5*std::sqrt(3.0);
 				transmat(row++, col_offset + 3) = -0.5*std::sqrt(3.0); 
-				transmat(row++, col_offset + 4) = 1.0;
+				transmat(row++, col_offset + 4) = std::sqrt(3.0);
 				break;
 			}
 			case 3: { // f-type
@@ -648,7 +649,7 @@ Matrix IntegralEngine::compute_schwarz_ints( const std::vector<libint2::Shell> &
 		
 		bf1 += n1; 
 	}
-	
+	std::cout << makeSpherical(ecps) << std::endl;
 	return ecps;
  }
  

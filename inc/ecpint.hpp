@@ -240,10 +240,10 @@ public:
 	* Initialises the object, in turn intialising the quadrature grids and BesselFunction
 	* @param maxL - the maximum angular momentum of integral needed
 	* @param tol - the tolerance for convergence of integrals (defaults to 1e-12)
-	* @param small - the maximum number of quadrature points for the small integration grid (default 128, minimum recommended)
+	* @param small - the maximum number of quadrature points for the small integration grid (default 256, minimum recommended)
 	* @param large - the maximum number of quadrature points for the large integration grid (default 1024, minimum recommended)
 	*/
-	void init(int maxL, double tol = 1e-12, int small = 128, int large = 1024);
+	void init(int maxL, double tol = 1e-12, int small = 256, int large = 1024);
 	
 	/**
 	* Given two GaussianShells, builds the parameters needed by both kind of integral. 
