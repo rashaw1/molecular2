@@ -630,8 +630,8 @@ double ECPIntegral::calcC(int a, int m, double A, std::vector<double> &fac) cons
 void ECPIntegral::makeC(FiveIndex<double> &C, int L, double *A, std::vector<double> &fac) {
 	int z; double Ck, Cl;
 	int na = 0;
-	for (int x = 0; x <= L; x++) {
-		for (int y = 0; y <= L - x; y++) {
+	for (int x = L; x >= 0; x--) {
+		for (int y = L-x; y >= 0; y--) {
 			z = L - x - y;
 			
 			for (int k = 0; k<= x; k++) {
