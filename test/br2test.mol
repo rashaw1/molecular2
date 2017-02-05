@@ -1,7 +1,14 @@
-basis, default, cc-pvdz-pp
+basis, default, cc-pvdz
+basis, br, cc-pvdz-pp
 ecp, br, ecp10mdf
-rhf,
-geom,
-br, 1.5, 0.1, 0.9
-br, -0.1, 0.8, -0.1
+geom, angstrom
+h, 0.0, 0.0, 0.0
+br, 1.4, 0.0, 0.0
+h, 3.4, 0.0, 0.0
+f, 4.5, 0.0, 0.0
 geomend
+fragments,
+1, 2, 0, 1
+3, 4, 0, 1
+fragmentsend
+almo,

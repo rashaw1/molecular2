@@ -239,11 +239,11 @@ public:
 	/**
 	* Initialises the object, in turn intialising the quadrature grids and BesselFunction
 	* @param maxL - the maximum angular momentum of integral needed
-	* @param tol - the tolerance for convergence of integrals (defaults to 1e-12)
+	* @param tol - the tolerance for convergence of integrals (defaults to 1e-15)
 	* @param small - the maximum number of quadrature points for the small integration grid (default 256, minimum recommended)
 	* @param large - the maximum number of quadrature points for the large integration grid (default 1024, minimum recommended)
 	*/
-	void init(int maxL, double tol = 1e-12, int small = 256, int large = 1024);
+	void init(int maxL, double tol = 1e-15, int small = 256, int large = 1024);
 	
 	/**
 	* Given two GaussianShells, builds the parameters needed by both kind of integral. 
@@ -316,6 +316,7 @@ public:
 	void type1(ECP& U, GaussianShell &shellA, GaussianShell &shellB, ShellPairData &data, FiveIndex<double> &CA, FiveIndex<double> &CB, TwoIndex<double> &values);
 	/// Calculates the type 2 integrals for the given ECP center over the given shell pair
 	void type2(int l, ECP& U, GaussianShell &shellA, GaussianShell &shellB, ShellPairData &data, FiveIndex<double> &CA, FiveIndex<double> &CB, ThreeIndex<double> &values);
+	
 	/// Computes the overall ECP integrals over the given ECP center and shell pair
 	void compute_shell_pair(ECP &U, GaussianShell &shellA, GaussianShell &shellB, TwoIndex<double> &values, int shiftA = 0, int shiftB = 0);
 };

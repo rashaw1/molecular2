@@ -100,39 +100,39 @@ double AngularIntegral::calcH2(int i, int j, int k, int m, std::vector<double> &
 ThreeIndex<double> AngularIntegral::uklm(int lam, int mu, std::vector<double> &fac) const {
 	ThreeIndex<double> values(lam+1, lam+1, 2);
 	 
-  	double or2 = 1.0/sqrt(2.0);
-  	double u = 0.0;
+	double or2 = 1.0/sqrt(2.0);
+	double u = 0.0;
 	double um = 0.0;
 	double g = calcG(lam, mu, fac);
 
-  	double u1, h1, h2;
-  	int j;
-  	for (int k = 0; k <= lam; k++) {
-  	  for (int l = 0; l <= lam - k; l++) {
-		u = um = 0.0;
-	  	j = k + l - mu;
-		if (j % 2 == 0 && j > -1) { 
-			u1 = 0.0;
-			j/=2;
-			for (int i = j; i <= (lam - mu)/2; i++) u1 += calcH1(i, j, lam, mu, fac);
+	double u1, h1, h2;
+	int j;
+	for (int k = 0; k <= lam; k++) {
+		for (int l = 0; l <= lam - k; l++) {
+			u = um = 0.0;
+			j = k + l - mu;
+			if (j % 2 == 0 && j > -1) { 
+				u1 = 0.0;
+				j/=2;
+				for (int i = j; i <= (lam - mu)/2; i++) u1 += calcH1(i, j, lam, mu, fac);
 			
-			u = g * u1;
-			u1 = 0;
-			for (int i = 0; i <= j; i++) u1 += calcH2(i, j, k, mu, fac);
-			u *= u1;
-			um = u;
-			
-			j = l % 2;
-			u *= (1 - j);
-			um *= j;
-			if (mu == 0) {
-				u *= or2;
+				u = g * u1;
+				u1 = 0;
+				for (int i = 0; i <= j; i++) u1 += calcH2(i, j, k, mu, fac);
+				u *= u1;
 				um = u;
-			} 
+			
+				j = l % 2;
+				u *= (1 - j);
+				um *= j;
+				if (mu == 0) {
+					u *= or2;
+					um = u;
+				} 
+			}
+			values(k, l, 0) = u;
+			values(k, l, 1) = um;
 		}
-		values(k, l, 0) = u;
-		values(k, l, 1) = um;
-	  }
 	}
 	return values;						
 }
@@ -320,9 +320,16 @@ void RadialIntegral::init(int maxL, double tol, int small, int large) {
 
 void RadialIntegral::buildBessel(std::vector<double> &r, int nr, int maxL, TwoIndex<double> &values, double weight) {
 	std::vector<double> besselValues;
-	for (int i = 0; i < nr; i++) {
-		bessie.calculate(weight * r[i], maxL, besselValues);
-		for (int l = 0; l <= maxL; l++) values(l, i) = besselValues[l];
+	if (fabs(weight) < 1e-15) {
+		for (int i = 0; i < nr; i++) {
+			values(0, i) = 1.0;
+			for (int l = 1; l <= maxL; l++) values(l, i) = 0.0;
+		}
+	} else {
+		for (int i = 0; i < nr; i++) {
+			bessie.calculate(weight * r[i], maxL, besselValues);
+			for (int l = 0; l <= maxL; l++) values(l, i) = besselValues[l];
+		}
 	}
 }
 
@@ -510,6 +517,9 @@ void RadialIntegral::type2(int l, int l1start, int l1end, int l2start, int l2end
 	int npA = shellA.nprimitive();
 	int npB = shellB.nprimitive();
 	
+	double A = data.Am;
+	double B = data.Bm;
+	
 	//buildParameters(shellA, shellB, Avec, Bvec);
 	std::function<double(double, double*, int)> intgd = integrand; 
 	// Start with the small grid
@@ -523,8 +533,11 @@ void RadialIntegral::type2(int l, int l1start, int l1end, int l2start, int l2end
 	
 	double Utab[gridSize];
 	buildU(U, l, N, smallGrid, Utab);
+	values.assign(l1end+1, l2end+1, 0.0);
 	
 	// Build the F matrices
+	if (A < 1e-15) l1end = 0; 
+	if (B < 1e-15) l2end = 0; 
 	TwoIndex<double> Fa;
 	TwoIndex<double> Fb;
 	buildF(shellA, data.Am, l1start, l1end, gridPoints, gridSize, smallGrid.start, smallGrid.end, Fa);
@@ -535,7 +548,6 @@ void RadialIntegral::type2(int l, int l1start, int l1end, int l2start, int l2end
 	std::vector<int> tests((l1end +1) * (l2end+1));
 	double params[gridSize]; 
 	bool failed = false;
-	values.assign(l1end+1, l2end+1, 0.0);
 	int ix = 0;
 	for (int l1 = 0; l1 <= l1end; l1++) {
 		for (int l2 = 0; l2 <= l2end; l2++) {
@@ -552,8 +564,6 @@ void RadialIntegral::type2(int l, int l1start, int l1end, int l2start, int l2end
 	if (failed) {
 		// Not converged, switch to big grid
 		double zeta_a, zeta_b, c_a, c_b;
-		double A = data.Am;
-		double B = data.Bm;
 				
 		gridSize = bigGrid.getN();
 		Fa.assign(l1end+1, gridSize, 0.0);
@@ -617,7 +627,7 @@ ECPIntegral::ECPIntegral(ECPBasis &_basis, int maxLB, int maxLU, int deriv) : ba
 	// Initialise angular and radial integrators
 	angInts.init(maxLB + deriv, maxLU);
 	angInts.compute();
-	radInts.init(2*(maxLB+deriv) + maxLU, 1e-12, 256, 1024);
+	radInts.init(2*(maxLB+deriv) + maxLU, 1e-15, 256, 1024);
 };
 
 double ECPIntegral::calcC(int a, int m, double A, std::vector<double> &fac) const {
@@ -864,10 +874,10 @@ Matrix ECPIntegral::compute_pair(GaussianShell &shellA, GaussianShell &shellB) {
 	TwoIndex<double> tempValues;
 	Matrix values = Matrix::Zero(shellA.ncartesian(), shellB.ncartesian());
 	for (int i = 0; i < basis.getN(); i++) {
-		 compute_shell_pair(basis.getECP(i), shellA, shellB, tempValues);
-		 for (int na = 0; na < shellA.ncartesian(); na++) {
-			 for (int nb = 0; nb < shellB.ncartesian(); nb++) values(na, nb) += tempValues(na, nb);
-		 }
+		compute_shell_pair(basis.getECP(i), shellA, shellB, tempValues);
+		for (int na = 0; na < shellA.ncartesian(); na++) {
+			for (int nb = 0; nb < shellB.ncartesian(); nb++) values(na, nb) += tempValues(na, nb);
+		}
 	}
 	return values;
 }

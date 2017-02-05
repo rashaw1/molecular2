@@ -72,12 +72,11 @@ IntegralEngine::IntegralEngine(Molecule& m, bool print) : molecule(m)
 	sints = compute_1body_ints(shells, libint2::Operator::overlap);
 	tints = compute_1body_ints(shells, libint2::Operator::kinetic);
 	naints = compute_1body_ints(shells, libint2::Operator::nuclear, atoms);
-	
-	buildTransMat();
+
 	if(molecule.getBasis().hasECPS()) {
 		naints = naints + compute_ecp_ints(shells);
 	}
-  
+	
   	if (print) {
 		molecule.getLog().print("One electron integrals complete\n");
 		molecule.getLog().localTime();
@@ -649,7 +648,7 @@ Matrix IntegralEngine::compute_schwarz_ints( const std::vector<libint2::Shell> &
 		
 		bf1 += n1; 
 	}
-	std::cout << makeSpherical(ecps) << std::endl;
+
 	return ecps;
  }
  
