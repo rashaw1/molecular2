@@ -18,6 +18,7 @@
 #include "atom.hpp"
 #include "tensor4.hpp"
 #include <iostream>
+#include <iomanip>
 #include <cmath>
 #include <libint2.hpp>
 #include "logger.hpp"

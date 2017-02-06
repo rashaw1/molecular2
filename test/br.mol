@@ -1,6 +1,7 @@
 basis, default, cc-pvdz-pp
 ecp, br, ecp10mdf
 hf,
+multiplicity,2
 geom,
 br, 0, 0, 0
 geomend

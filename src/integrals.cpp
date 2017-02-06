@@ -620,7 +620,7 @@ Matrix IntegralEngine::compute_schwarz_ints( const std::vector<libint2::Shell> &
 		double A[3] = { shells[s1].O[0], shells[s1].O[1], shells[s1].O[2] };
 		GaussianShell shellA(A, shells[s1].contr[0].l);
 		for (auto c : shells[s1].contr)
-			for (int i = 0; i < c.coeff.size(); i++) 
+			for (int i = 0; i < c.coeff.size(); i++)
 				shellA.addPrim(shells[s1].alpha[i], c.coeff[i]);
 
 		for(auto s2=0; s2<=s1; ++s2) {

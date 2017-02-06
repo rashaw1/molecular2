@@ -3,8 +3,8 @@
 #include "ecpint.hpp"
 #include "gshell.hpp"
 #include <iostream>
-#include <functional>
 #include <algorithm>
+#include <functional>
 #include <cmath>
 
 // Compute all the real spherical harmonics Slm(theta, phi) for l,m up to lmax
@@ -232,7 +232,6 @@ void AngularIntegral::makeOmega(FiveIndex<double> &U) {
 	
 	double om_plus=0.0, om_minus=0.0;
 	double wval; 
-	bool test1, test2, test3;
 	for (int k = 0; k <= LB; k++) {
 		for (int l = 0; l <= LB; l++) {
 			for (int m = 0; m <= LB; m++) {
@@ -241,7 +240,6 @@ void AngularIntegral::makeOmega(FiveIndex<double> &U) {
 					for (int sigma = -rho; sigma <= rho; sigma++) {
 						
 						for (int lam = 0; lam <= rho; lam++) {
-							test1 = (k+l+m+lam) % 2 == rho % 2;
 	
 							for (int mu = 0; mu <= lam; mu++) {
 								
@@ -514,14 +512,14 @@ void RadialIntegral::buildF(GaussianShell &shell, double A, int lstart, int lend
 }
 
 void RadialIntegral::type2(int l, int l1start, int l1end, int l2start, int l2end, int N, ECP &U, GaussianShell &shellA, GaussianShell &shellB, ShellPairData &data, TwoIndex<double> &values) {
+	std::function<double(double, double*, int)> intgd = integrand; 
+
 	int npA = shellA.nprimitive();
 	int npB = shellB.nprimitive();
 	
 	double A = data.Am;
 	double B = data.Bm;
 	
-	//buildParameters(shellA, shellB, Avec, Bvec);
-	std::function<double(double, double*, int)> intgd = integrand; 
 	// Start with the small grid
 	// Pretabulate U
 	int gridSize = smallGrid.getN();
@@ -604,7 +602,8 @@ void RadialIntegral::type2(int l, int l1start, int l1end, int l2start, int l2end
 					for (int l2 = 0; l2 <= l2end; l2++) {
 						
 						if (tests[ix] == 0) {
-							for (int i = 0; i < gridSize; i++) params2[i] = Xvals[i] * Fa(l1, i) * Fb(l2, i);
+							for (int i = 0; i < gridSize; i++)
+								params2[i] = Xvals[i] * Fa(l1, i) * Fb(l2, i);
 							test = newGrid.integrate(intgd, params2, tolerance); 
 							if (test == 0) std::cerr << "Failed at second attempt" << std::endl;
 							values(l1, l2) += c_a * c_b * newGrid.getI(); 
@@ -628,6 +627,7 @@ ECPIntegral::ECPIntegral(ECPBasis &_basis, int maxLB, int maxLU, int deriv) : ba
 	angInts.init(maxLB + deriv, maxLU);
 	angInts.compute();
 	radInts.init(2*(maxLB+deriv) + maxLU, 1e-15, 256, 1024);
+	time = 0.0;
 };
 
 double ECPIntegral::calcC(int a, int m, double A, std::vector<double> &fac) const {
@@ -743,12 +743,15 @@ void ECPIntegral::type2(int lam, ECP& U, GaussianShell &shellA, GaussianShell &s
 	
 	ThreeIndex<double> radials(L+1, lam + LA + 1, lam + LB + 1); 
 	TwoIndex<double> temp;
+	boost::timer::nanosecond_type start = timer.elapsed().wall;
 	for (int N = 0; N < L+1; N++) {
 		radInts.type2(lam, 0, lam + LA, 0, lam + LB, N, U, shellA, shellB, data, temp); 
 		for (int l1 = 0; l1 < lam + LA + 1; l1++)
 			for (int l2 = 0; l2 < lam + LB + 1; l2++)
 				radials(N, l1, l2) = temp(l1, l2); 
 	}
+	boost::timer::nanosecond_type end = timer.elapsed().wall;
+	time += (double)((end - start)/(1e9)); 
 	
 	std::vector<double> fac = facArray(2*(lam + maxLBasis) + 1);
 	std::vector<double> dfac = dfacArray(2*(lam + maxLBasis) + 1);
@@ -765,6 +768,7 @@ void ECPIntegral::type2(int lam, ECP& U, GaussianShell &shellA, GaussianShell &s
 	int z1, z2;
 	double C, val1, val2;
 	int na = 0; 
+	
 	for (int x1 = LA; x1 >= 0; x1--) {
 		for (int r1 = LA-x1; r1 >= 0; r1--) {
 			z1 = LA - x1 - r1; 
@@ -786,6 +790,7 @@ void ECPIntegral::type2(int lam, ECP& U, GaussianShell &shellA, GaussianShell &s
 											int N = alpha + beta; 
 											C = CA(0, na, alpha_x, alpha_y, alpha_z) * CB(0, nb, beta_x, beta_y, beta_z); 
 											
+											if (fabs(C) > 1e-15) {
 											for (int lam1 = 0; lam1 <= lam + alpha; lam1++) {
 												for (int lam2 = 0; lam2 <= lam + beta; lam2++) {
 													val1 = prefac * C * radials(N, lam1, lam2);
@@ -795,13 +800,14 @@ void ECPIntegral::type2(int lam, ECP& U, GaussianShell &shellA, GaussianShell &s
 															
 															val2 = val1 * SA(lam1, lam1+mu1) * SB(lam2, lam2+mu2);
 															
-															for (int mu = -lam; mu <= lam; mu++) 
+															for (int mu = -lam; mu <= lam; mu++)
 																values(na, nb, lam+mu) += val2 * angInts.getIntegral(alpha_x, alpha_y, alpha_z, lam, mu, lam1, mu1) * angInts.getIntegral(beta_x, beta_y, beta_z, lam, mu, lam2, mu2);
-							
+														
 														}
 													}
 												}
 											}
+										}
 											
 										}
 									}
@@ -864,7 +870,7 @@ void ECPIntegral::compute_shell_pair(ECP &U, GaussianShell &shellA, GaussianShel
 		for (int m = -l; m <= l; m++) {
 			for(int na = 0; na < data.ncartA; na++) {
 				for (int nb = 0; nb < data.ncartB; nb++)
-					values(na, nb) += t2vals(na, nb, l+m); 
+					values(na, nb) += t2vals(na, nb, l+m);
 			}
 		}
 	}
@@ -877,8 +883,9 @@ Matrix ECPIntegral::compute_pair(GaussianShell &shellA, GaussianShell &shellB) {
 		compute_shell_pair(basis.getECP(i), shellA, shellB, tempValues);
 		for (int na = 0; na < shellA.ncartesian(); na++) {
 			for (int nb = 0; nb < shellB.ncartesian(); nb++) values(na, nb) += tempValues(na, nb);
-		}
+		} 
 	}
+	//std::cout << time << std::endl; 
 	return values;
 }
 

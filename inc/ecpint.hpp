@@ -19,6 +19,7 @@ REFERENCES:
 #include "ecp.hpp"
 #include "bessel.hpp"
 #include "eigen_wrapper.hpp"
+#include <boost/timer/timer.hpp>
 
 //namespace psi {
 
@@ -281,6 +282,7 @@ public:
 	* @param values - the matrix to return the integrals in
 	*/
 	void type2(int lam, int l1start, int l1end, int l2start, int l2end, int N, ECP &U, GaussianShell &shellA, GaussianShell &shellB, ShellPairData &data, TwoIndex<double> &values);	
+
 };
 
 /** 
@@ -305,6 +307,8 @@ private:
 	double calcC(int a, int m, double A, std::vector<double> &fac) const;
 
 public:
+	double time; 
+	boost::timer::cpu_timer timer;
 	void makeC(FiveIndex<double> &C, int L, double *A, std::vector<double> &fac);
 	/// Constructor declares reference to the ECP basis
 	ECPIntegral(ECPBasis &basis, int maxLB, int maxLU, int deriv=0);

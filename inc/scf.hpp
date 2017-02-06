@@ -49,7 +49,7 @@ public:
   Vector calcErr();
   bool testConvergence(double val);
   void rhf(bool print = true);
-  void uhf(bool print = false);
+  void uhf(bool print = true);
 };
 
 #endif
