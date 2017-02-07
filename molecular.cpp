@@ -78,77 +78,87 @@ int main (int argc, char* argv[])
 				libint2::initialize();
 				Eigen::setNbThreads(mol.getLog().getNThreads());
 				
-				IntegralEngine integral(mol);
+				IntegralEngine ints(mol);
 
 				// All calculations will need some form of HF
-				Fock focker(integral, mol);
-				SCF hf(mol, focker);
-				
+				Fock* focker;
+				SCF* hf; 
+								
 				// Run the commands given
 				int cmd = log.nextCmd();
 				while (cmd!=0) {
 					switch(cmd) {
 						case 1: { // HF
 							if(mol.getMultiplicity() > 1){
-								hf.uhf();
+								focker = new UnrestrictedFock(ints, mol);
+								hf = new SCF(mol, *focker); 
+								hf->uhf();
 							} else if ((mol.getNel()%2) != 0) {
-								hf.uhf();
+								focker = new UnrestrictedFock(ints, mol);
+								hf = new SCF(mol, *focker);
+								hf->uhf();
 							} else {
-								hf.rhf();
+								focker = new Fock(ints, mol);
+								hf = new SCF(mol, *focker); 
+								hf->rhf();
 							}
 							break;
 						}
 						case 2: { // RHF
-							hf.rhf();
+							focker = new Fock(ints, mol);
+							hf = new SCF(mol, *focker);
+							hf->rhf();
 							break;
 						}
 						case 3: { // UHF
-							hf.uhf();
+							focker = new UnrestrictedFock(ints, mol);
+							hf = new SCF(mol, *focker);
+							hf->uhf();
 							break;
 						}
 						case 4: { // Just MP2
-							MP2 mp2obj(focker);
-							runmp2(mp2obj, log, hf, true);
+							MP2 mp2obj(*focker);
+							runmp2(mp2obj, log, *hf, true);
 							break;
 						}
 						case 5: { // MP2 + CCSD 
-							MP2 mp2obj(focker);
-							runmp2(mp2obj, log, hf, true);
+							MP2 mp2obj(*focker);
+							runmp2(mp2obj, log, *hf, true);
 							mp2obj.spatialToSpin();
 							CCSD ccobj(mp2obj, false, log.diis());
 							ccobj.compute();
-							log.result("Total Energy = ", hf.getEnergy() + ccobj.getEnergy(), "Hartree");
+							log.result("Total Energy = ", hf->getEnergy() + ccobj.getEnergy(), "Hartree");
 							break;
 						}
 						case 6: { // MP2 + CCSD(T) 
-							MP2 mp2obj(focker);
-							runmp2(mp2obj, log, hf, true);
+							MP2 mp2obj(*focker);
+							runmp2(mp2obj, log, *hf, true);
 							mp2obj.spatialToSpin();
 							CCSD ccobj(mp2obj, true, log.diis());
 							ccobj.compute();
-							log.result("Total Energy = ", hf.getEnergy() + ccobj.getEnergy() + ccobj.getETriples(), "Hartree");
+							log.result("Total Energy = ", hf->getEnergy() + ccobj.getEnergy() + ccobj.getETriples(), "Hartree");
 							break;
 						}
 						case 7: { // Just CCSD
-							MP2 mp2obj(focker);
-							runmp2(mp2obj, log, hf, false);
+							MP2 mp2obj(*focker);
+							runmp2(mp2obj, log, *hf, false);
 							mp2obj.spatialToSpin();
 							CCSD ccobj(mp2obj, false, log.diis());
 							ccobj.compute();
-							log.result("Total Energy = ", hf.getEnergy() + ccobj.getEnergy(), "Hartree");
+							log.result("Total Energy = ", hf->getEnergy() + ccobj.getEnergy(), "Hartree");
 							break;
 						}
 						case 8: { // Just CCSD(T) 
-							MP2 mp2obj(focker);
-							runmp2(mp2obj, log, hf, false);
+							MP2 mp2obj(*focker);
+							runmp2(mp2obj, log, *hf, false);
 							mp2obj.spatialToSpin();
 							CCSD ccobj(mp2obj, true, log.diis());
 							ccobj.compute();
-							log.result("Total Energy = ", hf.getEnergy() + ccobj.getEnergy() + ccobj.getETriples(), "Hartree");
+							log.result("Total Energy = ", hf->getEnergy() + ccobj.getEnergy() + ccobj.getETriples(), "Hartree");
 							break;
 						}
 						case 9: { // ALMO SCF 
-							ALMOSCF almo(mol, focker); 
+							ALMOSCF almo(mol, *focker); 
 							almo.rscf(); 
 							break;
 						}

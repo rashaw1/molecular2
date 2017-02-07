@@ -105,7 +105,7 @@ void SCF::rhf(bool print)
 		// Get initial guess
 		focker.transform(true); // Get guess of fock from hcore
 		focker.diagonalise();
-		focker.makeDens(nel/2);
+		focker.makeDens();
 		Matrix old_dens = focker.getDens();
 		focker.makeJK();
 		focker.makeFock();
@@ -125,7 +125,7 @@ void SCF::rhf(bool print)
 		while (!converged && iter < molecule.getLog().maxiter()) {
 			// Recalculate
 			focker.diagonalise();
-			focker.makeDens(nel/2);
+			focker.makeDens();
 			dd = (focker.getDens() - old_dens).norm();
 			old_dens = focker.getDens();
 			focker.makeJK();
@@ -160,10 +160,8 @@ void SCF::rhf(bool print)
 
 // UHF
 void SCF::uhf(bool print)
-{
-	// Make a second focker instance
-	Fock focker2(focker.getIntegrals(), molecule);
-  
+{ 
+	UnrestrictedFock& ufocker = dynamic_cast<UnrestrictedFock&>(focker); 
 	// Get number of alpha/beta electrons
 	int nalpha = molecule.nalpha();
 	int nbeta = molecule.nbeta();
@@ -179,51 +177,47 @@ void SCF::uhf(bool print)
 	bool converged = false;
   
 	// Get initial guess                                                                                                                                                                      
-	focker.transform(true); focker2.transform(true);
-	focker.diagonalise(); focker2.diagonalise();
+	ufocker.transform(true);
+	ufocker.diagonalise();
 	int iter = 1;
 	double delta, ea, eb, dist;
-	Matrix DA = Matrix::Zero(focker.getFockMO().rows(), focker.getFockMO().rows());
-	Matrix DB = Matrix::Zero(focker2.getFockMO().rows(), focker2.getFockMO().rows());
 	//bool average = molecule.getLog().diis();
 	double err1 = 0.0, err2 = 0.0, err1_last = 0.0, err2_last = 0.0;
 	std::vector<Vector> errs;
+	int nbfs = ufocker.getHCore().rows();
+	Matrix old_dens_alpha = Matrix::Zero(nbfs, nbfs);
+	Matrix old_dens_beta = Matrix::Zero(nbfs, nbfs);
 	while (!converged && iter < molecule.getLog().maxiter()) {
-		if (iter!= 1) {
-			DA = focker.getDens(); DB = focker2.getDens();
-		}
-		focker.makeDens(nalpha); focker2.makeDens(nbeta);
-		/*if (iter != 1 && average ) { 
-		focker.simpleAverage(DA, 0.5); 
-		focker2.simpleAverage(DB, 0.5);
-		}*/
-		focker.makeJK(); focker2.makeJK();
-		focker.makeFock(focker2.getJ()); focker2.makeFock(focker.getJ());    
+		
+		ufocker.makeDens();
+		ufocker.makeJK(); 
+		ufocker.makeFock();  
 
-		errs.push_back(calcErr(focker.getFockAO(), focker.getDens(), focker.getIntegrals().getOverlap(), focker.getOrthog()));
+		errs.push_back(calcErr(ufocker.getFockAlphaAO(), ufocker.getDensAlpha(), ufocker.getS(), ufocker.getOrthog()));
 		err1_last = err1;
 		err1 = error;
 
-		errs.push_back(calcErr(focker2.getFockAO(), focker2.getDens(), focker2.getIntegrals().getOverlap(), focker.getOrthog()));
+		errs.push_back(calcErr(ufocker.getFockBetaAO(), ufocker.getDensBeta(), ufocker.getS(), ufocker.getOrthog()));
 		err2_last = err2;
 		err2 = error;
 	
 		Vector weights = diis.compute(errs);
 		errs.clear();
-		focker.average(weights);
-		focker2.average(weights);
+		ufocker.average(weights);
 
-		ea = calcE(focker.getHCore(), focker.getDens(), focker.getFockAO());
-		eb = calcE(focker2.getHCore(), focker2.getDens(), focker2.getFockAO());
+		ea = calcE(ufocker.getHCore(), ufocker.getDensAlpha(), ufocker.getFockAlphaAO());
+		eb = calcE(ufocker.getHCore(), ufocker.getDensBeta(), ufocker.getFockBetaAO());
 
-		focker.transform(); focker2.transform();
-		focker.diagonalise(); focker2.diagonalise();
+		ufocker.transform(); 
+		ufocker.diagonalise();
     
 		last_energy = energy;
 		energy = (ea + eb)/2.0 + molecule.getEnuc();
 		delta = fabs(energy - last_energy);
     
-		dist = (focker.getDens() + focker2.getDens() - DA - DB).norm();
+		dist = (ufocker.getDensAlpha() + ufocker.getDensBeta() - old_dens_alpha - old_dens_beta).norm();
+		old_dens_alpha = ufocker.getDensAlpha();
+		old_dens_beta = ufocker.getDensBeta(); 
 		//dist = 0.5*(err1+err2-err1_last-err2_last);
     
 		if(print) molecule.getLog().iteration(iter, energy, delta, dist);
@@ -232,14 +226,13 @@ void SCF::uhf(bool print)
 		iter++;
 	}
 
-	focker.diagonalise();
-	focker2.diagonalise();
+	ufocker.diagonalise();
 	if (converged && print) {
 		// Construct the orbital energies
 		molecule.getLog().print("\nALPHA ORBITALS");
-		molecule.getLog().orbitals(focker.getEps(), nalpha, true);
+		molecule.getLog().orbitals(ufocker.getEpsAlpha(), nalpha, true);
 		molecule.getLog().print("\nBETA ORBITALS");
-		molecule.getLog().orbitals(focker2.getEps(), nbeta, true);
+		molecule.getLog().orbitals(ufocker.getEpsBeta(), nbeta, true);
 		molecule.getLog().result("UHF Energy", energy, "Hartree");
 	} else {
 		molecule.getLog().result("UHF failed to converge");
