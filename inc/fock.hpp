@@ -90,30 +90,21 @@ public:
   virtual void transform(bool first = false);
   virtual void diagonalise();
   virtual void makeJK();
-  virtual void formJK(Matrix& P, double multiplier = 1.0);
-  virtual void formJKdirect(const Matrix& Schwarz, Matrix& P1, double multiplier = 1.0);
+  void formJK(Matrix& P, double multiplier = 1.0);
+  void formJKdirect(const Matrix& Schwarz, Matrix& P1, double multiplier = 1.0);
   virtual void formJKfile();
   virtual void makeFock();
   virtual void makeDens();
   virtual void average(Vector &w);
   void simpleAverage(Matrix& D0, double weight = 0.5);
   
+  virtual void clearDiis(); 
+  
   virtual void compute_forces(const std::vector<Atom> &atoms, int nocc); 
   virtual void compute_hessian(const std::vector<Atom> &atoms, int nocc);
   
   template <unsigned deriv_order>
   std::vector<EMatrix> compute_2body_fock_deriv(const std::vector<Atom> &atoms, const EMatrix& D);
-};
-
-class FockFragment : public Fock 
-{
-private:
-	int start, end;
-public:
-	Matrix Sxx; 
-	FockFragment(IntegralEngine& ints, Molecule& m, int start, int end);
-	FockFragment(const FockFragment& other);
-	void buildFock(Matrix& qfq, Matrix& qfp, Matrix& pfp); 
 };
 
 class UnrestrictedFock : public Fock
@@ -147,12 +138,39 @@ public:
     virtual void transform(bool first = false);
     virtual void diagonalise();
     virtual void makeJK();
-    virtual void formJK(Matrix& P1, Matrix& P2, double multiplier = 1.0);
-    virtual void formJKdirect(const Matrix& Schwarz, Matrix& P1, Matrix& P2, double multiplier = 1.0);
+   	void formJK(Matrix& P1, Matrix& P2, double multiplier = 1.0);
+    void formJKdirect(const Matrix& Schwarz, Matrix& P1, Matrix& P2, double multiplier = 1.0);
     virtual void formJKfile();
     virtual void makeFock();
     virtual void makeDens();
     virtual void average(Vector &w);
+	
+	virtual void clearDiis(); 
+};
+
+class FockFragment : public Fock 
+{
+private:
+	int start, end;
+public:
+	Matrix Sxx; 
+	FockFragment(IntegralEngine& ints, Molecule& m, int start, int end);
+	FockFragment(const FockFragment& other);
+	Vector buildFock(Matrix& qfq, Matrix& qfp, Matrix& pfp, bool alpha = false); 
+	virtual void gensolve();
+};
+
+
+class UnrestrictedFockFragment : public UnrestrictedFock
+{
+private: 
+	int start, end;
+public:
+	Matrix Sxx;
+	UnrestrictedFockFragment(IntegralEngine& ints, Molecule& m, int start, int end);
+	UnrestrictedFockFragment(const UnrestrictedFockFragment& other);
+	Vector buildFock(Matrix& qfq, Matrix& qfp, Matrix& pfp, bool alpha); 
+	virtual void gensolve();
 };
 
 #endif

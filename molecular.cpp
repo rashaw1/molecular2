@@ -158,6 +158,7 @@ int main (int argc, char* argv[])
 							break;
 						}
 						case 9: { // ALMO SCF 
+							focker = new Fock(ints, mol);
 							ALMOSCF almo(mol, *focker); 
 							almo.rscf(); 
 							break;

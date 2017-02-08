@@ -39,44 +39,106 @@ void ALMOSCF::setFragments(bool unrestricted)
 		int f_nbfs = ints[nf].nbasis(shells);
 		IntegralEngine new_engine(frags[i], focker.getIntegrals(), start, start+f_nbfs);
 		ints.push_back(new_engine);
-		fragments.push_back(FockFragment(ints[nf], frags[i], start, start+f_nbfs));
+		if (unrestricted) {
+			ufragments.push_back(UnrestrictedFockFragment(ints[nf], frags[i], start, start+f_nbfs)); 
+			SCF hf(frags[i], fragments[fragments.size()-1]);
+			hf.uhf(); 
+			monomer_energies.push_back(hf.getEnergy()); 
+		} else {
+			fragments.push_back(FockFragment(ints[nf], frags[i], start, start+f_nbfs));
+			SCF hf(frags[i], fragments[fragments.size()-1]);
+			hf.rhf();
+			monomer_energies.push_back(hf.getEnergy()); 
+		}
 		start += f_nbfs;
-		
-		SCF hf(frags[i], fragments[fragments.size()-1]);
-		if (unrestricted) hf.uhf();
-		else hf.rhf(); 
-		monomer_energies.push_back(hf.getEnergy()); 
+
+		fragments[fragments.size()-1].clearDiis(); 
 
 		nf++;
 	}
 }
 
-// Routines
-void ALMOSCF::rcompute() {
-
+double ALMOSCF::makeDens(unsigned int type) {
 	// Make inverse overlap metric
 	Matrix& S = focker.getS();
-	Matrix& H = focker.getHCore();
-	Matrix P_old = P; 
+	Matrix P_old; int nocc;
+	
+	switch(type) {
+		
+		case 1: { // Alpha
+			P_old = P_alpha; 
+			nocc = focker.getMolecule().nalpha();
+			break;
+		}
+		
+		case 2: { //Beta
+			P_old = P_beta;
+			nocc = focker.getMolecule().nbeta(); 
+			break;
+		}
+		
+		default: { // Restricted
+			P_old = P;
+			nocc = focker.getMolecule().getNel() / 2;
+		}
+		
+	}
 	
 	//Build T matrix
 	int nbfs = S.rows();
-	int nocc = focker.getMolecule().getNel() / 2;
 	int i_offset = 0; int mu_offset = 0; 
 	Matrix sigma(nocc, nocc);
+	int f1_nocc, int f2_nocc; 
 	for (int i = 0; i < fragments.size(); i++) {
 		auto& f1 = fragments[i];
-		int f1_nocc = f1.getMolecule().getNel() / 2;
+		
+		switch(type) {
+			case 1: {
+				f1_nocc = f1.getMolecule().nalpha();
+				break;
+			}
+			
+			case 2: {
+				f1_nocc = f1.getMolecule().nbeta();
+				break;
+			}
+			
+			default: {
+				f1_nocc = f1.getMolecule().getNel()/2;
+			}
+		}
+
 		int f1_nbfs = f1.getHCore().rows(); 
 		
 		int j_offset = 0; int nu_offset = 0;
 		for (int j = 0; j <= i; j++) {
 			auto& f2 = fragments[j];
-			int f2_nocc = f2.getMolecule().getNel() / 2;
 			int f2_nbfs = f2.getHCore().rows(); 
+			switch(type) {
+				case 1: {
+					UnrestrictedFockFragment& f1a = dynamic_cast<UnrestrictedFockFragment&>(f1);
+					UnrestrictedFockFragment& f2a = dynamic_cast<UnrestrictedFockFragment&>(f2);
+					f2_nocc = f2a.getMolecule().nalpha();
+					sigma.block(i_offset, j_offset, f1_nocc, f2_nocc) = f1a.getCP_alpha().block(0, 0, f1_nbfs, f1_nocc).transpose() 
+						* S.block(mu_offset, nu_offset, f1_nbfs, f2_nbfs) * f2a.getCP_alpha().block(0, 0, f2_nbfs, f2_nocc);
+					break;
+				}
 			
-			sigma.block(i_offset, j_offset, f1_nocc, f2_nocc) = f1.getCP().block(0, 0, f1_nbfs, f1_nocc).transpose() 
-				* S.block(mu_offset, nu_offset, f1_nbfs, f2_nbfs) * f2.getCP().block(0, 0, f2_nbfs, f2_nocc);
+				case 2: {
+					UnrestrictedFockFragment& f1a = dynamic_cast<UnrestrictedFockFragment&>(f1);
+					UnrestrictedFockFragment& f2a = dynamic_cast<UnrestrictedFockFragment&>(f2);
+					f2_nocc = f2.getMolecule().nbeta();
+					sigma.block(i_offset, j_offset, f1_nocc, f2_nocc) = f1a.getCP_beta().block(0, 0, f1_nbfs, f1_nocc).transpose() 
+						* S.block(mu_offset, nu_offset, f1_nbfs, f2_nbfs) * f2a.getCP_beta().block(0, 0, f2_nbfs, f2_nocc);
+					break;
+				}
+			
+				default: {
+					f2_nocc = f2.getMolecule().getNel()/2;
+					sigma.block(i_offset, j_offset, f1_nocc, f2_nocc) = f1.getCP().block(0, 0, f1_nbfs, f1_nocc).transpose() 
+						* S.block(mu_offset, nu_offset, f1_nbfs, f2_nbfs) * f2.getCP().block(0, 0, f2_nbfs, f2_nocc);
+				}
+			}
 			
 			j_offset += f2_nocc;
 			nu_offset += f2_nbfs;
@@ -91,17 +153,55 @@ void ALMOSCF::rcompute() {
 	i_offset = 0; mu_offset = 0;
 	for (int i = 0; i < fragments.size(); i++) {
 		auto& f1 = fragments[i];
-		int f1_nocc = f1.getMolecule().getNel() / 2;
+		
+		switch(type) {
+			case 1: {
+				f1_nocc = f1.getMolecule().nalpha();
+				break;
+			}
+			
+			case 2: {
+				f1_nocc = f1.getMolecule().nbeta();
+				break;
+			}
+			
+			default: {
+				f1_nocc = f1.getMolecule().getNel()/2;
+			}
+		}
+		
 		int f1_nbfs = f1.getHCore().rows(); 
 		
 		int j_offset = 0; int nu_offset = 0;
 		for (int j = 0; j <= i; j++) {
 			auto& f2 = fragments[j];
-			int f2_nocc = f2.getMolecule().getNel() / 2;
 			int f2_nbfs = f2.getHCore().rows(); 
 			
-			P.block(mu_offset, nu_offset, f1_nbfs, f2_nbfs) = f1.getCP().block(0, 0, f1_nbfs, f1_nocc) 
-				* sigma.block(i_offset, j_offset, f1_nocc, f2_nocc) * f2.getCP().block(0, 0, f2_nbfs, f2_nocc).transpose();
+			switch(type) {
+				case 1: {
+					UnrestrictedFockFragment& f1a = dynamic_cast<UnrestrictedFockFragment&>(f1);
+					UnrestrictedFockFragment& f2a = dynamic_cast<UnrestrictedFockFragment&>(f2);
+					f2_nocc = f2.getMolecule().nalpha();
+					P_alpha.block(mu_offset, nu_offset, f1_nbfs, f2_nbfs) = f1a.getCP_alpha().block(0, 0, f1_nbfs, f1_nocc) 
+						* sigma.block(i_offset, j_offset, f1_nocc, f2_nocc) * f2a.getCP_alpha().block(0, 0, f2_nbfs, f2_nocc).transpose();
+					break;
+				}
+			
+				case 2: {
+					UnrestrictedFockFragment& f1a = dynamic_cast<UnrestrictedFockFragment&>(f1);
+					UnrestrictedFockFragment& f2a = dynamic_cast<UnrestrictedFockFragment&>(f2);
+					f2_nocc = f2.getMolecule().nbeta();
+					P_beta.block(mu_offset, nu_offset, f1_nbfs, f2_nbfs) = f1a.getCP_beta().block(0, 0, f1_nbfs, f1_nocc) 
+						* sigma.block(i_offset, j_offset, f1_nocc, f2_nocc) * f2a.getCP_beta().block(0, 0, f2_nbfs, f2_nocc).transpose();
+					break;
+				}
+			
+				default: {
+					f2_nocc = f2.getMolecule().getNel()/2;
+					P.block(mu_offset, nu_offset, f1_nbfs, f2_nbfs) = f1.getCP().block(0, 0, f1_nbfs, f1_nocc) 
+						* sigma.block(i_offset, j_offset, f1_nocc, f2_nocc) * f2.getCP().block(0, 0, f2_nbfs, f2_nocc).transpose();
+				}
+			}
 			
 			j_offset += f2_nocc;
 			nu_offset += f2_nbfs;
@@ -110,8 +210,35 @@ void ALMOSCF::rcompute() {
 		mu_offset += f1_nbfs; 
 		i_offset += f1_nocc; 
 	}
-	P = P.selfadjointView<Eigen::Lower>();
-	delta_d = (P - P_old).norm(); 
+	Matrix newP;
+	switch(type) {
+		case 1: {
+			newP = P_alpha.selfadjointView<Eigen::Lower>();
+			break;
+		}
+		
+		case 2: {
+			newP = P_beta.selfadjointView<Eigen::Lower>();
+			break;
+		}
+		
+		default: {
+			newP = P.selfadjointView<Eigen::Lower>();
+		}
+	}
+	double dd = (newP - P_old).norm(); 
+	
+	return dd; 
+}
+
+// Routines
+void ALMOSCF::rcompute() {
+	
+	Matrix& S = focker.getS();
+	Matrix& H = focker.getHCore();
+	int nbfs = S.rows();
+	
+	delta_d = makeDens(0);
 	
 	// Build Fock matrix
 	if (molecule.getLog().direct())
@@ -126,28 +253,6 @@ void ALMOSCF::rcompute() {
 	Matrix Q = - S * P; 
 	for (int i = 0; i < nbfs; i++) Q(i, i) += 1.0; 
 	Matrix QFP = Q * F; 
-	if (molecule.getLog().diis()) {
-		QFP = QFP * P; 
-		
-		std::vector<Vector> errs; 
-		int offset = 0;
-		for (int i = 0; i < fragments.size(); i++) {
-			int f_nbfs = fragments[i].getHCore().rows();
-			Matrix e = QFP.block(offset, offset, f_nbfs, f_nbfs) * fragments[i].Sxx;
-			e = (e - e.transpose()).eval(); 
-
-			Vector new_err(Eigen::Map<Vector>(e.data(), e.cols()*e.rows()));
-			errs.push_back(new_err); 
-			
-			offset += f_nbfs; 
-		}
-		
-		Vector weights = diis.compute(errs);
-		focker.average(weights);
-		F = focker.getFockAO();
-		 
-		QFP = Q * F; 
-	} 
 	
 	double new_dimer_energy = (P * (H + F)).trace() + focker.getMolecule().getEnuc();
 	delta_e = new_dimer_energy - dimer_energy;
@@ -157,10 +262,73 @@ void ALMOSCF::rcompute() {
 	QFP = QFP * P; 
 	Matrix PFP = P * F * P; 
 	
+	std::vector<Vector> errs;
 	for (int i = 0; i < fragments.size(); i++)
-		fragments[i].buildFock(QFQ, QFP, PFP);
-	std::cout << "Done diagonalizations..." << molecule.getLog().getGlobalTime() << std::endl << std::endl;
+		errs.push_back(fragments[i].buildFock(QFQ, QFP, PFP));
 	
+	if (molecule.getLog().diis()) {
+		Vector weights = diis.compute(errs); 
+		for(int i = 0; i < fragments.size(); i++)
+			fragments[i].average(weights);
+	}
+	
+	for (int i = 0; i < fragments.size(); i++)
+		fragments[i].gensolve(); 
+}
+
+void ALMOSCF::ucompute() {
+	UnrestrictedFock& ufocker = dynamic_cast<UnrestrictedFock&>(focker);
+	
+	Matrix& S = ufocker.getS();
+	Matrix& H = ufocker.getHCore();
+	int nbfs = S.rows();
+	
+	delta_d = makeDens(1);
+	delta_d += makeDens(2); 
+	
+	// Build Fock matrix
+	if (molecule.getLog().direct())
+		ufocker.formJKdirect(focker.getIntegrals().getPrescreen(), P_alpha, P_beta, 2.0);
+	else 
+		ufocker.formJK(P_alpha, P_beta, 2.0);
+	
+	ufocker.makeFock();
+	Matrix& Fa = ufocker.getFockAlphaAO(); 
+	Matrix& Fb = ufocker.getFockBetaAO();
+	
+	// Calculate errors
+	Matrix Q_alpha = - S * P_alpha;
+	Matrix Q_beta = -S * P_beta;  
+	for (int i = 0; i < nbfs; i++) {
+		Q_alpha(i, i) += 1.0; 
+		Q_beta(i, i) += 1.0; 
+	}
+	Matrix QFP_alpha = Q_alpha * Fa;
+	Matrix QFP_beta = Q_beta * Fb; 
+	
+	double new_dimer_energy = 0.5 * (P_alpha * (H + Fa) + P_beta * (H + Fb)).trace() + ufocker.getMolecule().getEnuc();
+	delta_e = new_dimer_energy - dimer_energy;
+	dimer_energy = new_dimer_energy;
+	
+	Matrix QFQ_alpha = QFP_alpha * Q_alpha.transpose();
+	Matrix QFQ_beta = QFP_beta * Q_beta.transpose();
+	QFP_alpha = QFP_alpha * P_alpha; 
+	QFP_beta = QFP_beta * P_beta;
+	Matrix PFP_alpha = P_alpha * Fa * P_alpha; 
+	Matrix PFP_beta = P_beta * Fb * P_beta;
+	
+	std::vector<Vector> errs;
+	for (int i = 0; i < fragments.size(); i++)
+		errs.push_back(fragments[i].buildFock(QFQ_alpha, QFP_alpha, PFP_alpha, true));
+	
+	if (molecule.getLog().diis()) {
+		Vector weights = diis.compute(errs); 
+		for(int i = 0; i < fragments.size(); i++)
+			fragments[i].average(weights);
+	}
+	
+	for (int i = 0; i < fragments.size(); i++)
+		fragments[i].gensolve(); 
 }
 
 // Calculate the perturbative correction

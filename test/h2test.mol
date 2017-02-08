@@ -1,8 +1,9 @@
-basis, default, cc-pvtz
+basis, default, avqz
 memory, 4000
 !rhf,
 uhf,
-mp2,
+integral,direct
+!mp2,
 geom,
 h, 0.0, 0.0, 0.0
 h, 0.0, 0.0, 1.4

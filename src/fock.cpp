@@ -77,6 +77,7 @@ Fock::Fock(const Fock& other) : integrals(other.integrals), molecule(other.molec
 	fromfile = other.fromfile;
 	diis = other.diis;
 	nbfs = other.nbfs;
+	nocc = other.nocc;
 	iter = other.iter;
 	MAX = other.MAX; 
 }
@@ -661,6 +662,10 @@ std::vector<EMatrix> Fock::compute_2body_fock_deriv(const std::vector<Atom> &ato
 
 	return GG;
 }
+void Fock::clearDiis() {
+	iter = 0;
+	focks.clear(); 
+}
 
 FockFragment::FockFragment(IntegralEngine& ints, Molecule& m, int _start, int _end) : Fock(ints, m), start(_start), end(_end) { 
 	Sxx = ints.getOverlap();
@@ -672,17 +677,32 @@ FockFragment::FockFragment(const FockFragment& other) : Fock(other) {
 	end = other.end;
 }
 
-void FockFragment::buildFock(Eigen::MatrixXd& qfq, Eigen::MatrixXd& qfp, Eigen::MatrixXd& pfp) 
+Vector FockFragment::buildFock(Matrix& qfq, Matrix& qfp, Matrix& pfp, bool alpha) 
 {
 	int nbfs = end - start; 
 	
 	focka = qfp.block(start, start, nbfs, nbfs) * Sxx; 
+	Matrix e = focka - focka.transpose(); 
+	Vector err(Eigen::Map<Vector>(e.data(), e.cols()*e.rows()));
+	
 	focka = focka + focka.transpose() + qfq.block(start, start, nbfs, nbfs) + Sxx * pfp.block(start, start, nbfs, nbfs) * Sxx; 
 	
+	if (diis) { // Archive for averaging
+		if (iter >= MAX) {
+			focks.erase(focks.begin());
+		}
+		focks.push_back(focka);
+	}		
+	
+	return err; 
+}
+
+void FockFragment::gensolve()
+{
 	GeneralizedEigenSolver es(focka, Sxx); 
 	CP = es.eigenvectors();
-	eps = es.eigenvalues(); 
-			
+	eps = es.eigenvalues();
+	iter++;
 }
 
 UnrestrictedFock::UnrestrictedFock(IntegralEngine& ints, Molecule& m) : Fock(ints, m)
@@ -739,8 +759,8 @@ void UnrestrictedFock::formJKdirect(const Matrix& Schwarz, Matrix& Da, Matrix& D
 	
 	std::vector<Shell>& shells = molecule.getBasis().getIntShells();
 	const auto n = integrals.nbasis(shells);
-	jints = Matrix::Zero(n, n);
-	kints = Matrix::Zero(n, n);
+	jkints_alpha = Matrix::Zero(n, n);
+	jkints_beta = Matrix::Zero(n, n);
 	
 	const auto do_schwarz_screen = Schwarz.cols() != 0 && Schwarz.rows() != 0;
 	Matrix D_tot = Da + Db; 
@@ -920,5 +940,63 @@ void UnrestrictedFock::average(Vector &w) {
 
 void UnrestrictedFock::formJKfile() {
 	std::cerr << "File-read not implemented yet!" << std::endl;  
+}
+
+void UnrestrictedFock::clearDiis() {
+	iter = 0;
+	alpha_focks.clear();
+	beta_focks.clear();
+}
+
+UnrestrictedFockFragment::UnrestrictedFockFragment(IntegralEngine& ints, Molecule& m, int _start, int _end) : UnrestrictedFock(ints, m), start(_start), end(_end) { 
+	Sxx = ints.getOverlap();
+}
+
+UnrestrictedFockFragment::UnrestrictedFockFragment(const UnrestrictedFockFragment& other) : UnrestrictedFock(other) {
+	Sxx = other.Sxx;
+	start = other.start;
+	end = other.end;
+}
+
+Vector UnrestrictedFockFragment::buildFock(Matrix& qfq, Matrix& qfp, Matrix& pfp, bool alpha) 
+{
+	int nbfs = end - start; 
+	
+	focka = qfp.block(start, start, nbfs, nbfs) * Sxx; 
+	focka = focka + focka.transpose() + qfq.block(start, start, nbfs, nbfs) + Sxx * pfp.block(start, start, nbfs, nbfs) * Sxx; 
+	
+	Matrix e = focka - focka.transpose(); 
+	Vector err(Eigen::Map<Vector>(e.data(), e.cols()*e.rows()));
+	
+	if (alpha) {
+		fock_alpha_ao = focka;
+		if (diis) { // Archive for averaging
+			if (iter >= MAX)
+				alpha_focks.erase(alpha_focks.begin());
+			alpha_focks.push_back(fock_alpha_ao);
+		}	
+	} else { 
+		fock_beta_ao = focka;
+		if (diis) { // Archive for averaging
+			if (iter >= MAX)
+				beta_focks.erase(beta_focks.begin());
+			beta_focks.push_back(fock_beta_ao);
+		}	
+	}
+	
+	return err; 
+}
+
+void UnrestrictedFockFragment::gensolve()
+{
+	GeneralizedEigenSolver es_alpha(fock_alpha_ao, Sxx); 
+	CP_alpha = es_alpha.eigenvectors();
+	eps_alpha = es_alpha.eigenvalues(); 
+	
+	GeneralizedEigenSolver es_beta(fock_beta_ao, Sxx);
+	CP_beta = es_beta.eigenvectors();
+	eps_beta = es_beta.eigenvalues(); 
+	
+	iter++;
 }
 

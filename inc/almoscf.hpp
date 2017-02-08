@@ -17,13 +17,14 @@ private:
 	Molecule& molecule;
 	Fock& focker;
 	std::vector<FockFragment> fragments;
+	std::vector<UnrestrictedFockFragment> ufragments; 
 	std::vector<IntegralEngine> ints; 
 	DIISEngine diis;
 	double dimer_energy, e_frz, e_pol, e_ct, e_int, e_pert_2, e_pert_4; 
 	double delta_e, delta_d;
 	std::vector<double> monomer_energies;
 	int nfrags, MAX; 
-	Matrix P; 
+	Matrix P, P_alpha, P_beta; 
 public:
 	// Constructor
 	ALMOSCF(Molecule& m, Fock& f);
@@ -35,6 +36,7 @@ public:
 	
 	void rscf();
 	void rcompute();
+	double makeDens(unsigned int type = 0);
 };
 
 #endif
