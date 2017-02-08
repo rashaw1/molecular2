@@ -29,14 +29,16 @@ public:
 	// Constructor
 	ALMOSCF(Molecule& m, Fock& f);
 	// Routines
-	void perturb(bool order4 = false);
+	void rperturb(bool order4 = false);
 	void setFragments(bool unrestricted = false);
 	double getDimerEnergy() const { return dimer_energy; } 
 	std::vector<double>& getMonomerEnergies() { return monomer_energies; }
 	
 	void rscf();
+	void uscf();
 	void rcompute();
-	double makeDens(unsigned int type = 0);
+	void ucompute();
+	double makeDens(bool alpha);
 };
 
 #endif

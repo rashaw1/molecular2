@@ -158,10 +158,14 @@ void SCF::rhf(bool print)
 	}
 }
 
+void SCF::uhf(bool print) {
+		UnrestrictedFock& ufocker = dynamic_cast<UnrestrictedFock&>(focker);
+		uhf_internal(print, ufocker);  
+}
+
 // UHF
-void SCF::uhf(bool print)
+void SCF::uhf_internal(bool print, UnrestrictedFock& ufocker)
 { 
-	UnrestrictedFock& ufocker = dynamic_cast<UnrestrictedFock&>(focker); 
 	// Get number of alpha/beta electrons
 	int nalpha = molecule.nalpha();
 	int nbeta = molecule.nbeta();
@@ -234,7 +238,7 @@ void SCF::uhf(bool print)
 		molecule.getLog().print("\nBETA ORBITALS");
 		molecule.getLog().orbitals(ufocker.getEpsBeta(), nbeta, true);
 		molecule.getLog().result("UHF Energy", energy, "Hartree");
-	} else {
+	} else if (!converged){
 		molecule.getLog().result("UHF failed to converge");
 	}
 }

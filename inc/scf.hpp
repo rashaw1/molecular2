@@ -50,6 +50,7 @@ public:
   bool testConvergence(double val);
   void rhf(bool print = true);
   void uhf(bool print = true);
+  void uhf_internal(bool print, UnrestrictedFock& ufocker);
 };
 
 #endif
