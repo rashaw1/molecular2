@@ -31,6 +31,7 @@
 #include "ecpint.hpp"
 #include "multiarr.hpp"
 #include "gshell.hpp"
+#include "ProgramController.hpp"
 
 #include <cmath>
 #include <iomanip>
@@ -38,7 +39,7 @@
 #include <thread>   
 
 // Constructor
-IntegralEngine::IntegralEngine(Molecule& m, bool print) : molecule(m)
+IntegralEngine::IntegralEngine(Molecule& m, bool direct, bool print) : molecule(m)
 {
 	// Calculate sizes
 	int natoms = molecule.getNAtoms();
@@ -61,8 +62,8 @@ IntegralEngine::IntegralEngine(Molecule& m, bool print) : molecule(m)
 	sizes[3] = (ones*(ones+1))/4;
 
 	if (print) {
-		molecule.getLog().title("INTEGRAL GENERATION");
-		molecule.getLog().print("Forming the one electron integrals\n");
+		molecule.control.log.title("INTEGRAL GENERATION");
+		molecule.control.log.print("Forming the one electron integrals\n");
   	}
 	
 	auto &shells = molecule.getBasis().getIntShells();
@@ -78,44 +79,44 @@ IntegralEngine::IntegralEngine(Molecule& m, bool print) : molecule(m)
 	}
 	
   	if (print) {
-		molecule.getLog().print("One electron integrals complete\n");
-		molecule.getLog().localTime();
+		molecule.control.log.print("One electron integrals complete\n");
+		molecule.control.log.localTime();
 	}
 	
 	Vector ests = getEstimates();
-	if ( molecule.getLog().getMemory() < ests(3) && !molecule.getLog().direct() ) {
+	if ( molecule.control.get_option<double>("memory") < ests(3) && !direct) {
 		Error e("MEMERR", "Not enough memory for ERIs.");
 		if (print) {
-			molecule.getLog().error(e);
-			molecule.getLog().setDirect(true);
+			molecule.control.log.error(e);
+			molecule.control.set_option<bool>("direct", true);
 		}
 	}
 	
 	prescreen = compute_schwarz_ints<>(shells);
 	if (prescreen.rows() < 10 && print) { 
-		molecule.getLog().print("Forming the two electron repulsion integrals.\n");
-		molecule.getLog().print("PRESCREENING MATRIX:\n");
-		molecule.getLog().print(prescreen);
-		molecule.getLog().print("\n\n");
+		molecule.control.log.print("Forming the two electron repulsion integrals.\n");
+		molecule.control.log.print("PRESCREENING MATRIX:\n");
+		molecule.control.log.print(prescreen);
+		molecule.control.log.print("\n\n");
 	}
 		
-	if ( molecule.getLog().direct() ){
-		if(print) molecule.getLog().print("Two electron integrals to be calculated on the fly.\n");
+	if ( direct ){
+		if(print) molecule.control.log.print("Two electron integrals to be calculated on the fly.\n");
 	} else { // Check memory requirements
 		twoints = compute_eris(shells);
 		
-		if(print) molecule.getLog().print("Two electron integrals completed.\n");
+		if(print) molecule.control.log.print("Two electron integrals completed.\n");
 		std::string mem = "Approximate memory usage = ";
 		mem += std::to_string(ests(3));
 		mem += " MB\n";
 		if(print) {
-			molecule.getLog().print(mem);
-			molecule.getLog().localTime();
+			molecule.control.log.print(mem);
+			molecule.control.log.localTime();
 		}
 		
-		if (molecule.getLog().twoprint()) {
-			molecule.getLog().print("Writing ERIs to file.\n");
-			printERI(molecule.getLog().getIntFile(), M);
+		if (molecule.control.log.twoprint()) {
+			molecule.control.log.print("Writing ERIs to file.\n");
+			printERI(molecule.control.log.getIntFile(), M);
 		}	
 	} 
 }
@@ -147,7 +148,7 @@ IntegralEngine::IntegralEngine(Molecule& m, const IntegralEngine& ints, int star
 	
 	prescreen = compute_schwarz_ints<>(shells);
 	
-	if ( !molecule.getLog().direct() ) {
+	if ( !molecule.control.log.direct() ) {
 		twoints.assign(nbfs, 0.0);
 		for (int i = 0; i < nbfs; i++)
 			for (int j = 0; j <= i; j++)
@@ -213,7 +214,7 @@ void IntegralEngine::printERI(std::ostream& output, int NSpher) const
 					if ((c1+c2) != (c3+c4)) { multiplier*=2.0; }
 					else if ((c1!=c3) && (c1 != c4)) { multiplier *=2.0; }
 					else if ((c2!=c3) && (c2 != c4)) { multiplier *=2.0; }
-					if (fabs(getERI(c4, c3, c2, c1)) < molecule.getLog().thrint()) { scount++; multiplier = 0; }
+					if (fabs(getERI(c4, c3, c2, c1)) < molecule.control.log.thrint()) { scount++; multiplier = 0; }
 					output << std::setw(6) << c1+1;
 					output << std::setw(6) << c2+1;
 					output << std::setw(6) << c3+1;
@@ -604,9 +605,9 @@ Matrix IntegralEngine::compute_schwarz_ints( const std::vector<libint2::Shell> &
 	Matrix ecps = Matrix::Zero(n, n);
 	
 	// Initialise ecp integral engine
-	molecule.getLog().print("\nIntialising ECP integral calculations...\n");
+	molecule.control.log.print("\nIntialising ECP integral calculations...\n");
 	ECPIntegral ecpint(molecule.getECPBasis(), molecule.getBasis().getMaxL(), molecule.getECPBasis().getMaxL(), deriv_order);
-	molecule.getLog().localTime();
+	molecule.control.log.localTime();
 	
 	ECPBasis& ecpset = molecule.getECPBasis();
 	auto shell2bf = map_shell_to_basis_function(shells);

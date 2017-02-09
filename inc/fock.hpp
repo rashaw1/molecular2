@@ -28,6 +28,7 @@
 #include "molecule.hpp"
 #include "eigen_wrapper.hpp"
 #include <vector>
+#include "ProgramController.hpp"
 
 // Forward declarations
 class Atom;
@@ -52,9 +53,10 @@ protected:
   IntegralEngine& integrals;
   Molecule& molecule;
   bool direct, twoints, fromfile, diis;
+  double precision; 
   int nbfs, iter, MAX, nocc;
 public:
-  Fock(IntegralEngine& ints, Molecule& m);
+  Fock(Command& cmd, IntegralEngine& ints, Molecule& m);
   Fock(const Fock& other);
   IntegralEngine& getIntegrals() { return integrals; }
   Molecule& getMolecule() { return molecule; }
@@ -119,7 +121,7 @@ protected:
 	std::vector<Matrix> alpha_focks, beta_focks;
 	int nalpha, nbeta; 
 public:
-    UnrestrictedFock(IntegralEngine& ints, Molecule& m);
+    UnrestrictedFock(Command& cmd, IntegralEngine& ints, Molecule& m);
     UnrestrictedFock(const UnrestrictedFock& other);
 	
 	Matrix& getFockAlphaAO() { return fock_alpha_ao; }
@@ -154,7 +156,7 @@ private:
 	int start, end;
 public:
 	Matrix Sxx; 
-	FockFragment(IntegralEngine& ints, Molecule& m, int start, int end);
+	FockFragment(Command& cmd, IntegralEngine& ints, Molecule& m, int start, int end);
 	FockFragment(const FockFragment& other);
 	Vector buildFock(Matrix& qfq, Matrix& qfp, Matrix& pfp, bool alpha = false); 
 	virtual void gensolve();
@@ -167,7 +169,7 @@ private:
 	int start, end;
 public:
 	Matrix Sxx;
-	UnrestrictedFockFragment(IntegralEngine& ints, Molecule& m, int start, int end);
+	UnrestrictedFockFragment(Command& cmd, IntegralEngine& ints, Molecule& m, int start, int end);
 	UnrestrictedFockFragment(const UnrestrictedFockFragment& other);
 	Vector buildFock(Matrix& qfq, Matrix& qfp, Matrix& pfp, bool alpha); 
 	virtual void gensolve();

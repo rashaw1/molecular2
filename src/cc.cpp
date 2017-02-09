@@ -9,14 +9,18 @@
 #include <thread>
 
 // Constructor
-CCSD::CCSD(MP2& _mp2, bool _triples, bool _doDiis) : mp2(_mp2), doDiis(_doDiis),  withTriples(_triples) {
+CCSD::CCSD(Command& c, MP2& _mp2) : cmd(c), mp2(_mp2) {
 	N = 2*mp2.getN();
 	nocc = 2*mp2.getNocc();
 	energy = 0.0;
 	delta_e = 0.0;
 	delta_singles = 0.0;
 	delta_doubles = 0.0;
-	maxDiis = 5;
+	
+	maxDiis = cmd.get_option<int>("maxdiis");
+	doDiis = cmd.get_option<bool>("diis");
+	withTriples = cmd.get_option<bool>("triples"); 
+	
 	diis.init(maxDiis, doDiis);
 }
 
@@ -437,7 +441,7 @@ void CCSD::calculateTriples() {
 
 void CCSD::compute()
 {
-	Logger& log = mp2.getFock().getMolecule().getLog();
+	Logger& log = mp2.getFock().getMolecule().control.log;
 	
 	log.title("CCSD CALCULATION");
 	
@@ -456,7 +460,9 @@ void CCSD::compute()
 	
 	log.print("\nBeginning CC iterations:\n\n");
 	bool converged = false; 
-	int MAXITER = log.maxiter();
+	int MAXITER = cmd.get_option<int>("maxiter");
+	double CONVERGE = cmd.get_option<double>("converge");
+	
 	iter = 1;
 	Matrix F = Matrix::Zero(N, N);
 	Tensor4 W(N, N, N, N, 0.0);
@@ -475,7 +481,7 @@ void CCSD::compute()
 		time_en = log.getLocalTime();
 		
 		log.iterationCC(iter, energy, delta_e, delta_singles, delta_doubles, time_interms, time_amps, time_interms+time_amps+time_en);
-		converged = (fabs(delta_e) < log.converge()) && (fabs(delta_doubles) < log.converge());
+		converged = (fabs(delta_e) < CONVERGE) && (fabs(delta_doubles) < CONVERGE);
 		iter++;
 	}
 	

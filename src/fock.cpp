@@ -24,7 +24,7 @@
 #include "logger.hpp"
 
 // Constructor
-Fock::Fock(IntegralEngine& ints, Molecule& m) : integrals(ints), molecule(m)
+Fock::Fock(Command& cmd, IntegralEngine& ints, Molecule& m) : integrals(ints), molecule(m)
 {
 	
 	// Make the core hamiltonian matrix
@@ -34,21 +34,23 @@ Fock::Fock(IntegralEngine& ints, Molecule& m) : integrals(ints), molecule(m)
 	try {
 		formOrthog();
 	} catch (Error e) {
-		molecule.getLog().error(e);
+		molecule.control.log.error(e);
 	}
 
 	// Retrieve whether this calculation should be done direct, or whether
 	// the twoints matrix has been formed, or if the 2e integrals need to be
 	// read from file.
-	direct = molecule.getLog().direct();
-	diis = molecule.getLog().diis();
+	direct = cmd.get_option<bool>("direct");
+	diis = cmd.get_option<bool>("diis");
 	iter = 0;
 	nocc = molecule.getNel() / 2; 
-	MAX = 8;
+	MAX = cmd.get_option<int>("maxdiis");
+	precision = cmd.get_option<double>("precision");
+	
 	twoints = false;
 	if (!direct){
 		Vector ests = integrals.getEstimates();
-		if (ests[3] < molecule.getLog().getMemory())
+		if (ests[3] < molecule.control.get_option<double>("memory")) 
 			twoints = true;
 	}
 
@@ -163,7 +165,7 @@ void Fock::makeJK()
 		try {
 			formJKfile();
 		} catch (Error e) {
-			molecule.getLog().error(e);
+			molecule.control.log.error(e);
 		}
 	}
 }
@@ -200,7 +202,7 @@ void Fock::formJKdirect(const Matrix& Schwarz, Matrix& D, double multiplier)
 	
 	const auto do_schwarz_screen = Schwarz.cols() != 0 && Schwarz.rows() != 0;
 	EMatrix D_shblk_norm = integrals.compute_shellblock_norm(shells, D);
-	auto fock_precision = molecule.getLog().precision();
+	auto fock_precision = precision;
 	auto maxnprim =  integrals.max_nprim(shells);
 	auto maxnprim4 = maxnprim * maxnprim * maxnprim * maxnprim;
 	auto engine_precision = std::min(fock_precision / D_shblk_norm.maxCoeff(), std::numeric_limits<double>::epsilon()) / maxnprim4;
@@ -489,7 +491,6 @@ std::vector<EMatrix> Fock::compute_2body_fock_deriv(const std::vector<Atom> &ato
 	
 	std::vector<Shell>& shells = molecule.getBasis().getIntShells();
 	const Matrix& Schwarz = integrals.getPrescreen();
-	double precision = molecule.getLog().precision();
 	const auto n = integrals.nbasis(shells);
 	const auto nshells = shells.size();
 	const auto nderiv = libint2::num_geometrical_derivatives(atoms.size(), deriv_order);
@@ -500,7 +501,7 @@ std::vector<EMatrix> Fock::compute_2body_fock_deriv(const std::vector<Atom> &ato
 	
 	const auto do_schwarz_screen = Schwarz.cols() != 0 && Schwarz.rows() != 0;
 	EMatrix D_shblk_norm = integrals.compute_shellblock_norm(shells, dens);
-	auto fock_precision = molecule.getLog().precision();
+	auto fock_precision = precision;
 	auto maxnprim =  integrals.max_nprim(shells);
 	auto maxnprim4 = maxnprim * maxnprim * maxnprim * maxnprim;
 	auto engine_precision = std::min(fock_precision / D_shblk_norm.maxCoeff(), std::numeric_limits<double>::epsilon()) / maxnprim4;
@@ -667,7 +668,7 @@ void Fock::clearDiis() {
 	focks.clear(); 
 }
 
-FockFragment::FockFragment(IntegralEngine& ints, Molecule& m, int _start, int _end) : Fock(ints, m), start(_start), end(_end) { 
+FockFragment::FockFragment(Command& cmd, IntegralEngine& ints, Molecule& m, int _start, int _end) : Fock(cmd,ints, m), start(_start), end(_end) { 
 	Sxx = ints.getOverlap();
 }
 
@@ -705,7 +706,7 @@ void FockFragment::gensolve()
 	iter++;
 }
 
-UnrestrictedFock::UnrestrictedFock(IntegralEngine& ints, Molecule& m) : Fock(ints, m)
+UnrestrictedFock::UnrestrictedFock(Command& cmd, IntegralEngine& ints, Molecule& m) : Fock(cmd, ints, m)
 {
 	nalpha = molecule.nalpha();
 	nbeta = molecule.nbeta(); 
@@ -765,7 +766,7 @@ void UnrestrictedFock::formJKdirect(const Matrix& Schwarz, Matrix& Da, Matrix& D
 	const auto do_schwarz_screen = Schwarz.cols() != 0 && Schwarz.rows() != 0;
 	Matrix D_tot = Da + Db; 
 	EMatrix D_shblk_norm = integrals.compute_shellblock_norm(shells, D_tot);
-	auto fock_precision = molecule.getLog().precision();
+	auto fock_precision = precision;
 	auto maxnprim =  integrals.max_nprim(shells);
 	auto maxnprim4 = maxnprim * maxnprim * maxnprim * maxnprim;
 	auto engine_precision = std::min(fock_precision / D_shblk_norm.maxCoeff(), std::numeric_limits<double>::epsilon()) / maxnprim4;
@@ -905,7 +906,7 @@ void UnrestrictedFock::makeJK()
 		try {
 			formJKfile();
 		} catch (Error e) {
-			molecule.getLog().error(e);
+			molecule.control.log.error(e);
 		}
 	}
 }
@@ -948,7 +949,7 @@ void UnrestrictedFock::clearDiis() {
 	beta_focks.clear();
 }
 
-UnrestrictedFockFragment::UnrestrictedFockFragment(IntegralEngine& ints, Molecule& m, int _start, int _end) : UnrestrictedFock(ints, m), start(_start), end(_end) { 
+UnrestrictedFockFragment::UnrestrictedFockFragment(Command& cmd, IntegralEngine& ints, Molecule& m, int _start, int _end) : UnrestrictedFock(cmd, ints, m), start(_start), end(_end) { 
 	Sxx = ints.getOverlap();
 }
 

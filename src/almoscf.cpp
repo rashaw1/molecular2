@@ -15,18 +15,18 @@
 #include <libint2.hpp>
 
 // Constructor
-ALMOSCF::ALMOSCF(Molecule& m, Fock& f) : molecule(m), focker(f) 
+ALMOSCF::ALMOSCF(Command& c, Molecule& m, Fock& f) : cmd(c), molecule(m), focker(f) 
 {	
 	// Zero out energies
 	dimer_energy = e_frz = e_pol = e_ct = e_int = 0.0;
-	MAX = 6;
-	diis.init(MAX, m.getLog().diis());
+	MAX = cmd.get_option<int>("maxdiis");
+	diis.init(MAX, cmd.get_option<bool>("diis"));
 }
 
 void ALMOSCF::setFragments(bool unrestricted)
 {
 	// Add the fragment Fock matrices and perform monomer calculations
-	std::vector<Fragment>& frags = molecule.getLog().getFragments(); 
+	std::vector<Fragment>& frags = molecule.getFragments(); 
 	nfrags = frags.size();
 	int start = 0;
 	int nf = 0;
@@ -43,16 +43,16 @@ void ALMOSCF::setFragments(bool unrestricted)
 			ufragments.push_back(UnrestrictedFockFragment(ints[nf], frags[i], start, start+f_nbfs)); 
 			SCF hf(frags[i], ufragments[ufragments.size()-1]);
 			hf.uhf_internal(false, ufragments[ufragments.size()-1]);
-			molecule.getLog().print("Monomer " + std::to_string(nf) + " energy = " + std::to_string(hf.getEnergy()) + " Hartree");
-			molecule.getLog().flush();   
+			molecule.control.log.print("Monomer " + std::to_string(nf) + " energy = " + std::to_string(hf.getEnergy()) + " Hartree");
+			molecule.control.log.flush();   
 			monomer_energies.push_back(hf.getEnergy()); 
 			ufragments[ufragments.size()-1].clearDiis(); 
 		} else {
 			fragments.push_back(FockFragment(ints[nf], frags[i], start, start+f_nbfs));
 			SCF hf(frags[i], fragments[fragments.size()-1]);
 			hf.rhf(false);
-			molecule.getLog().print("Monomer " + std::to_string(nf) + " energy = " + std::to_string(hf.getEnergy()) + " Hartree");
-			molecule.getLog().flush();  
+			molecule.control.log.print("Monomer " + std::to_string(nf) + " energy = " + std::to_string(hf.getEnergy()) + " Hartree");
+			molecule.control.log.flush();  
 			monomer_energies.push_back(hf.getEnergy()); 
 			fragments[fragments.size()-1].clearDiis(); 
 		}
@@ -215,7 +215,7 @@ void ALMOSCF::rcompute() {
 	delta_d = (P - P_old).norm(); 
 	
 	// Build Fock matrix
-	if (molecule.getLog().direct())
+	if (cmd.get_option<bool>("direct"))
 		focker.formJKdirect(focker.getIntegrals().getPrescreen(), P, 2.0);
 	else 
 		focker.formJK(P, 2.0);
@@ -240,7 +240,7 @@ void ALMOSCF::rcompute() {
 	for (int i = 0; i < fragments.size(); i++)
 		errs.push_back(fragments[i].buildFock(QFQ, QFP, PFP));
 	
-	if (molecule.getLog().diis()) {
+	if (cmd.get_option<bool>("diis")) {
 		Vector weights = diis.compute(errs); 
 		for(int i = 0; i < fragments.size(); i++)
 			fragments[i].average(weights);
@@ -261,7 +261,7 @@ void ALMOSCF::ucompute() {
 	delta_d += makeDens(false); 
 	
 	// Build Fock matrix
-	if (molecule.getLog().direct())
+	if (cmd.get_option<bool>("direct"))
 		ufocker.formJKdirect(focker.getIntegrals().getPrescreen(), P_alpha, P_beta, 2.0);
 	else 
 		ufocker.formJK(P_alpha, P_beta, 2.0);
@@ -297,7 +297,7 @@ void ALMOSCF::ucompute() {
 		errs.push_back(ufragments[i].buildFock(QFQ_beta, QFP_beta, PFP_beta, false)); 
 	}
 	
-	if (molecule.getLog().diis()) {
+	if (cmd.get_option<bool>("diis")) {
 		Vector weights = diis.compute(errs); 
 		for(int i = 0; i < ufragments.size(); i++)
 			ufragments[i].average(weights);
@@ -396,32 +396,47 @@ void ALMOSCF::rperturb(bool order4)
 void ALMOSCF::rscf()
 {
 	P = Matrix::Zero(focker.getHCore().rows(), focker.getHCore().rows());
-	molecule.getLog().title("Closed-shell ALMO Calculation");
+	molecule.control.log.title("Closed-shell ALMO Calculation");
 	
 	setFragments();
 	
-	molecule.getLog().initIteration(); 
+	molecule.control.log.initIteration(); 
 	delta_d = 1.0; delta_e = 1.0; 
 	bool converged = false;
 	int iter = 0;
-	while (!converged && iter < molecule.getLog().maxiter()) {
+	double CONVERGE = cmd.get_option<double>("converge");
+	int MAXITER = cmd.get_option<int>("maxiter");
+	
+	while (!converged && iter < MAXITER) {
 		rcompute(); 
-		molecule.getLog().iteration(iter++, dimer_energy, delta_e, delta_d);
-		converged = (fabs(delta_e) < molecule.getLog().converge()) && (fabs(delta_d) < molecule.getLog().converge());
+		molecule.control.log.iteration(iter++, dimer_energy, delta_e, delta_d);
+		converged = (fabs(delta_e) < CONVERGE) && (fabs(delta_d) < CONVERGE);
 	}
 	
 	if (converged) {
+		
 		double energy = dimer_energy;
 		for (auto en : monomer_energies) energy -= en; 
-		molecule.getLog().result("ALMO Interaction Energy", energy * Logger::TOKCAL, "kcal / mol"); 
-		rperturb(true);
-		e_pert_2 *= 2.0;
-		e_pert_4 *= 2.0;
-		molecule.getLog().result("E(2)", e_pert_2 * Logger::TOKCAL, "kcal /mol"); 
-		molecule.getLog().result("E(4)", e_pert_4 * Logger::TOKCAL, "kcal / mol"); 
-		molecule.getLog().result("Total ALMO+CT interaction energy", (energy + e_pert_2 + e_pert_4) * Logger::TOKCAL, "kcal / mol");
+		molecule.control.log.result("ALMO Interaction Energy", energy * Logger::TOKCAL, "kcal / mol"); 
+		
+		int perturbation = cmd.get_option<int>("perturb"); 
+		if (perturbation > 0) {
+			bool fourth = perturbation == 2; 
+			rperturb(fourth); 
+			e_pert_2 *= 2.0;
+			molecule.control.log.result("E(2)", e_pert_2 * Logger::TOKCAL, "kcal /mol"); 
+			
+			if (fourth) {
+				e_pert_4 *= 2.0;
+				molecule.control.log.result("E(4)", e_pert_4 * Logger::TOKCAL, "kcal / mol"); 
+			} else {
+				e_pert_4 = 0.0;
+			}
+			molecule.control.log.result("Total ALMO+CT interaction energy", (energy + e_pert_2 + e_pert_4) * Logger::TOKCAL, "kcal / mol");
+		}
+		
 	} else {
-		molecule.getLog().result("ALMO SCF failed to converge");
+		molecule.control.log.result("ALMO SCF failed to converge");
 	}
 }
 
@@ -430,26 +445,29 @@ void ALMOSCF::uscf()
 	int nbfs = focker.getHCore().rows();
 	P_alpha = Matrix::Zero(nbfs, nbfs);
 	P_beta = Matrix::Zero(nbfs, nbfs);
-	molecule.getLog().title("Unrestricted Open-shell ALMO Calculation"); 
+	molecule.control.log.title("Unrestricted Open-shell ALMO Calculation"); 
 	
 	setFragments(true); 
 	
-	molecule.getLog().initIteration(); 
+	molecule.control.log.initIteration(); 
 	delta_d = 1.0; delta_e = 1.0; 
 	bool converged = false;
 	int iter =0 ;
-	while (!converged && iter < molecule.getLog().maxiter()) {
+	double CONVERGE = cmd.get_option<double>("converge");
+	int MAXITER = cmd.get_option<int>("maxiter");
+	
+	while (!converged && iter < MAXITER) {
 		ucompute(); 
-		molecule.getLog().iteration(iter++, dimer_energy, delta_e, delta_d);
-		converged = (fabs(delta_e) < molecule.getLog().converge()) && (fabs(delta_d) < molecule.getLog().converge());
+		molecule.control.log.iteration(iter++, dimer_energy, delta_e, delta_d);
+		converged = (fabs(delta_e) < CONVERGE) && (fabs(delta_d) < CONVERGE);
 	}
 	
 	if (converged) {
 		double energy = dimer_energy;
 		for (auto en : monomer_energies) energy -= en; 
-		molecule.getLog().result("ALMO Interaction Energy", energy * Logger::TOKCAL, "kcal / mol"); 
+		molecule.control.log.result("ALMO Interaction Energy", energy * Logger::TOKCAL, "kcal / mol"); 
 	} else {
-		molecule.getLog().result("ALMO SCF failed to converge");
+		molecule.control.log.result("ALMO SCF failed to converge");
 	}
 	
 }

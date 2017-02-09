@@ -56,10 +56,8 @@ int main (int argc, char* argv[])
 			std::ofstream output(ofname);
 			std::ofstream err(efname);
       
-			// Create the logger
-			Logger log(input, output, err);
-			log.init();
-			log.flush();
+			// Create the program controller
+			ProgramController control(input, output, err); 
 
 			try{
 				// Create the molecule and print initial output

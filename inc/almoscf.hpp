@@ -9,12 +9,14 @@
 #include "diis.hpp"
 #include <vector>
 #include "integrals.hpp"
+#include "ProgramController.hpp"
 
 // Begin class
 class ALMOSCF
 {
 private:
 	Molecule& molecule;
+	Command& cmd; 
 	Fock& focker;
 	std::vector<FockFragment> fragments;
 	std::vector<UnrestrictedFockFragment> ufragments; 
@@ -27,7 +29,7 @@ private:
 	Matrix P, P_alpha, P_beta; 
 public:
 	// Constructor
-	ALMOSCF(Molecule& m, Fock& f);
+	ALMOSCF(Command& c, Molecule& m, Fock& f);
 	// Routines
 	void rperturb(bool order4 = false);
 	void setFragments(bool unrestricted = false);

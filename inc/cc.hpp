@@ -6,6 +6,7 @@
 #include "mp2.hpp"
 #include "diis.hpp"
 #include <vector>
+#include "ProgramController.hpp"
 
 class IntegralEngine;
 
@@ -13,6 +14,7 @@ class CCSD
 {
 private:
 	int N, nocc, iter;
+	Command& cmd;
 	MP2& mp2;
 	Matrix spinFock;
 	Matrix singles;
@@ -30,7 +32,7 @@ private:
 	double delta_singles, delta_doubles;
 	bool withTriples;
 public:
-	CCSD(MP2& _mp2, bool _triples = false, bool _doDIIS = true);
+	CCSD(Command& c, MP2& _mp2);
 	void build_fock();
 	void build_guess();
 	void build_intermediates(Matrix& F, Tensor4& W, S4OddTensor4& tau, S4OddTensor4& tautilde);

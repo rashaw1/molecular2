@@ -1,7 +1,7 @@
 /* 
  *   
- *     PURPOSE: To define a class Logger, which will perform the majority of IO and data storage
- *              functions in the molecular suite. It is esentially acts as the communicator 
+ *     PURPOSE: To define a class Logger, which will perform the majority of IO.
+ *				It esentially acts as the communicator 
  *              between all the different units, 'logging' everything that happens. 
  *              For convenience, fundamental constants are stored here as well. 
  *
@@ -13,14 +13,10 @@
  *                                the console, any ostream
  *                    errs - an array of Error messages that have been thrown
  *                    intfile - the file to print two electron integrals to if wanted
- *              data: nerr, natoms - the number of errors accumulated, and the num. of atoms
+ *              data: nerr - the number of errors accumulated
  *                    timer - a boost::timer::cpu_timer for keeping track of time elapsed, and the time
  *                            that the log was instantiated at
  *                    last_time - the last time that timer.elapsed was called
- *              input storage: charge, multiplicity, atoms, basisset, direct, memory, twoprint
- *              user defined constants: 
- *                    PRECISION - the numerical precision to be used throughout the program
- *                    MAXITER - the maximum number of iterations that will be performed
  *              fundamental constants:
  *                    M_PI - a definition of pi, in case one is not available for some reason
  *              conversion factors:
@@ -30,10 +26,6 @@
  *                    TOBOHR, TOANG - convert distances either from angstrom to bohr, or bohr 
  *                                    to angstrom, respectively
  *              routines:
- *                    INPUT:
- *                         getBasis(), charge(), multiplicity(), getAtom(charge), precision(),
- *                         maxiter() - all return the data/constant/object to which they refer
- *                         natoms() - returns the number of atoms
  *                    OUTPUT:
  *                         print() - overloaded function that will just print a general message
  *                                   or object in a generic way
@@ -87,21 +79,14 @@ class Error;
 class Logger
 {
 private:
-  std::ifstream& infile;
+  ProgramController& control; 
   std::ofstream& outfile, intfile;
   std::ostream& errstream;
   Error* errs;
-  std::vector<Atom> atoms;
-  std::vector<Fragment> fragments;
-  std::vector<std::string> cmds;
-  int nerr, ncmd, charge, multiplicity, natoms;
+  int nerr;
   boost::timer::cpu_timer timer;
   boost::timer::nanosecond_type last_time;
-  Basis basisset;
-  // User defined constants
-  double PRECISION, THRINT, CONVERGE,  memory;
-  int MAXITER, nthreads;
-  bool directing, twoprinting, diising, basisprint, fragmented;
+  
 public:
   // Conversion factors
   static const double RTOCM;
@@ -112,33 +97,11 @@ public:
   static const double TOBOHR;
   static const double TOANG;
   
-  std::map<int, std::string> bnames;
-  
   // Constructor/destructor
-  Logger(std::ifstream& in, std::ofstream& out, std::ostream& e);
+  Logger(ProgramController &control, std::ofstream& out, std::ostream& e);
   ~Logger(); // Delete the various arrays
   // Accessors
-  Basis& getBasis() { return basisset; }
-  int getCharge() const { return charge; }
-  int getNThreads() const { return nthreads; }
-  int getMultiplicity() const { return multiplicity; }
-  bool direct() const { return directing; }
-  void setDirect(bool d) { directing = d; }
-  bool twoprint() const { return twoprinting; }
-  bool diis() const { return diising; }
-  bool frags() const { return fragmented; }
-  bool bprint() const { return basisprint; }
-  std::ofstream& getIntFile() { return intfile; }
-  double getMemory() const { return memory; }
-  Atom getAtom(int i) const { return atoms[i]; }
-  Fragment& getFragment(int i) { return fragments[i]; }
-  std::vector<Fragment>& getFragments() { return fragments; }
-  int nextCmd(); // Return next directive 
-  double precision() const { return PRECISION; }
-  double thrint() const { return THRINT; }
-  double converge() const { return CONVERGE; }
-  int maxiter() const { return MAXITER; }
-  int getNatoms() const { return natoms; }
+  
   // Overloaded print functions
   void print(const std::string& msg) const; // Print a string message
   // Print out a vector with precision digits, either horizontally or vertically
