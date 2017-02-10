@@ -37,13 +37,13 @@ class SCF
 {
 private:
 	Command& cmd; 
-	Molecule& molecule;
+	SharedMolecule molecule;
 	Fock& focker;
 	DIISEngine diis;
 	double energy, last_energy, one_E, two_E, error, last_err;
 public:
 	// Constructor
-	SCF(Command& c, Molecule& m, Fock& f);
+	SCF(Command& c, SharedMolecule m, Fock& f);
 	// Routines
 	void calcE();
 	double getEnergy() const { return energy; } 

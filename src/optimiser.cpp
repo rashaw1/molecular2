@@ -70,12 +70,12 @@ Vector quadratic(Matrix& hessian, Vector& gradient) {
 	return dq; 
 }
 
-void quadratic_scf(Command& cmd, Molecule& mol, Fock& blah)
+void quadratic_scf(Command& cmd, SharedMolecule mol, Fock& blah)
 {
-	Logger& log = mol.control.log;
+	Logger& log = mol->control->log;
 	log.title("QUADRATIC GEOMETRY OPTIMIZATION"); 
 	
-	bool unrestricted = (mol.getMultiplicity() > 1) || (mol.getNel()%2 != 0);
+	bool unrestricted = (mol->getMultiplicity() > 1) || (mol->getNel()%2 != 0);
 	
 	double grad_norm = 1.0;
 	double old_e = 0.0;
@@ -95,9 +95,9 @@ void quadratic_scf(Command& cmd, Molecule& mol, Fock& blah)
 		energy = hf.getEnergy();
 		
 		std::vector<Atom> atomlist; 
-		for (int i = 0; i < mol.getNAtoms(); i++) atomlist.push_back(mol.getAtom(i));
+		for (int i = 0; i < mol->getNAtoms(); i++) atomlist.push_back(mol->getAtom(i));
 		f.getDens() = 0.5 * f.getDens();
-		f.compute_forces(atomlist, mol.getNel()/2);
+		f.compute_forces(atomlist, mol->getNel()/2);
 		Matrix g = f.getForces().transpose(); 
 		Vector gradient(Eigen::Map<Vector>(g.data(), g.cols()*g.rows()));
 		grad_norm = gradient.norm();
@@ -106,12 +106,12 @@ void quadratic_scf(Command& cmd, Molecule& mol, Fock& blah)
 		old_e = energy; 
 		
 		if (!converged) {	
-			f.compute_hessian(atomlist, mol.getNel()/2);
+			f.compute_hessian(atomlist, mol->getNel()/2);
 			Vector delta_geom = quadratic(f.getHessian(), gradient);
 			int offset = 0; 
-			for (int i = 0; i < mol.getNAtoms(); i++) {
-				mol.getAtom(i).translate(delta_geom[offset], delta_geom[offset+1], delta_geom[offset+2]);
-				mol.updateBasisPositions();
+			for (int i = 0; i < mol->getNAtoms(); i++) {
+				mol->getAtom(i).translate(delta_geom[offset], delta_geom[offset+1], delta_geom[offset+2]);
+				mol->updateBasisPositions();
 				offset+=3; 
 			} 
 		}
@@ -119,7 +119,7 @@ void quadratic_scf(Command& cmd, Molecule& mol, Fock& blah)
 	
 	if (converged) {
 		log.print("Converged geometry:\n");
-		for (int i = 0; i <mol.getNAtoms(); i++) log.print(mol.getAtom(i));
+		for (int i = 0; i <mol->getNAtoms(); i++) log.print(mol->getAtom(i));
 		log.result("HF Energy", energy, "Hartree");
 	} else {
 		log.result("Geometry optimisation failed to converge.");

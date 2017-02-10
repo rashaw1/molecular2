@@ -441,7 +441,7 @@ void CCSD::calculateTriples() {
 
 void CCSD::compute()
 {
-	Logger& log = mp2.getFock().getMolecule().control.log;
+	Logger& log = mp2.getFock().getMolecule()->control->log;
 	
 	log.title("CCSD CALCULATION");
 	

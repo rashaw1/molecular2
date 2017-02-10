@@ -25,7 +25,7 @@
 #include "ProgramController.hpp"
 
 // Constructor
-Fock::Fock(Command& cmd, IntegralEngine& ints, Molecule& m) : integrals(ints), molecule(m)
+Fock::Fock(Command& cmd, IntegralEngine& ints, SharedMolecule m) : integrals(ints), molecule(m)
 {
 	
 	// Make the core hamiltonian matrix
@@ -35,23 +35,23 @@ Fock::Fock(Command& cmd, IntegralEngine& ints, Molecule& m) : integrals(ints), m
 	try {
 		formOrthog();
 	} catch (Error e) {
-		molecule.control.log.error(e);
+		molecule->control->log.error(e);
 	}
 
 	// Retrieve whether this calculation should be done direct, or whether
 	// the twoints matrix has been formed, or if the 2e integrals need to be
 	// read from file.
-	direct = molecule.control.get_option<bool>("direct");
+	direct = molecule->control->get_option<bool>("direct");
 	diis = cmd.get_option<bool>("diis");
 	iter = 0;
-	nocc = molecule.getNel() / 2; 
+	nocc = molecule->getNel() / 2; 
 	MAX = cmd.get_option<int>("maxdiis");
 	precision = cmd.get_option<double>("precision");
 	
 	twoints = false;
 	if (!direct){
 		Vector ests = integrals.getEstimates();
-		if (ests[3] < molecule.control.get_option<double>("memory")) 
+		if (ests[3] < molecule->control->get_option<double>("memory")) 
 			twoints = true;
 	}
 
@@ -166,7 +166,7 @@ void Fock::makeJK()
 		try {
 			formJKfile();
 		} catch (Error e) {
-			molecule.control.log.error(e);
+			molecule->control->log.error(e);
 		}
 	}
 }
@@ -196,7 +196,7 @@ void Fock::formJKdirect(const Matrix& Schwarz, Matrix& D, double multiplier)
 	using libint2::Engine;
 	using libint2::Operator;
 	
-	std::vector<Shell>& shells = molecule.getBasis().getIntShells();
+	std::vector<Shell>& shells = molecule->getBasis().getIntShells();
 	const auto n = integrals.nbasis(shells);
 	jints = Matrix::Zero(n, n);
 	kints = Matrix::Zero(n, n);
@@ -319,7 +319,7 @@ void Fock::compute_forces(const std::vector<Atom> &atoms, int nocc) {
 	using libint2::Shell;
 	using libint2::Operator;
 
-	std::vector<Shell>& shells = molecule.getBasis().getIntShells();
+	std::vector<Shell>& shells = molecule->getBasis().getIntShells();
 	
 	Matrix F1 = Matrix::Zero(atoms.size(), 3);
 	Matrix F_Pulay = Matrix::Zero(atoms.size(), 3);
@@ -398,7 +398,7 @@ void Fock::compute_hessian(const std::vector<Atom> &atoms, int nocc) {
 	using libint2::Shell;
 	using libint2::Operator;
 
-	std::vector<Shell>& shells = molecule.getBasis().getIntShells();
+	std::vector<Shell>& shells = molecule->getBasis().getIntShells();
 	Matrix H1 = Matrix::Zero(ncoords, ncoords);
 	Matrix H_Pulay = Matrix::Zero(ncoords, ncoords);
 	
@@ -490,7 +490,7 @@ std::vector<EMatrix> Fock::compute_2body_fock_deriv(const std::vector<Atom> &ato
 	using libint2::Engine;	
 	using libint2::Operator;		
 	
-	std::vector<Shell>& shells = molecule.getBasis().getIntShells();
+	std::vector<Shell>& shells = molecule->getBasis().getIntShells();
 	const Matrix& Schwarz = integrals.getPrescreen();
 	const auto n = integrals.nbasis(shells);
 	const auto nshells = shells.size();
@@ -669,7 +669,7 @@ void Fock::clearDiis() {
 	focks.clear(); 
 }
 
-FockFragment::FockFragment(Command& cmd, IntegralEngine& ints, Molecule& m, int _start, int _end) : Fock(cmd,ints, m), start(_start), end(_end) { 
+FockFragment::FockFragment(Command& cmd, IntegralEngine& ints, SharedMolecule m, int _start, int _end) : Fock(cmd,ints, m), start(_start), end(_end) { 
 	Sxx = ints.getOverlap();
 }
 
@@ -707,10 +707,10 @@ void FockFragment::gensolve()
 	iter++;
 }
 
-UnrestrictedFock::UnrestrictedFock(Command& cmd, IntegralEngine& ints, Molecule& m) : Fock(cmd, ints, m)
+UnrestrictedFock::UnrestrictedFock(Command& cmd, IntegralEngine& ints, SharedMolecule m) : Fock(cmd, ints, m)
 {
-	nalpha = molecule.nalpha();
-	nbeta = molecule.nbeta(); 
+	nalpha = molecule->nalpha();
+	nbeta = molecule->nbeta(); 
 }
 
 UnrestrictedFock::UnrestrictedFock(const UnrestrictedFock& other) : Fock(other)
@@ -759,7 +759,7 @@ void UnrestrictedFock::formJKdirect(const Matrix& Schwarz, Matrix& Da, Matrix& D
 	using libint2::Engine;
 	using libint2::Operator;
 	
-	std::vector<Shell>& shells = molecule.getBasis().getIntShells();
+	std::vector<Shell>& shells = molecule->getBasis().getIntShells();
 	const auto n = integrals.nbasis(shells);
 	jkints_alpha = Matrix::Zero(n, n);
 	jkints_beta = Matrix::Zero(n, n);
@@ -907,7 +907,7 @@ void UnrestrictedFock::makeJK()
 		try {
 			formJKfile();
 		} catch (Error e) {
-			molecule.control.log.error(e);
+			molecule->control->log.error(e);
 		}
 	}
 }
@@ -950,7 +950,7 @@ void UnrestrictedFock::clearDiis() {
 	beta_focks.clear();
 }
 
-UnrestrictedFockFragment::UnrestrictedFockFragment(Command& cmd, IntegralEngine& ints, Molecule& m, int _start, int _end) : UnrestrictedFock(cmd, ints, m), start(_start), end(_end) { 
+UnrestrictedFockFragment::UnrestrictedFockFragment(Command& cmd, IntegralEngine& ints, SharedMolecule m, int _start, int _end) : UnrestrictedFock(cmd, ints, m), start(_start), end(_end) { 
 	Sxx = ints.getOverlap();
 }
 

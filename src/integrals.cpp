@@ -39,15 +39,15 @@
 #include <thread>   
 
 // Constructor
-IntegralEngine::IntegralEngine(Molecule& m, bool print) : molecule(m)
+IntegralEngine::IntegralEngine(SharedMolecule m, bool print) : molecule(m)
 {
 	// Calculate sizes
-	int natoms = molecule.getNAtoms();
+	int natoms = molecule->getNAtoms();
 	int N = 0; // No. of cartesian basis functions
 	int M = 0; // No. of spherical basis functions
 	for (int i = 0; i < natoms; i++){
-		N += m.getAtom(i).getNbfs();
-		M += m.getAtom(i).getNSpherical();
+		N += m->getAtom(i).getNbfs();
+		M += m->getAtom(i).getNSpherical();
 	}
 	// Cartesian is easy - there are (N^2+N)/2
 	// unique 1e integrals and ([(N^2+N)/2]^2 + (N^2+N)/2)/2
@@ -62,66 +62,66 @@ IntegralEngine::IntegralEngine(Molecule& m, bool print) : molecule(m)
 	sizes[3] = (ones*(ones+1))/4;
 
 	if (print) {
-		molecule.control.log.title("INTEGRAL GENERATION");
-		molecule.control.log.print("Forming the one electron integrals\n");
+		molecule->control->log.title("INTEGRAL GENERATION");
+		molecule->control->log.print("Forming the one electron integrals\n");
   	}
 	
-	auto &shells = molecule.getBasis().getIntShells();
+	auto &shells = molecule->getBasis().getIntShells();
 	std::vector<Atom> atoms;
-	for (int i = 0; i < molecule.getNAtoms(); i++) atoms.push_back(molecule.getAtom(i));
+	for (int i = 0; i < molecule->getNAtoms(); i++) atoms.push_back(molecule->getAtom(i));
 	
 	sints = compute_1body_ints(shells, libint2::Operator::overlap);
 	tints = compute_1body_ints(shells, libint2::Operator::kinetic);
 	naints = compute_1body_ints(shells, libint2::Operator::nuclear, atoms);
 
-	if(molecule.getBasis().hasECPS()) {
+	if(molecule->getBasis().hasECPS()) {
 		naints = naints + compute_ecp_ints(shells);
 	}
 	
   	if (print) {
-		molecule.control.log.print("One electron integrals complete\n");
-		molecule.control.log.localTime();
+		molecule->control->log.print("One electron integrals complete\n");
+		molecule->control->log.localTime();
 	}
 	
 	Vector ests = getEstimates();
-	if ( molecule.control.get_option<double>("memory") < ests(3) && !molecule.control.get_option<bool>("direct")) {
+	if ( molecule->control->get_option<double>("memory") < ests(3) && !molecule->control->get_option<bool>("direct")) {
 		Error e("MEMERR", "Not enough memory for ERIs.");
 		if (print) {
-			molecule.control.log.error(e);
-			molecule.control.set_option<bool>("direct", true);
+			molecule->control->log.error(e);
+			molecule->control->set_option<bool>("direct", true);
 		}
 	}
 	
 	prescreen = compute_schwarz_ints<>(shells);
 	if (prescreen.rows() < 10 && print) { 
-		molecule.control.log.print("Forming the two electron repulsion integrals.\n");
-		molecule.control.log.print("PRESCREENING MATRIX:\n");
-		molecule.control.log.print(prescreen);
-		molecule.control.log.print("\n\n");
+		molecule->control->log.print("Forming the two electron repulsion integrals.\n");
+		molecule->control->log.print("PRESCREENING MATRIX:\n");
+		molecule->control->log.print(prescreen);
+		molecule->control->log.print("\n\n");
 	}
 		
-	if ( molecule.control.get_option<bool>("direct") ){
-		if(print) molecule.control.log.print("Two electron integrals to be calculated on the fly.\n");
+	if ( molecule->control->get_option<bool>("direct") ){
+		if(print) molecule->control->log.print("Two electron integrals to be calculated on the fly.\n");
 	} else { // Check memory requirements
 		twoints = compute_eris(shells);
 		
-		if(print) molecule.control.log.print("Two electron integrals completed.\n");
+		if(print) molecule->control->log.print("Two electron integrals completed.\n");
 		std::string mem = "Approximate memory usage = ";
 		mem += std::to_string(ests(3));
 		mem += " MB\n";
 		if(print) {
-			molecule.control.log.print(mem);
-			molecule.control.log.localTime();
+			molecule->control->log.print(mem);
+			molecule->control->log.localTime();
 		}
 		
-		if (molecule.control.get_option<bool>("printeris")) {
-			molecule.control.log.print("Writing ERIs to file.\n");
-			printERI(molecule.control.log.getIntFile(), M);
+		if (molecule->control->get_option<bool>("printeris")) {
+			molecule->control->log.print("Writing ERIs to file.\n");
+			printERI(molecule->control->log.getIntFile(), M);
 		}	
 	} 
 }
 
-IntegralEngine::IntegralEngine(Molecule& m, const IntegralEngine& ints, int start, int finish) : molecule(m)
+IntegralEngine::IntegralEngine(SharedMolecule m, const IntegralEngine& ints, int start, int finish) : molecule(m)
 {
 	int nbfs = finish - start; 
 	
@@ -137,18 +137,18 @@ IntegralEngine::IntegralEngine(Molecule& m, const IntegralEngine& ints, int star
 	Matrix T = ints.getKinetic();
 	tints = T.block(start, start, nbfs, nbfs);
 		
-	auto &shells = molecule.getBasis().getIntShells();
+	auto &shells = molecule->getBasis().getIntShells();
 	std::vector<Atom> atoms;
-	for (int i = 0; i < molecule.getNAtoms(); i++) atoms.push_back(molecule.getAtom(i));
+	for (int i = 0; i < molecule->getNAtoms(); i++) atoms.push_back(molecule->getAtom(i));
 	naints = compute_1body_ints(shells, libint2::Operator::nuclear, atoms);
 	
-	if(molecule.getBasis().hasECPS()) {
+	if(molecule->getBasis().hasECPS()) {
 		naints = naints + compute_ecp_ints(shells);
 	}
 	
 	prescreen = compute_schwarz_ints<>(shells);
 	
-	if ( !molecule.control.get_option<bool>("direct") ) {
+	if ( !molecule->control->get_option<bool>("direct") ) {
 		twoints.assign(nbfs, 0.0);
 		for (int i = 0; i < nbfs; i++)
 			for (int j = 0; j <= i; j++)
@@ -214,7 +214,7 @@ void IntegralEngine::printERI(std::ostream& output, int NSpher) const
 					if ((c1+c2) != (c3+c4)) { multiplier*=2.0; }
 					else if ((c1!=c3) && (c1 != c4)) { multiplier *=2.0; }
 					else if ((c2!=c3) && (c2 != c4)) { multiplier *=2.0; }
-					if (fabs(getERI(c4, c3, c2, c1)) < molecule.control.get_option<double>("thrint")) { scount++; multiplier = 0; }
+					if (fabs(getERI(c4, c3, c2, c1)) < molecule->control->get_option<double>("thrint")) { scount++; multiplier = 0; }
 					output << std::setw(6) << c1+1;
 					output << std::setw(6) << c2+1;
 					output << std::setw(6) << c3+1;
@@ -259,13 +259,13 @@ Matrix IntegralEngine::makeSpherical(const Matrix& ints) const
 
 void IntegralEngine::buildTransMat() 
 {
-	auto &shells = molecule.getBasis().getIntShells();
+	auto &shells = molecule->getBasis().getIntShells();
 	
-	int natoms = molecule.getNAtoms();
+	int natoms = molecule->getNAtoms();
 	int ncart = nbasis(shells); // No. of cartesian basis functions
 	int nspher = 0; // No. of spherical basis functions
 	for (int i = 0; i < natoms; i++){
-		nspher += molecule.getAtom(i).getNSpherical();
+		nspher += molecule->getAtom(i).getNSpherical();
 	}
 	
 	transmat = Matrix::Zero(nspher, ncart);
@@ -605,11 +605,11 @@ Matrix IntegralEngine::compute_schwarz_ints( const std::vector<libint2::Shell> &
 	Matrix ecps = Matrix::Zero(n, n);
 	
 	// Initialise ecp integral engine
-	molecule.control.log.print("\nIntialising ECP integral calculations...\n");
-	ECPIntegral ecpint(molecule.getECPBasis(), molecule.getBasis().getMaxL(), molecule.getECPBasis().getMaxL(), deriv_order);
-	molecule.control.log.localTime();
+	molecule->control->log.print("\nIntialising ECP integral calculations...\n");
+	ECPIntegral ecpint(molecule->getECPBasis(), molecule->getBasis().getMaxL(), molecule->getECPBasis().getMaxL(), deriv_order);
+	molecule->control->log.localTime();
 	
-	ECPBasis& ecpset = molecule.getECPBasis();
+	ECPBasis& ecpset = molecule->getECPBasis();
 	auto shell2bf = map_shell_to_basis_function(shells);
 	
 	// loop over shells

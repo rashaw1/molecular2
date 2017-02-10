@@ -15,7 +15,7 @@
 class ALMOSCF
 {
 private:
-	Molecule& molecule;
+	SharedMolecule molecule;
 	Command& cmd; 
 	Fock& focker;
 	std::vector<FockFragment> fragments;
@@ -29,7 +29,7 @@ private:
 	Matrix P, P_alpha, P_beta; 
 public:
 	// Constructor
-	ALMOSCF(Command& c, Molecule& m, Fock& f);
+	ALMOSCF(Command& c, SharedMolecule m, Fock& f);
 	// Routines
 	void rperturb(bool order4 = false);
 	void setFragments(bool unrestricted = false);

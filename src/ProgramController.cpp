@@ -109,7 +109,7 @@ ProgramController::ProgramController(std::ifstream& input, std::ofstream& output
 	if (!is_option_set("printeris")) set_option<bool>("printeris", false);
 	if (!is_option_set("direct")) set_option<bool>("direct", false);
 	if (!is_option_set("intfile")) set_option<std::string>("intfile", "eris.ints"); 
- 	if (!is_option_set("thrint")) set_option<double>("thrint", 1e-12); 
+	if (!is_option_set("thrint")) set_option<double>("thrint", 1e-12); 
 	
 }
 
@@ -176,14 +176,17 @@ void ProgramController::parse(std::ifstream& input) {
 				} else { // Read in options
 					bool options_end = false; 
 					std::vector<std::string> lines; 
-					if (std::getline(input, line)) {
-						while(!options_end) {
-							pos = line.find(')'); 
-							if (pos != std::string::npos) options_end = true; 
-							else {
-								cleanLine(line); 
-								lines.push_back(line);
-								if (!std::getline(input, line)) options_end = true; 
+					pos = line.find(')');
+					if (pos == std::string::npos) {
+						if(std::getline(input, line)) {
+							while(!options_end) {
+								pos = line.find(')'); 
+								if (pos != std::string::npos) options_end = true; 
+								else {
+									cleanLine(line); 
+									lines.push_back(line);
+									if (!std::getline(input, line)) options_end = true; 
+								}
 							}
 						}
 					}
@@ -229,17 +232,18 @@ void ProgramController::run() {
 	hf = nullptr;
 	mp2obj = nullptr;
 	ints = nullptr; 
+	
 	try {
 		// Build molecules
 		int curr_molecule = 0;
 		for (auto& c : constructs) {
-			Molecule m(*this, c); 
-			m.buildShellBasis();
-			m.buildECPBasis();
-			m.calcEnuc();
-			log.print(m, true); 
-			m.updateBasisPositions(); 
-			log.print(m.getBasis(), get_option<bool>("bprint")); 
+			std::shared_ptr<Molecule> m = std::make_shared<Molecule>(shared_from_this(), c);
+			m->buildShellBasis();
+			m->buildECPBasis();
+			m->calcEnuc();
+			log.print(*m, true); 
+			m->updateBasisPositions(); 
+			log.print(m->getBasis(), get_option<bool>("bprint")); 
 			log.localTime(); 
 			log.flush(); 
 
@@ -253,7 +257,7 @@ void ProgramController::run() {
 				else {
 					auto it = command_list.find(cmd.name);
 					if (it != command_list.end())  {
-						std::function<void(Command&, Molecule&)> f = it->second;
+						std::function<void(Command&, SharedMolecule)> f = it->second;
 						f(cmd, m); 
 					}
 				}
@@ -269,14 +273,14 @@ void ProgramController::run() {
 	
 }
 
-void ProgramController::call_hf(Command& c, Molecule& m) {
-	if (m.getMultiplicity() > 1 || m.getNel()%2 != 0)
+void ProgramController::call_hf(Command& c, SharedMolecule m) {
+	if (m->getMultiplicity() > 1 || m->getNel()%2 != 0)
 		call_uhf(c, m);
 	else 
 		call_rhf(c, m); 
 }
 
-void ProgramController::call_rhf(Command& c, Molecule& m) {
+void ProgramController::call_rhf(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true); 
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 8);
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
@@ -286,9 +290,10 @@ void ProgramController::call_rhf(Command& c, Molecule& m) {
 	focker = std::make_shared<Fock>(c, *ints, m);
 	hf = std::make_shared<SCF>(c, m, *focker); 
 	hf->rhf(); 
+	done_hf = true;
 }
 
-void ProgramController::call_uhf(Command& c, Molecule& m) {
+void ProgramController::call_uhf(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true); 
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 8);
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
@@ -298,9 +303,10 @@ void ProgramController::call_uhf(Command& c, Molecule& m) {
 	focker = std::make_shared<UnrestrictedFock>(c, *ints, m);
 	hf = std::make_shared<SCF>(c, m, *focker); 
 	hf->uhf(); 
+	done_hf = true;
 }
 
-void ProgramController::call_mp2(Command& c, Molecule& m) {
+void ProgramController::call_mp2(Command& c, SharedMolecule m) {
 	if(done_hf && !done_transform) { 
 		mp2obj = std::make_shared<MP2>(*focker); 
 		runmp2(*mp2obj, *hf, true); 
@@ -311,7 +317,7 @@ void ProgramController::call_mp2(Command& c, Molecule& m) {
 	}
 }
 
-void ProgramController::call_ccsd(Command& c, Molecule& m) {
+void ProgramController::call_ccsd(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true);
 	if(!c.is_option_set("triples")) c.set_option<bool>("triples", false);
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 5);
@@ -332,7 +338,7 @@ void ProgramController::call_ccsd(Command& c, Molecule& m) {
 	} 
 }
 
-void ProgramController::call_ralmo(Command& c, Molecule& m) {
+void ProgramController::call_ralmo(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true);
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 6);
 	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
@@ -344,7 +350,7 @@ void ProgramController::call_ralmo(Command& c, Molecule& m) {
 	almo.rscf(); 
 }
 
-void ProgramController::call_ualmo(Command& c, Molecule& m) {
+void ProgramController::call_ualmo(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true);
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 6);
 	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
@@ -356,7 +362,7 @@ void ProgramController::call_ualmo(Command& c, Molecule& m) {
 	almo.uscf(); 
 }
 
-void ProgramController::call_optg(Command& c, Molecule& m) {
+void ProgramController::call_optg(Command& c, SharedMolecule m) {
 	// To be implemented
 }
 

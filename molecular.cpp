@@ -38,8 +38,8 @@ int main (int argc, char* argv[])
 			std::ofstream err(efname);
       
 			// Create the program controller
-			ProgramController control(input, output, err); 
-			control.run(); 
+			std::shared_ptr<ProgramController> control = std::make_shared<ProgramController>(input, output, err);
+			control->run(); 
 		   
 			// Close file streams
 			input.close();

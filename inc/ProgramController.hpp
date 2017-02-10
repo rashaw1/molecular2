@@ -108,12 +108,12 @@ struct Construct {
 	virtual void parse(std::vector<std::string>& lines);
 };
 
-class ProgramController {
+class ProgramController : public std::enable_shared_from_this<ProgramController> {
 private:
 	std::vector<Option> global_options;
 	std::vector<Command> commands; 
 	std::vector<Construct> constructs;  
-	std::map<std::string, std::function<void(Command&, Molecule&)>> command_list;
+	std::map<std::string, std::function<void(Command&, SharedMolecule)>> command_list;
 	
 	std::shared_ptr<Fock> focker;
 	std::shared_ptr<SCF> hf; 
@@ -175,15 +175,17 @@ public:
 	void run(); 
 	void cleanLine(std::string& line); 
 	
-	void call_hf(Command& c, Molecule& m);
-	void call_rhf(Command& c, Molecule& m);
-	void call_uhf(Command& c, Molecule& m);
-	void call_mp2(Command& c, Molecule& m);
-	void call_ccsd(Command& c, Molecule& m);
-	void call_ralmo(Command& c, Molecule& m);
-	void call_ualmo(Command& c, Molecule& m);
-	void call_optg(Command& c, Molecule& m);
+	void call_hf(Command& c, SharedMolecule m);
+	void call_rhf(Command& c, SharedMolecule m);
+	void call_uhf(Command& c, SharedMolecule m);
+	void call_mp2(Command& c, SharedMolecule m);
+	void call_ccsd(Command& c, SharedMolecule m);
+	void call_ralmo(Command& c, SharedMolecule m);
+	void call_ualmo(Command& c, SharedMolecule m);
+	void call_optg(Command& c, SharedMolecule m);
 	
 };
+
+using SharedPC = std::shared_ptr<ProgramController>; 
 
 #endif

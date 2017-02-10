@@ -9,13 +9,13 @@
 */
 
 #include <iostream>
-#include "ProgramController.hpp"
 #include "molecule.hpp"
 #include "error.hpp"
 #include "basisreader.hpp"
 #include "ioutil.hpp"
 #include <cmath>
 #include <libint2.hpp>
+#include "ProgramController.hpp"
 
 Atom Molecule::parseGeomLine(std::string line) {
 	std::string delimiter = ","; // Define the separation delimiter
@@ -62,15 +62,15 @@ Atom Molecule::parseGeomLine(std::string line) {
 	
 			} else {
 				Error e2("INPUT", "Missing coordinate.");
-				control.log.error(e2);
+				control->log.error(e2);
 			}
 		} else { 
 			Error e3("INPUT", "Missing coordinate.");
-			control.log.error(e3);
+			control->log.error(e3);
 		} 
 	} else {
 		Error e4("INPUT", "Missing coordinate.");
-		control.log.error(e4);
+		control->log.error(e4);
 	}					
 	
 	return Atom(coords, q, m);
@@ -126,7 +126,7 @@ void Molecule::init(Construct& c)
 				
 			} else {
 				Error e("INIT", "Basis specification is empty!"); 
-				control.log.error(e); 
+				control->log.error(e); 
 			}
 			
 		} else if (sc.name == "geometry") {
@@ -149,7 +149,7 @@ void Molecule::init(Construct& c)
 				
 			} else {
 				Error e("INIT", "There are no atoms!");
-				control.log.error(e); 
+				control->log.error(e); 
 				atoms = NULL;
 			}
 			
@@ -194,7 +194,7 @@ void Molecule::init(Construct& c)
 			}	
 		} else {
 			Error e("INIT", "Construct not recognised."); 
-			control.log.error(e);
+			control->log.error(e);
 		}
 	}
 
@@ -219,7 +219,7 @@ void Molecule::init(Construct& c)
 		
 		if (fragmented) {
 			for(auto& f : frags) 
-				if (f.size() > 3) fragments.push_back(Fragment(control, *this, &atoms[f[0]], f[1] - f[0], f[2], f[3]));
+				if (f.size() > 3) fragments.push_back(Fragment(control, shared_from_this(), &atoms[f[0]], f[1] - f[0], f[2], f[3]));
 		}
 	}
 
@@ -232,13 +232,13 @@ void Fragment::init(Atom* as, int nat, int q, int mult)
 	multiplicity = mult;
 	atoms = as; 
 	natoms = nat;
-	has_ecps = mol.hasECPS(); 
+	has_ecps = mol->hasECPS(); 
 	
 	if (nat <= 0) {
 		Error e("FRAGINIT", "There are no atoms in this fragment!");
-		control.log.error(e);
+		control->log.error(e);
 	} else {
-		bfset = mol.getBasis(); 
+		bfset = mol->getBasis(); 
 		
 		nel = 0;
 		for (int i = 0; i < natoms; i++) 
@@ -247,13 +247,13 @@ void Fragment::init(Atom* as, int nat, int q, int mult)
 }
 
 // Constructor
-Molecule::Molecule(ProgramController& _control, Construct& c, int q) : control(_control)
+Molecule::Molecule(SharedPC _control, Construct& c, int q) : control(_control)
 {
 	// Set the log and then initialise
 	init(c);
 }
 
-Molecule::Molecule(ProgramController& _control, int q) : control(_control) { }
+Molecule::Molecule(SharedPC _control, int q) : control(_control) { }
 
 // Copy constructor
 Molecule::Molecule(const Molecule& other) : control(other.control)
@@ -310,7 +310,7 @@ Molecule& Molecule::operator=(const Molecule& other) {
 	return *this; 
 }
 
-Fragment::Fragment(ProgramController& control, Molecule& m, Atom* as, int nat, int q, int mult) : Molecule(control, q), mol(m)  {
+Fragment::Fragment(SharedPC control, SharedMolecule m, Atom* as, int nat, int q, int mult) : Molecule(control, q), mol(m)  {
 	init(as, nat, q, mult); 
 }
 
@@ -341,7 +341,7 @@ void Molecule::rotate(const Matrix& U)
 		updateBasisPositions();
 	} else {
 		Error e("ROTATE", "Unsuitable rotation matrix.");
-		control.log.error(e);
+		control->log.error(e);
 	}
 }
 
@@ -580,7 +580,7 @@ Vector Molecule::rConsts(int units)
 	}
 	// Constant Bi = K/Ii 
 	for (int i = 0; i < 3; i++){
-		if (I(i) < control.get_option<double>("precision")) { I[i] = 0.0; }  
+		if (I(i) < control->get_option<double>("precision")) { I[i] = 0.0; }  
 		else { I[i] = K/I(i); }
 	}
 	return I;

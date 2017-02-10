@@ -1,4 +1,5 @@
-direct,true
+memory, 500
+direct, false
 molecule = {
 	 angstrom, true
 	 geometry = {
@@ -7,10 +8,13 @@ molecule = {
     	      H, -0.86681,  0.60144, 0.00000
 	 }
 	 basis = {
-	       default, cc-pvtz
-	       o, cc-pvdz
+	       default, sto-3g
 	 }
 }
-rhf (
+hf (
 diis,true
+converge, 1e-6
+)
+ccsd (
+     triples, true
 )

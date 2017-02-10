@@ -72,7 +72,7 @@ class Tensor6;
 class IntegralEngine
 {
 private:
-	Molecule& molecule;
+	SharedMolecule molecule;
 	Matrix sints;
 	Matrix tints;
 	Matrix naints;
@@ -81,8 +81,8 @@ private:
 	iVector sizes;
 	S8EvenTensor4 twoints;
 public:
-	IntegralEngine(Molecule& m, bool print = true); //Constructor
-	IntegralEngine(Molecule& m, const IntegralEngine& i, int start, int finish); 
+	IntegralEngine(SharedMolecule m, bool print = true); //Constructor
+	IntegralEngine(SharedMolecule m, const IntegralEngine& i, int start, int finish); 
 	IntegralEngine(const IntegralEngine& other);
 	~IntegralEngine();
 

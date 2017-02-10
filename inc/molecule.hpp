@@ -57,12 +57,16 @@
 #include "eigen_wrapper.hpp"
 
 // Declare forward dependcies
-class ProgramController;
 class Fragment;
-struct Construct; 
+class Molecule;
+class ProgramController;
+struct Construct;
+
+using SharedMolecule = std::shared_ptr<Molecule>; 
+using SharedFragment = std::shared_ptr<Fragment>;  
 
 // Begin class definition
-class Molecule
+class Molecule : public std::enable_shared_from_this<Molecule> 
 {
 protected:
   ECPBasis ecpset;
@@ -75,12 +79,12 @@ protected:
   double enuc;
 public:
 	
-  ProgramController& control;
+  std::shared_ptr<ProgramController> control;
   
   // Constructors and destructor
   void init(Construct& c); // An initialisation function
-  Molecule(ProgramController& control, Construct& c, int q = 0); // Need the log for input, q is charge
-  Molecule(ProgramController& control, int q); 
+  Molecule(std::shared_ptr<ProgramController> control, Construct& c, int q = 0); // Need the log for input, q is charge
+  Molecule(std::shared_ptr<ProgramController> control, int q); 
   Molecule(const Molecule& other); // Copy constructor
   ~Molecule(); // Deletes the atom array
   
@@ -127,9 +131,9 @@ class Fragment : public Molecule
 {
 private:
 	std::vector<Atom> frag_atoms; 
-	Molecule& mol; 
+	SharedMolecule mol; 
 public:
-	Fragment(ProgramController& control, Molecule& m, Atom* as, int nat, int q = 0, int mult = 1); 
+	Fragment(std::shared_ptr<ProgramController> control, SharedMolecule m, Atom* as, int nat, int q = 0, int mult = 1); 
 	Fragment(const Fragment& other);
 	~Fragment();
 	void init(Atom* as, int nat, int q, int mult);

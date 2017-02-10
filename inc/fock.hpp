@@ -51,15 +51,15 @@ protected:
   std::vector<Matrix> focks;
   Matrix dens;
   IntegralEngine& integrals;
-  Molecule& molecule;
+  SharedMolecule molecule;
   bool direct, twoints, fromfile, diis;
   double precision; 
   int nbfs, iter, MAX, nocc;
 public:
-  Fock(Command& cmd, IntegralEngine& ints, Molecule& m);
+  Fock(Command& cmd, IntegralEngine& ints, SharedMolecule m);
   Fock(const Fock& other);
   IntegralEngine& getIntegrals() { return integrals; }
-  Molecule& getMolecule() { return molecule; }
+  SharedMolecule getMolecule() { return molecule; }
   Matrix& getHCore() { return hcore; }
   Matrix& getFockAO() { return focka; }
   Matrix& getFockMO() { return fockm; }
@@ -121,7 +121,7 @@ protected:
 	std::vector<Matrix> alpha_focks, beta_focks;
 	int nalpha, nbeta; 
 public:
-    UnrestrictedFock(Command& cmd, IntegralEngine& ints, Molecule& m);
+    UnrestrictedFock(Command& cmd, IntegralEngine& ints, SharedMolecule m);
     UnrestrictedFock(const UnrestrictedFock& other);
 	
 	Matrix& getFockAlphaAO() { return fock_alpha_ao; }
@@ -156,7 +156,7 @@ private:
 	int start, end;
 public:
 	Matrix Sxx; 
-	FockFragment(Command& cmd, IntegralEngine& ints, Molecule& m, int start, int end);
+	FockFragment(Command& cmd, IntegralEngine& ints, SharedMolecule m, int start, int end);
 	FockFragment(const FockFragment& other);
 	Vector buildFock(Matrix& qfq, Matrix& qfp, Matrix& pfp, bool alpha = false); 
 	virtual void gensolve();
@@ -169,7 +169,7 @@ private:
 	int start, end;
 public:
 	Matrix Sxx;
-	UnrestrictedFockFragment(Command& cmd, IntegralEngine& ints, Molecule& m, int start, int end);
+	UnrestrictedFockFragment(Command& cmd, IntegralEngine& ints, SharedMolecule m, int start, int end);
 	UnrestrictedFockFragment(const UnrestrictedFockFragment& other);
 	Vector buildFock(Matrix& qfq, Matrix& qfp, Matrix& pfp, bool alpha); 
 	virtual void gensolve();

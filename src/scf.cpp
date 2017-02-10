@@ -16,7 +16,7 @@
 #include "ProgramController.hpp"
 
 // Constructor
-SCF::SCF(Command& c, Molecule& m, Fock& f) : cmd(c), molecule(m), focker(f), energy(0.0), last_energy(0.0), one_E(0.0), two_E(0.0), error(0.0), last_err(0.0)
+SCF::SCF(Command& c, SharedMolecule m, Fock& f) : cmd(c), molecule(m), focker(f), energy(0.0), last_energy(0.0), one_E(0.0), two_E(0.0), error(0.0), last_err(0.0)
 {
 	int maxdiis = cmd.get_option<int>("maxdiis");
 	bool dodiis = cmd.get_option<bool>("diis");
@@ -35,7 +35,7 @@ void SCF::calcE()
   
 	// Calculate the energy
 	last_energy = energy;
-	energy = calcE(hcore, dens, fock) + molecule.getEnuc();
+	energy = calcE(hcore, dens, fock) + molecule->getEnuc();
 }
 
 // Do the same but as an external function, where matrices are given as arguments
@@ -90,19 +90,19 @@ bool SCF::testConvergence(double val)
 void SCF::rhf(bool print)
 {
 	// Check the multiplicity and number of electrons
-	int nel = molecule.getNel();
-	int mult = molecule.getMultiplicity();
+	int nel = molecule->getNel();
+	int mult = molecule->getMultiplicity();
   
 	if ( (nel%2 != 0) ) {
 		Error e1("RHF", "Molecule has an odd number of electrons.");
-		molecule.control.log.error(e1);
+		molecule->control->log.error(e1);
 	} else if (mult != 1) {
 		Error e2("RHF", "Molecule is not a singlet state.");
-		molecule.control.log.error(e2);
+		molecule->control->log.error(e2);
 	} else { // All is fine
 		if (print) {
-			molecule.control.log.title("RHF SCF Calculation");
-			molecule.control.log.initIteration();
+			molecule->control->log.title("RHF SCF Calculation");
+			molecule->control->log.initIteration();
 		}
 		bool converged = false;
 		// Get initial guess
@@ -119,7 +119,7 @@ void SCF::rhf(bool print)
 		errs.clear();
 
 		calcE();
-		if(print) molecule.control.log.iteration(0, energy, 0.0, 0.0);
+		if(print) molecule->control->log.iteration(0, energy, 0.0, 0.0);
 		focker.average(weights);
 		focker.transform(false);
 		int iter = 1;
@@ -143,7 +143,7 @@ void SCF::rhf(bool print)
       
 			calcE();
 			delta = fabs(energy-last_energy);
-			if(print) molecule.control.log.iteration(iter, energy, delta, dd);
+			if(print) molecule->control->log.iteration(iter, energy, delta, dd);
 			focker.average(weights);
 			focker.transform(false);
 			converged = testConvergence(dd);
@@ -153,13 +153,13 @@ void SCF::rhf(bool print)
 		focker.diagonalise();
 	
 		if (!converged) { 
-			molecule.control.log.result("SCF failed to converge.");
+			molecule->control->log.result("SCF failed to converge.");
 		} else if (print) {
-			molecule.control.log.print("\nOne electron energy (Hartree) = " + std::to_string(one_E));
-			molecule.control.log.print("\nTwo electron energy (Hartree) = " + std::to_string(two_E));
-			molecule.control.log.print("\n");
-			molecule.control.log.orbitals(focker.getEps(), nel, false);
-			molecule.control.log.result("RHF Energy", energy, "Hartree");
+			molecule->control->log.print("\nOne electron energy (Hartree) = " + std::to_string(one_E));
+			molecule->control->log.print("\nTwo electron energy (Hartree) = " + std::to_string(two_E));
+			molecule->control->log.print("\n");
+			molecule->control->log.orbitals(focker.getEps(), nel, false);
+			molecule->control->log.result("RHF Energy", energy, "Hartree");
 		}
 	}
 }
@@ -173,16 +173,16 @@ void SCF::uhf(bool print) {
 void SCF::uhf_internal(bool print, UnrestrictedFock& ufocker)
 { 
 	// Get number of alpha/beta electrons
-	int nalpha = molecule.nalpha();
-	int nbeta = molecule.nbeta();
+	int nalpha = molecule->nalpha();
+	int nbeta = molecule->nbeta();
 
 	// Start logging
 	if (print) {
-		molecule.control.log.title("UHF SCF Calculation");
-		molecule.control.log.print("# alpha = " + std::to_string(nalpha));
-		molecule.control.log.print("# beta = " + std::to_string(nbeta));
-		molecule.control.log.print("\n");
-		molecule.control.log.initIteration();
+		molecule->control->log.title("UHF SCF Calculation");
+		molecule->control->log.print("# alpha = " + std::to_string(nalpha));
+		molecule->control->log.print("# beta = " + std::to_string(nbeta));
+		molecule->control->log.print("\n");
+		molecule->control->log.initIteration();
 	}
 	bool converged = false;
   
@@ -191,7 +191,7 @@ void SCF::uhf_internal(bool print, UnrestrictedFock& ufocker)
 	ufocker.diagonalise();
 	int iter = 1;
 	double delta, ea, eb, dist;
-	//bool average = molecule.control.log.diis();
+	//bool average = molecule->control->log.diis();
 	double err1 = 0.0, err2 = 0.0, err1_last = 0.0, err2_last = 0.0;
 	std::vector<Vector> errs;
 	int nbfs = ufocker.getHCore().rows();
@@ -225,7 +225,7 @@ void SCF::uhf_internal(bool print, UnrestrictedFock& ufocker)
 		ufocker.diagonalise();
     
 		last_energy = energy;
-		energy = (ea + eb)/2.0 + molecule.getEnuc();
+		energy = (ea + eb)/2.0 + molecule->getEnuc();
 		delta = fabs(energy - last_energy);
     
 		dist = (ufocker.getDensAlpha() + ufocker.getDensBeta() - old_dens_alpha - old_dens_beta).norm();
@@ -233,7 +233,7 @@ void SCF::uhf_internal(bool print, UnrestrictedFock& ufocker)
 		old_dens_beta = ufocker.getDensBeta(); 
 		//dist = 0.5*(err1+err2-err1_last-err2_last);
     
-		if(print) molecule.control.log.iteration(iter, energy, delta, dist);
+		if(print) molecule->control->log.iteration(iter, energy, delta, dist);
 
 		if (delta < CONVERGE/100.0 && dist < CONVERGE) { converged = true; }
 		iter++;
@@ -242,12 +242,12 @@ void SCF::uhf_internal(bool print, UnrestrictedFock& ufocker)
 	ufocker.diagonalise();
 	if (converged && print) {
 		// Construct the orbital energies
-		molecule.control.log.print("\nALPHA ORBITALS");
-		molecule.control.log.orbitals(ufocker.getEpsAlpha(), nalpha, true);
-		molecule.control.log.print("\nBETA ORBITALS");
-		molecule.control.log.orbitals(ufocker.getEpsBeta(), nbeta, true);
-		molecule.control.log.result("UHF Energy", energy, "Hartree");
+		molecule->control->log.print("\nALPHA ORBITALS");
+		molecule->control->log.orbitals(ufocker.getEpsAlpha(), nalpha, true);
+		molecule->control->log.print("\nBETA ORBITALS");
+		molecule->control->log.orbitals(ufocker.getEpsBeta(), nbeta, true);
+		molecule->control->log.result("UHF Energy", energy, "Hartree");
 	} else if (!converged){
-		molecule.control.log.result("UHF failed to converge");
+		molecule->control->log.result("UHF failed to converge");
 	}
 }
