@@ -203,23 +203,25 @@ void ProgramController::parse(std::ifstream& input) {
 		}
 	}
 	
-	std::cout << "OPTIONS: " << std::endl;
-	for (auto& op : global_options) std::cout << op.name << " " << op._value << std::endl;
-	std::cout << "\nCOMMANDS: " << std::endl;
-	for (auto& c : commands) std::cout << c.name << " " << c.molecule_id << std::endl; 
-	std::cout << "\nCONSTRUCTS: " << std::endl; 
-	for (auto& c : constructs) {
-		std::cout << c.name << std::endl; 
-		std::cout << "CONTENT" << std::endl;
-		for (auto& line : c.content) std::cout << line << std::endl; 
-		std::cout << "SUBCONSTRUCTS" << std::endl; 
-		for (auto& sc : c.subconstructs) {
-			std::cout << sc.name << std::endl;
-			std::cout << "SUBCONTENT" << std::endl;
-			for (auto& line : sc.content) std::cout << line << std::endl; 
+	if (get_option<bool>("debug")) {
+		std::cout << "OPTIONS: " << std::endl;
+		for (auto& op : global_options) std::cout << op.name << " " << op._value << std::endl;
+		std::cout << "\nCOMMANDS: " << std::endl;
+		for (auto& c : commands) std::cout << c.name << " " << c.molecule_id << std::endl; 
+		std::cout << "\nCONSTRUCTS: " << std::endl; 
+		for (auto& c : constructs) {
+			std::cout << c.name << std::endl; 
+			std::cout << "CONTENT" << std::endl;
+			for (auto& line : c.content) std::cout << line << std::endl; 
+			std::cout << "SUBCONSTRUCTS" << std::endl; 
+			for (auto& sc : c.subconstructs) {
+				std::cout << sc.name << std::endl;
+				std::cout << "SUBCONTENT" << std::endl;
+				for (auto& line : sc.content) std::cout << line << std::endl; 
+				std::cout << std::endl;
+			} 
 			std::cout << std::endl;
-		} 
-		std::cout << std::endl;
+		}
 	}
 }
 
@@ -344,6 +346,7 @@ void ProgramController::call_ralmo(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
 	if(!c.is_option_set("perturb")) c.set_option<int>("perturb", 0);
+	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12); 
 
 	focker = std::make_shared<Fock>(c, *ints, m); 
 	ALMOSCF almo(c, m, *focker); 
@@ -356,6 +359,7 @@ void ProgramController::call_ualmo(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
 	if(!c.is_option_set("perturb")) c.set_option<int>("perturb", 0);
+	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12); 
 
 	focker = std::make_shared<UnrestrictedFock>(c, *ints, m);
 	ALMOSCF almo(c, m, *focker); 

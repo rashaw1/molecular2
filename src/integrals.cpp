@@ -60,6 +60,7 @@ IntegralEngine::IntegralEngine(SharedMolecule m, bool print) : molecule(m)
 	ones = (M*(M+1));
 	sizes[2] = ones;
 	sizes[3] = (ones*(ones+1))/4;
+	
 
 	if (print) {
 		molecule->control->log.title("INTEGRAL GENERATION");
@@ -140,6 +141,7 @@ IntegralEngine::IntegralEngine(SharedMolecule m, const IntegralEngine& ints, int
 	auto &shells = molecule->getBasis().getIntShells();
 	std::vector<Atom> atoms;
 	for (int i = 0; i < molecule->getNAtoms(); i++) atoms.push_back(molecule->getAtom(i));
+	
 	naints = compute_1body_ints(shells, libint2::Operator::nuclear, atoms);
 	
 	if(molecule->getBasis().hasECPS()) {

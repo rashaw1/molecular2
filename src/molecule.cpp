@@ -217,28 +217,31 @@ void Molecule::init(Construct& c)
 		
 		bfset = Basis(bnames, qs, has_ecps); 
 		
+		for (int i = 0; i < natoms; i++) atoms[i].setBasis(bfset);
+		
 		if (fragmented) {
 			for(auto& f : frags) 
-				if (f.size() > 3) fragments.push_back(Fragment(control, shared_from_this(), &atoms[f[0]], f[1] - f[0], f[2], f[3]));
+				if (f.size() > 3)
+					fragments.push_back(std::make_shared<Fragment>(control, &atoms[f[0]], f[1] - f[0], bfset, bnames, has_ecps, f[2], f[3]));
 		}
 	}
 
 }
 
-void Fragment::init(Atom* as, int nat, int q, int mult)
+void Fragment::init(Atom* as, int nat, int q, int mult, bool _has_ecps, const Basis& _bfset)
 {
 	charge = q;
 	parent = false;
 	multiplicity = mult;
 	atoms = as; 
 	natoms = nat;
-	has_ecps = mol->hasECPS(); 
+	has_ecps = _has_ecps; 
 	
 	if (nat <= 0) {
 		Error e("FRAGINIT", "There are no atoms in this fragment!");
 		control->log.error(e);
 	} else {
-		bfset = mol->getBasis(); 
+		bfset = _bfset; 
 		
 		nel = 0;
 		for (int i = 0; i < natoms; i++) 
@@ -310,19 +313,21 @@ Molecule& Molecule::operator=(const Molecule& other) {
 	return *this; 
 }
 
-Fragment::Fragment(SharedPC control, SharedMolecule m, Atom* as, int nat, int q, int mult) : Molecule(control, q), mol(m)  {
-	init(as, nat, q, mult); 
+Fragment::Fragment(SharedPC control, Atom* as, int nat, const Basis& _bfset, std::map<int, std::string> _bnames, bool _has_ecps, int q, int mult) : Molecule(control, q)  {
+	bnames = _bnames; 
+	init(as, nat, q, mult, _has_ecps, _bfset); 
 }
 
-Fragment::Fragment(const Fragment& other) : Molecule(other.control, other.charge), mol(other.mol) {
-	init(other.atoms, other.natoms, other.charge, other.multiplicity);
+Fragment::Fragment(const Fragment& other) : Molecule(other.control, other.charge) {
+	bnames = other.bnames; 
+	init(other.atoms, other.natoms, other.charge, other.multiplicity, other.has_ecps, other.bfset);
 }
 Fragment::~Fragment() { }
 
 Fragment& Fragment::operator=(const Fragment& other) {
-	mol = other.mol; 
 	control = other.control;
-	init(other.atoms, other.natoms, other.charge, other.multiplicity);
+	bnames = other.bnames;
+	init(other.atoms, other.natoms, other.charge, other.multiplicity, other.has_ecps, other.bfset);
 	return *this;
 }
 

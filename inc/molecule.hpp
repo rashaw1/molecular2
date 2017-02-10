@@ -74,7 +74,7 @@ protected:
   Atom* atoms;
   int charge, nel, multiplicity, natoms;
   bool parent, angstrom, fragmented, has_ecps;
-  std::vector<Fragment> fragments;
+  std::vector<SharedFragment> fragments;
   std::map<int, std::string> bnames;
   double enuc;
 public:
@@ -106,7 +106,7 @@ public:
   ECPBasis& getECPBasis() { return ecpset; }
   ECP& getECP(int i) { return ecpset.getECP(i); }
   bool hasECPS() { return has_ecps; }
-  std::vector<Fragment>& getFragments() { return fragments; }
+  std::vector<SharedFragment>& getFragments() { return fragments; }
   
   // Routines
   void rotate(const Matrix& U);
@@ -131,12 +131,11 @@ class Fragment : public Molecule
 {
 private:
 	std::vector<Atom> frag_atoms; 
-	SharedMolecule mol; 
 public:
-	Fragment(std::shared_ptr<ProgramController> control, SharedMolecule m, Atom* as, int nat, int q = 0, int mult = 1); 
+	Fragment(std::shared_ptr<ProgramController> control, Atom* as, int nat, const Basis& _bfset, std::map<int, std::string> _bnames, bool _has_ecps = false, int q = 0, int mult = 1); 
 	Fragment(const Fragment& other);
 	~Fragment();
-	void init(Atom* as, int nat, int q, int mult);
+	void init(Atom* as, int nat, int q, int mult, bool _has_ecps, const Basis& _bfset);
 	
 	Fragment& operator=(const Fragment& other); 
 };

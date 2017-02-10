@@ -26,30 +26,30 @@ ALMOSCF::ALMOSCF(Command& c, SharedMolecule m, Fock& f) : molecule(m), cmd(c), f
 void ALMOSCF::setFragments(bool unrestricted)
 {
 	// Add the fragment Fock matrices and perform monomer calculations
-	std::vector<Fragment>& frags = molecule->getFragments(); 
+	std::vector<SharedFragment>& frags = molecule->getFragments(); 
 	nfrags = frags.size();
 	int start = 0;
 	int nf = 0;
 	for (int i = 0; i < frags.size(); i++) {
 		
-		frags[i].buildShellBasis();
-		frags[i].calcEnuc();
-		std::vector<libint2::Shell>& shells = frags[i].getBasis().getIntShells();
+		frags[i]->buildShellBasis();
+		frags[i]->calcEnuc();
+		std::vector<libint2::Shell>& shells = frags[i]->getBasis().getIntShells();
 
 		int f_nbfs = ints[nf].nbasis(shells);
-		IntegralEngine new_engine(frags[i].shared_from_this(), focker.getIntegrals(), start, start+f_nbfs);
+		IntegralEngine new_engine(frags[i]->shared_from_this(), focker.getIntegrals(), start, start+f_nbfs);
 		ints.push_back(new_engine);
 		if (unrestricted) {
-			ufragments.push_back(UnrestrictedFockFragment(cmd, ints[nf], frags[i].shared_from_this(), start, start+f_nbfs)); 
-			SCF hf(cmd, frags[i].shared_from_this(), ufragments[ufragments.size()-1]);
+			ufragments.push_back(UnrestrictedFockFragment(cmd, ints[nf], frags[i], start, start+f_nbfs)); 
+			SCF hf(cmd, frags[i], ufragments[ufragments.size()-1]);
 			hf.uhf_internal(false, ufragments[ufragments.size()-1]);
 			molecule->control->log.print("Monomer " + std::to_string(nf) + " energy = " + std::to_string(hf.getEnergy()) + " Hartree");
 			molecule->control->log.flush();   
 			monomer_energies.push_back(hf.getEnergy()); 
 			ufragments[ufragments.size()-1].clearDiis(); 
 		} else {
-			fragments.push_back(FockFragment(cmd, ints[nf], frags[i].shared_from_this(), start, start+f_nbfs));
-			SCF hf(cmd, frags[i].shared_from_this(), fragments[fragments.size()-1]);
+			fragments.push_back(FockFragment(cmd, ints[nf], frags[i], start, start+f_nbfs));
+			SCF hf(cmd, frags[i], fragments[fragments.size()-1]);
 			hf.rhf(false);
 			molecule->control->log.print("Monomer " + std::to_string(nf) + " energy = " + std::to_string(hf.getEnergy()) + " Hartree");
 			molecule->control->log.flush();  

@@ -83,6 +83,7 @@ Fock::Fock(const Fock& other) : integrals(other.integrals), molecule(other.molec
 	nocc = other.nocc;
 	iter = other.iter;
 	MAX = other.MAX; 
+	precision = other.precision; 
 }
 
 // Form the core hamiltonian matrix
@@ -669,7 +670,7 @@ void Fock::clearDiis() {
 	focks.clear(); 
 }
 
-FockFragment::FockFragment(Command& cmd, IntegralEngine& ints, SharedMolecule m, int _start, int _end) : Fock(cmd,ints, m), start(_start), end(_end) { 
+FockFragment::FockFragment(Command& cmd, IntegralEngine& ints, SharedMolecule m, int _start, int _end) : Fock(cmd, ints, m), start(_start), end(_end) { 
 	Sxx = ints.getOverlap();
 }
 
