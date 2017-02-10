@@ -15,7 +15,7 @@
 #include <libint2.hpp>
 
 // Constructor
-ALMOSCF::ALMOSCF(Command& c, Molecule& m, Fock& f) : cmd(c), molecule(m), focker(f) 
+ALMOSCF::ALMOSCF(Command& c, Molecule& m, Fock& f) : molecule(m), cmd(c), focker(f) 
 {	
 	// Zero out energies
 	dimer_energy = e_frz = e_pol = e_ct = e_int = 0.0;
@@ -40,16 +40,16 @@ void ALMOSCF::setFragments(bool unrestricted)
 		IntegralEngine new_engine(frags[i], focker.getIntegrals(), start, start+f_nbfs);
 		ints.push_back(new_engine);
 		if (unrestricted) {
-			ufragments.push_back(UnrestrictedFockFragment(ints[nf], frags[i], start, start+f_nbfs)); 
-			SCF hf(frags[i], ufragments[ufragments.size()-1]);
+			ufragments.push_back(UnrestrictedFockFragment(cmd, ints[nf], frags[i], start, start+f_nbfs)); 
+			SCF hf(cmd, frags[i], ufragments[ufragments.size()-1]);
 			hf.uhf_internal(false, ufragments[ufragments.size()-1]);
 			molecule.control.log.print("Monomer " + std::to_string(nf) + " energy = " + std::to_string(hf.getEnergy()) + " Hartree");
 			molecule.control.log.flush();   
 			monomer_energies.push_back(hf.getEnergy()); 
 			ufragments[ufragments.size()-1].clearDiis(); 
 		} else {
-			fragments.push_back(FockFragment(ints[nf], frags[i], start, start+f_nbfs));
-			SCF hf(frags[i], fragments[fragments.size()-1]);
+			fragments.push_back(FockFragment(cmd, ints[nf], frags[i], start, start+f_nbfs));
+			SCF hf(cmd, frags[i], fragments[fragments.size()-1]);
 			hf.rhf(false);
 			molecule.control.log.print("Monomer " + std::to_string(nf) + " energy = " + std::to_string(hf.getEnergy()) + " Hartree");
 			molecule.control.log.flush();  
@@ -215,7 +215,7 @@ void ALMOSCF::rcompute() {
 	delta_d = (P - P_old).norm(); 
 	
 	// Build Fock matrix
-	if (cmd.get_option<bool>("direct"))
+	if (focker.getMolecule().control.get_option<bool>("direct"))
 		focker.formJKdirect(focker.getIntegrals().getPrescreen(), P, 2.0);
 	else 
 		focker.formJK(P, 2.0);
@@ -261,7 +261,7 @@ void ALMOSCF::ucompute() {
 	delta_d += makeDens(false); 
 	
 	// Build Fock matrix
-	if (cmd.get_option<bool>("direct"))
+	if (ufocker.getMolecule().control.get_option<bool>("direct"))
 		ufocker.formJKdirect(focker.getIntegrals().getPrescreen(), P_alpha, P_beta, 2.0);
 	else 
 		ufocker.formJK(P_alpha, P_beta, 2.0);

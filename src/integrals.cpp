@@ -39,7 +39,7 @@
 #include <thread>   
 
 // Constructor
-IntegralEngine::IntegralEngine(Molecule& m, bool direct, bool print) : molecule(m)
+IntegralEngine::IntegralEngine(Molecule& m, bool print) : molecule(m)
 {
 	// Calculate sizes
 	int natoms = molecule.getNAtoms();
@@ -84,7 +84,7 @@ IntegralEngine::IntegralEngine(Molecule& m, bool direct, bool print) : molecule(
 	}
 	
 	Vector ests = getEstimates();
-	if ( molecule.control.get_option<double>("memory") < ests(3) && !direct) {
+	if ( molecule.control.get_option<double>("memory") < ests(3) && !molecule.control.get_option<bool>("direct")) {
 		Error e("MEMERR", "Not enough memory for ERIs.");
 		if (print) {
 			molecule.control.log.error(e);
@@ -100,7 +100,7 @@ IntegralEngine::IntegralEngine(Molecule& m, bool direct, bool print) : molecule(
 		molecule.control.log.print("\n\n");
 	}
 		
-	if ( direct ){
+	if ( molecule.control.get_option<bool>("direct") ){
 		if(print) molecule.control.log.print("Two electron integrals to be calculated on the fly.\n");
 	} else { // Check memory requirements
 		twoints = compute_eris(shells);
@@ -114,7 +114,7 @@ IntegralEngine::IntegralEngine(Molecule& m, bool direct, bool print) : molecule(
 			molecule.control.log.localTime();
 		}
 		
-		if (molecule.control.log.twoprint()) {
+		if (molecule.control.get_option<bool>("printeris")) {
 			molecule.control.log.print("Writing ERIs to file.\n");
 			printERI(molecule.control.log.getIntFile(), M);
 		}	
@@ -148,7 +148,7 @@ IntegralEngine::IntegralEngine(Molecule& m, const IntegralEngine& ints, int star
 	
 	prescreen = compute_schwarz_ints<>(shells);
 	
-	if ( !molecule.control.log.direct() ) {
+	if ( !molecule.control.get_option<bool>("direct") ) {
 		twoints.assign(nbfs, 0.0);
 		for (int i = 0; i < nbfs; i++)
 			for (int j = 0; j <= i; j++)
@@ -214,7 +214,7 @@ void IntegralEngine::printERI(std::ostream& output, int NSpher) const
 					if ((c1+c2) != (c3+c4)) { multiplier*=2.0; }
 					else if ((c1!=c3) && (c1 != c4)) { multiplier *=2.0; }
 					else if ((c2!=c3) && (c2 != c4)) { multiplier *=2.0; }
-					if (fabs(getERI(c4, c3, c2, c1)) < molecule.control.log.thrint()) { scount++; multiplier = 0; }
+					if (fabs(getERI(c4, c3, c2, c1)) < molecule.control.get_option<double>("thrint")) { scount++; multiplier = 0; }
 					output << std::setw(6) << c1+1;
 					output << std::setw(6) << c2+1;
 					output << std::setw(6) << c3+1;

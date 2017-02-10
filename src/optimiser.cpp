@@ -70,9 +70,9 @@ Vector quadratic(Matrix& hessian, Vector& gradient) {
 	return dq; 
 }
 
-void quadratic_scf(Molecule& mol, Fock& blah)
+void quadratic_scf(Command& cmd, Molecule& mol, Fock& blah)
 {
-	Logger& log = mol.getLog();
+	Logger& log = mol.control.log;
 	log.title("QUADRATIC GEOMETRY OPTIMIZATION"); 
 	
 	bool unrestricted = (mol.getMultiplicity() > 1) || (mol.getNel()%2 != 0);
@@ -82,11 +82,14 @@ void quadratic_scf(Molecule& mol, Fock& blah)
 	double energy = 0.0; 
 	int iter = 0;
 	bool converged = false;
-	while (!converged && iter < log.maxiter()) {
+	int MAXITER = cmd.get_option<int>("maxiter");
+	double CONVERGE = cmd.get_option<double>("converge");
+	
+	while (!converged && iter < MAXITER) {
 		
 		IntegralEngine ints(mol, false);
-		Fock f(ints, mol);
-		SCF hf(mol, f); 
+		Fock f(cmd, ints, mol);
+		SCF hf(cmd, mol, f); 
 		if (unrestricted) hf.uhf(false);
 		else hf.rhf(false);
 		energy = hf.getEnergy();
@@ -98,7 +101,7 @@ void quadratic_scf(Molecule& mol, Fock& blah)
 		Matrix g = f.getForces().transpose(); 
 		Vector gradient(Eigen::Map<Vector>(g.data(), g.cols()*g.rows()));
 		grad_norm = gradient.norm();
-		converged = grad_norm < log.converge();
+		converged = grad_norm < CONVERGE;
 		log.iteration(iter++, energy, fabs(energy-old_e), grad_norm);
 		old_e = energy; 
 		

@@ -3,14 +3,12 @@
 
 #include "tensor4.hpp"
 #include "fock.hpp"
-#include "ProgramController.hpp"
 
 class IntegralEngine;
 
 class MP2
 {
 private:
-	Command& cmd;
 	int N, nocc;
 	double energy;
 	S8EvenTensor4 moInts;

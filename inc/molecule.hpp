@@ -58,6 +58,7 @@
 
 // Declare forward dependcies
 class ProgramController;
+class Fragment;
 struct Construct; 
 
 // Begin class definition
@@ -94,7 +95,6 @@ public:
   int getCharge() const { return charge; }
   int getNel() const { return nel; }
   int getMultiplicity() const { return multiplicity; }
-  Logger& getLog() { return log; }
   double getEnuc() const { return enuc; }
   Atom& getAtom(int i) { return atoms[i]; } // Return atom i
   BF& getBF(int q, int i) { return bfset.getBF(q, i); } // Return basis func. i of atom q
@@ -102,7 +102,7 @@ public:
   ECPBasis& getECPBasis() { return ecpset; }
   ECP& getECP(int i) { return ecpset.getECP(i); }
   bool hasECPS() { return has_ecps; }
-  std::vector<Fragments>& getFragments() { return fragments; }
+  std::vector<Fragment>& getFragments() { return fragments; }
   
   // Routines
   void rotate(const Matrix& U);
@@ -119,6 +119,8 @@ public:
   double torsionAngle(int i, int j, int k, int l) const;
   std::string rType();
   Vector rConsts(int units);
+  
+  Molecule& operator=(const Molecule& other); 
 };
 
 class Fragment : public Molecule 
@@ -127,10 +129,12 @@ private:
 	std::vector<Atom> frag_atoms; 
 	Molecule& mol; 
 public:
-	Fragment(ProgramController& control, Construct& c, Atom* as, int nat, int q = 0, int mult = 1); 
+	Fragment(ProgramController& control, Molecule& m, Atom* as, int nat, int q = 0, int mult = 1); 
 	Fragment(const Fragment& other);
 	~Fragment();
 	void init(Atom* as, int nat, int q, int mult);
+	
+	Fragment& operator=(const Fragment& other); 
 };
 
 #endif

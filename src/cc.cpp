@@ -13,6 +13,7 @@ CCSD::CCSD(Command& c, MP2& _mp2) : cmd(c), mp2(_mp2) {
 	N = 2*mp2.getN();
 	nocc = 2*mp2.getNocc();
 	energy = 0.0;
+	triples_energy = 0.0;
 	delta_e = 0.0;
 	delta_singles = 0.0;
 	delta_doubles = 0.0;
@@ -382,7 +383,6 @@ void CCSD::calculateEnergy() {
 }
 
 void CCSD::calculateTriples() {
-	triples_energy = 0.0; 
 	
 	int nvirt = N-nocc;
 	int nvirt2 = nvirt * nvirt;

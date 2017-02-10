@@ -22,6 +22,7 @@
 #include <cmath>
 #include <libint2.hpp>
 #include "logger.hpp"
+#include "ProgramController.hpp"
 
 // Constructor
 Fock::Fock(Command& cmd, IntegralEngine& ints, Molecule& m) : integrals(ints), molecule(m)
@@ -40,7 +41,7 @@ Fock::Fock(Command& cmd, IntegralEngine& ints, Molecule& m) : integrals(ints), m
 	// Retrieve whether this calculation should be done direct, or whether
 	// the twoints matrix has been formed, or if the 2e integrals need to be
 	// read from file.
-	direct = cmd.get_option<bool>("direct");
+	direct = molecule.control.get_option<bool>("direct");
 	diis = cmd.get_option<bool>("diis");
 	iter = 0;
 	nocc = molecule.getNel() / 2; 

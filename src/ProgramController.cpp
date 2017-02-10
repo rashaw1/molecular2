@@ -12,6 +12,8 @@ Option::Option(std::string& line) {
 	parse(line); 
 }
 
+Option::Option(std::string _name, std::string val) : name(_name), _value(val) {} 
+
 Option::Option(const Option& other) {
 	name = other.name; 
 	_value = other._value; 
@@ -22,6 +24,8 @@ void Option::parse(std::string& line) {
 	if (pos != std::string::npos) {
 		name = line.substr(0, pos); 
 		_value = line.substr(pos+1, line.length());
+		if (_value == "true" || _value == "yes" || _value == "on") _value = std::to_string(true);
+		else if (_value == "false" || _value == "no" || _value == "off") _value = std::to_string(false);
 	}
 }
 
@@ -84,19 +88,29 @@ void Construct::parse(std::vector<std::string>& lines) {
 	}
 }
 
-ProgramController::ProgramController(std::ifstream& input, std::ofstream& output, std::ostream& err) : log(output, err) {
+ProgramController::ProgramController(std::ifstream& input, std::ofstream& output, std::ostream& err) : log(*this, output, err) {
 	log.init();
 	log.flush();
 	
-	command_list["hf"] = call_hf;
-	command_list["rhf"] = call_rhf; 
-	command_list["uhf"] = call_uhf;
-	command_list["mp2"] = call_mp2;
-	command_list["ccsd"] = call_ccsd;
-	command_list["almo"] = call_almo;
-	command_list["optg"] = call_optg;
+	using namespace std::placeholders;
+	command_list["hf"] = std::bind(&ProgramController::call_hf, this, _1, _2); 
+	command_list["rhf"] = std::bind(&ProgramController::call_rhf, this, _1, _2);  
+	command_list["uhf"] = std::bind(&ProgramController::call_uhf, this, _1, _2); 
+	command_list["mp2"] = std::bind(&ProgramController::call_mp2, this, _1, _2); 
+	command_list["ccsd"] = std::bind(&ProgramController::call_ccsd, this, _1, _2); 
+	command_list["ralmo"] = std::bind(&ProgramController::call_ralmo, this, _1, _2); 
+	command_list["ualmo"] = std::bind(&ProgramController::call_ualmo, this, _1, _2); 
+	command_list["optg"] = std::bind(&ProgramController::call_optg, this, _1, _2); 
 	
 	parse(input); 
+	
+	if (!is_option_set("memory")) set_option<double>("memory", 100.0);
+	if (!is_option_set("nthreads")) set_option<int>("nthreads", 1);
+	if (!is_option_set("printeris")) set_option<bool>("printeris", false);
+	if (!is_option_set("direct")) set_option<bool>("direct", false);
+	if (!is_option_set("intfile")) set_option<std::string>("intfile", "eris.ints"); 
+ 	if (!is_option_set("thrint")) set_option<double>("thrint", 1e-12); 
+	
 }
 
 void ProgramController::cleanLine(std::string& line) {
@@ -185,6 +199,25 @@ void ProgramController::parse(std::ifstream& input) {
 			}	
 		}
 	}
+	
+	std::cout << "OPTIONS: " << std::endl;
+	for (auto& op : global_options) std::cout << op.name << " " << op._value << std::endl;
+	std::cout << "\nCOMMANDS: " << std::endl;
+	for (auto& c : commands) std::cout << c.name << " " << c.molecule_id << std::endl; 
+	std::cout << "\nCONSTRUCTS: " << std::endl; 
+	for (auto& c : constructs) {
+		std::cout << c.name << std::endl; 
+		std::cout << "CONTENT" << std::endl;
+		for (auto& line : c.content) std::cout << line << std::endl; 
+		std::cout << "SUBCONSTRUCTS" << std::endl; 
+		for (auto& sc : c.subconstructs) {
+			std::cout << sc.name << std::endl;
+			std::cout << "SUBCONTENT" << std::endl;
+			for (auto& line : sc.content) std::cout << line << std::endl; 
+			std::cout << std::endl;
+		} 
+		std::cout << std::endl;
+	}
 }
 
 void ProgramController::run() {
@@ -196,60 +229,163 @@ void ProgramController::run() {
 	hf = nullptr;
 	mp2obj = nullptr;
 	ints = nullptr; 
-	
-	// Build molecules
-	for (auto& c : constructs)
-		molecules.push_back(Molecule(*this, c));
-	
-	int curr_molecule = 0; 
-	for (auto& m : molecules) {
-		m.buildShellBasis();
-		m.buildECPBasis();
-		m.calcEnuc();
-		log.print(m, true); 
-		m.updateBasisPositions(); 
-		log.print(m.getBasis(), get_option<bool>("bprint")); 
-		log.localTime(); 
-		log.flush(); 
+	try {
+		// Build molecules
+		int curr_molecule = 0;
+		for (auto& c : constructs) {
+			Molecule m(*this, c); 
+			m.buildShellBasis();
+			m.buildECPBasis();
+			m.calcEnuc();
+			log.print(m, true); 
+			m.updateBasisPositions(); 
+			log.print(m.getBasis(), get_option<bool>("bprint")); 
+			log.localTime(); 
+			log.flush(); 
+
+			ints = std::make_shared<IntegralEngine>(m); 
 		
-		ints = new IntegralEngine(m); 
+			done_hf = false;
+			done_transform = false; 
 		
-		for (auto& c : commands) {
-			if(c.molecule_id != curr_molecule) continue; 
-			else {
-				auto it = command_list.find(c.name);
-				if (it != command_list.end())  {
-					std::function<void(Command&)> f = it->second;
-					f(c); 
+			for (auto& cmd : commands) {
+				if(cmd.molecule_id != curr_molecule) continue; 
+				else {
+					auto it = command_list.find(cmd.name);
+					if (it != command_list.end())  {
+						std::function<void(Command&, Molecule&)> f = it->second;
+						f(cmd, m); 
+					}
 				}
 			}
-		}
 		
-		curr_molecule++; 
+			curr_molecule++; 
+		}
+	} catch (Error e) {
+		log.error(e); 
 	}
-	
-	libint2::finalize();  
+	libint2::finalize(); 
+	log.finalise(); 
 	
 }
 
-void ProgramController::call_hf(Command& c) {
-	Molecule& m = molecules[c.molecule_id];
-	if (m.getMultiplicity() > 1 || mol.getNel()%2 != 0)
-		call_uhf(c);
+void ProgramController::call_hf(Command& c, Molecule& m) {
+	if (m.getMultiplicity() > 1 || m.getNel()%2 != 0)
+		call_uhf(c, m);
 	else 
-		call_rhf(c); 
+		call_rhf(c, m); 
 }
 
-void ProgramController::call_rhf(Command& c) {
-	Molecule& m = molecules[c.molecule_id]; 
-	focker = new Fock(c, ints, m);
-	hf = new SCF(m, *focker);
+void ProgramController::call_rhf(Command& c, Molecule& m) {
+	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true); 
+	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 8);
+	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
+	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
+	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12); 
+	
+	focker = std::make_shared<Fock>(c, *ints, m);
+	hf = std::make_shared<SCF>(c, m, *focker); 
 	hf->rhf(); 
 }
 
-void ProgramController::call_uhf(Command& c) {
-	Molecule& m = molecules[c.molecule_id];
-	focker = new UnrestrictedFock(c, ints, m);
-	hf = new SCF(m, *focker);
+void ProgramController::call_uhf(Command& c, Molecule& m) {
+	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true); 
+	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 8);
+	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
+	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
+	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12); 
+
+	focker = std::make_shared<UnrestrictedFock>(c, *ints, m);
+	hf = std::make_shared<SCF>(c, m, *focker); 
 	hf->uhf(); 
+}
+
+void ProgramController::call_mp2(Command& c, Molecule& m) {
+	if(done_hf && !done_transform) { 
+		mp2obj = std::make_shared<MP2>(*focker); 
+		runmp2(*mp2obj, *hf, true); 
+		done_transform = true;
+	} else {
+		Error e("MP2", "HF is required before MP2 can be done.");
+		log.error(e);
+	}
+}
+
+void ProgramController::call_ccsd(Command& c, Molecule& m) {
+	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true);
+	if(!c.is_option_set("triples")) c.set_option<bool>("triples", false);
+	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 5);
+	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 30); 
+	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
+	
+	if (done_hf) {
+		if(!done_transform) {
+			mp2obj = std::make_shared<MP2>(*focker); 
+			runmp2(*mp2obj, *hf, false);
+			done_transform = true;
+		}
+		
+		mp2obj->spatialToSpin();
+		CCSD ccobj(c, *mp2obj); 
+		ccobj.compute();
+		log.result("Total Energy = ", hf->getEnergy() + ccobj.getEnergy() + ccobj.getETriples(), "Hartree");
+	} 
+}
+
+void ProgramController::call_ralmo(Command& c, Molecule& m) {
+	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true);
+	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 6);
+	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
+	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
+	if(!c.is_option_set("perturb")) c.set_option<int>("perturb", 0);
+
+	focker = std::make_shared<Fock>(c, *ints, m); 
+	ALMOSCF almo(c, m, *focker); 
+	almo.rscf(); 
+}
+
+void ProgramController::call_ualmo(Command& c, Molecule& m) {
+	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true);
+	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 6);
+	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
+	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
+	if(!c.is_option_set("perturb")) c.set_option<int>("perturb", 0);
+
+	focker = std::make_shared<UnrestrictedFock>(c, *ints, m);
+	ALMOSCF almo(c, m, *focker); 
+	almo.uscf(); 
+}
+
+void ProgramController::call_optg(Command& c, Molecule& m) {
+	// To be implemented
+}
+
+void ProgramController::runmp2(MP2& mp2obj, SCF& hf, bool calc) {
+	if (calc)
+		log.title("MP2 CALCULATION");
+	else
+		log.title("INTEGRAL TRANSFORMATION");
+	mp2obj.transformIntegrals();
+	log.print("Integral transformation complete.\n");
+	log.localTime();
+	if (calc) {
+		mp2obj.calculateEnergy();
+		log.result("MP2 Energy Correction", mp2obj.getEnergy(), "Hartree");
+		log.result("Total Energy = ", hf.getEnergy() + mp2obj.getEnergy(), "Hartree");
+	}
+}
+
+ProgramController& ProgramController::operator=(const ProgramController& other) {
+	global_options = other.global_options;
+	commands = other.commands;
+	constructs = other.constructs;
+	command_list = other.command_list;
+	focker = other.focker;
+	hf = other.hf;
+	mp2obj = other.mp2obj;
+	ints = other.ints;
+	done_hf = other.done_hf;
+	done_transform = other.done_transform; 
+	log = other.log;
+	return *this;
 }

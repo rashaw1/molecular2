@@ -101,6 +101,9 @@ public:
   Logger(ProgramController &control, std::ofstream& out, std::ostream& e);
   ~Logger(); // Delete the various arrays
   // Accessors
+  Logger& operator=(const Logger& other);
+  
+  std::ofstream& getIntFile() { return intfile; }
   
   // Overloaded print functions
   void print(const std::string& msg) const; // Print a string message

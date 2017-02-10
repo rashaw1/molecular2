@@ -21,7 +21,7 @@ Atom Molecule::parseGeomLine(std::string line) {
 	std::string delimiter = ","; // Define the separation delimiter
 	int q, m; 
 	Vector coords(3);
-	double multiplier = (angstrom ? TOBOHR : 1.0); // Convert to bohr from angstrom?
+	double multiplier = (angstrom ? Logger::TOBOHR : 1.0); // Convert to bohr from angstrom?
 		
 	size_t position = line.find(delimiter); // Find first delimiter
 	std::string token = line.substr(0, position); // Tokenise
@@ -58,7 +58,7 @@ Atom Molecule::parseGeomLine(std::string line) {
 			if (line.length() > 0){
 				line.erase(std::remove(line.begin(), line.end(), ' '), line.end());
 				line.erase(std::remove(line.begin(), line.end(), '\t'), line.end());
-				coords[2] = multiplier*std::stod(temp);
+				coords[2] = multiplier*std::stod(line);
 	
 			} else {
 				Error e2("INPUT", "Missing coordinate.");
@@ -99,6 +99,7 @@ void Molecule::init(Construct& c)
 	has_ecps = false; 
 	std::vector<std::vector <int>> frags;
 	iVector qs; 
+	std::string token; 
 	
 	for (auto& sc : c.subconstructs) {
 		if (sc.name == "basis") {
@@ -138,10 +139,12 @@ void Molecule::init(Construct& c)
 				atoms = new Atom[natoms];
 				nel = 0; 
 				
+				int i = 0;
 				for (auto& line : sc.content) {
 					atoms[i] = parseGeomLine(line); 
 					qs[i] = atoms[i].getCharge(); 
 					nel += atoms[i].getCharge(); 
+					i++;
 				}
 				
 			} else {
@@ -195,9 +198,6 @@ void Molecule::init(Construct& c)
 		}
 	}
 
-	// k is now the number of unique qs, and all these unique qs are stored in qs
-	// resize to get rid of extra weight
-	qs.conservativeResize(k);
 	// Get the basis set     
 	if (basis_found && geom_found) {
 		
@@ -211,13 +211,17 @@ void Molecule::init(Construct& c)
 				k++;
 			}
 		}
+		// k is now the number of unique qs, and all these unique qs are stored in qs
+		// resize to get rid of extra weight
+		qs.conservativeResize(k);
 		
 		bfset = Basis(bnames, qs, has_ecps); 
 		
 		if (fragmented) {
 			for(auto& f : frags) 
-				if (f.size() > 3) fragments.push_back(Fragment(control, &atoms[f[0]], f[1] - f[0], f[2], f[3]));
+				if (f.size() > 3) fragments.push_back(Fragment(control, *this, &atoms[f[0]], f[1] - f[0], f[2], f[3]));
 		}
+	}
 
 }
 
@@ -232,7 +236,7 @@ void Fragment::init(Atom* as, int nat, int q, int mult)
 	
 	if (nat <= 0) {
 		Error e("FRAGINIT", "There are no atoms in this fragment!");
-		log.error(e);
+		control.log.error(e);
 	} else {
 		bfset = mol.getBasis(); 
 		
@@ -252,29 +256,75 @@ Molecule::Molecule(ProgramController& _control, Construct& c, int q) : control(_
 Molecule::Molecule(ProgramController& _control, int q) : control(_control) { }
 
 // Copy constructor
-Molecule::Molecule(const Molecule& other) : log(other.log)
+Molecule::Molecule(const Molecule& other) : control(other.control)
 {
-	init();
+	charge = other.charge;
+	nel = other.nel;
+	multiplicity = other.multiplicity;
+	natoms = other.natoms;
+	parent = other.parent;
+	angstrom = other.angstrom;
+	fragmented = other.fragmented;
+	has_ecps = other.has_ecps;
+	fragments = other.fragments; 
+	if (natoms > 0) {
+		atoms = new Atom[natoms];
+		for (int i = 0; i < natoms; i++) atoms[i] = other.atoms[i]; 
+	}
+		
+	bfset = other.bfset;
+	ecpset = other.ecpset;
+	bnames = other.bnames;
+	enuc = other.enuc;
 }
 
 
 // Destructor
 Molecule::~Molecule()
-{
-	if(log.getNatoms()!=0 && parent){
+{ 
+	if(natoms != 0 && parent){
 		delete [] atoms;
 	}
+}
+
+Molecule& Molecule::operator=(const Molecule& other) {
+	control = other.control;
+	charge = other.charge;
+	nel = other.nel;
+	multiplicity = other.multiplicity;
+	natoms = other.natoms;
+	parent = other.parent;
+	angstrom = other.angstrom;
+	fragmented = other.fragmented;
+	has_ecps = other.has_ecps;
+	fragments = other.fragments; 
+	if (natoms > 0) {
+		atoms = new Atom[natoms];
+		for (int i = 0; i < natoms; i++) atoms[i] = other.atoms[i]; 
+	}
+		
+	bfset = other.bfset;
+	ecpset = other.ecpset;
+	bnames = other.bnames;
+	enuc = other.enuc;
+	return *this; 
 }
 
 Fragment::Fragment(ProgramController& control, Molecule& m, Atom* as, int nat, int q, int mult) : Molecule(control, q), mol(m)  {
 	init(as, nat, q, mult); 
 }
 
-Fragment::Fragment(const Fragment& other) : Molecule(other.control, other.charge, false), mol(other.mol) {
+Fragment::Fragment(const Fragment& other) : Molecule(other.control, other.charge), mol(other.mol) {
 	init(other.atoms, other.natoms, other.charge, other.multiplicity);
 }
 Fragment::~Fragment() { }
 
+Fragment& Fragment::operator=(const Fragment& other) {
+	mol = other.mol; 
+	control = other.control;
+	init(other.atoms, other.natoms, other.charge, other.multiplicity);
+	return *this;
+}
 
 // Routines
 

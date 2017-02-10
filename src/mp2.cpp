@@ -7,6 +7,7 @@
 #include "error.hpp"
 #include <iostream>
 #include <thread>
+#include "ProgramController.hpp"
 
 // Constructor
 MP2::MP2(Fock& _focker) : spinBasis(false), focker(_focker)
@@ -20,14 +21,14 @@ MP2::MP2(Fock& _focker) : spinBasis(false), focker(_focker)
 // Integral transformation
 void MP2::transformIntegrals()
 {
-	if (focker.getMolecule().getLog().direct()) {
+	if (focker.getMolecule().control.get_option<bool>("direct")) {
 		Error e("MP2TRANS", "Integral direct MP2 not implemented yet.");
-		focker.getMolecule().getLog().error(e);
+		focker.getMolecule().control.log.error(e);
 		nocc = 0;
 	} else {
 	
 		// Multithread
-		int nthreads = focker.getMolecule().getLog().getNThreads();
+		int nthreads = focker.getMolecule().control.get_option<int>("nthreads");
 
 		std::vector<Tensor4> moTemps(nthreads);
 		std::vector<std::thread> thrds(nthreads);
@@ -68,13 +69,13 @@ void MP2::transformIntegrals()
 
 void MP2::spatialToSpin() {
 	if (!spinBasis) {
-		if (focker.getMolecule().getLog().direct()) {
+		if (focker.getMolecule().control.get_option<bool>("direct")) {
 			Error e("MP2TRANS", "Integral direct CC not implemented yet.");
-			focker.getMolecule().getLog().error(e);
+			focker.getMolecule().control.log.error(e);
 			nocc = 0;
 		} else if (moInts.getW() == 0) {
 			Error e("SPINTRANS", "Integrals have not yet been transformed to the MO basis");
-			focker.getMolecule().getLog().error(e);
+			focker.getMolecule().control.log.error(e);
 			nocc = 0;
 		} else {
 			spinInts.assign(2*N, 0.0);

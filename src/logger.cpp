@@ -45,13 +45,25 @@ Logger::Logger(ProgramController& _control, std::ofstream& out, std::ostream& e)
 	nerr = 0; // No errors as of yet (hopefully)!
 
 	if (control.get_option<bool>("printeris")) { 
-		std::string intfilename = input.getIntFile();
+		std::string intfilename = control.get_option<std::string>("intfile"); 
 		intfile.open(intfilename);
 		if (!intfile.is_open()){
 			Error e1("FILEIO", "Unable to open integral file.");
 			error(e1);
 		}
 	}
+}
+
+Logger& Logger::operator=(const Logger& other) {
+	control = other.control;
+	nerr = other.nerr; 
+	if (nerr > 0) {
+		errs = new Error[nerr];
+		for (int i = 0; i < nerr; i++) errs[i] = other.errs[i]; 
+	}
+	timer = other.timer;
+	last_time = other.last_time;
+	return *this;
 }
 
 // Destructor - get rid of the atoms and errors arrays

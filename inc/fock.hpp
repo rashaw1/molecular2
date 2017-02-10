@@ -28,10 +28,10 @@
 #include "molecule.hpp"
 #include "eigen_wrapper.hpp"
 #include <vector>
-#include "ProgramController.hpp"
 
 // Forward declarations
 class Atom;
+class Command; 
 
 // Begin class definition
 class Fock

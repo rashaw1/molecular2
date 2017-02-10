@@ -26,10 +26,11 @@
 #include "eigen_wrapper.hpp"
 #include "molecule.hpp"
 #include "diis.hpp"
-#include "ProgramController.hpp"
+
 
 // Declare forward dependencies
 class IntegralEngine;
+class Command; 
 
 // Begin class
 class SCF

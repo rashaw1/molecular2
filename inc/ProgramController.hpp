@@ -17,6 +17,7 @@
 struct Option {	
 	Option() { }
 	Option(std::string& line);
+	Option(std::string _name, std::string val); 
 	Option(const Option& other); 
 	
 	std::string name; 
@@ -28,6 +29,13 @@ struct Option {
 		T convertedValue;
 		if ( ss >> convertedValue ) return convertedValue;
 		else throw std::runtime_error("conversion failed");
+	}
+	
+	template <typename T>
+	void set_value(T val) {
+		std::ostringstream os;
+		os << val; 
+		_value = os.str(); 
 	}
 	
 	void parse(std::string& line); 
@@ -45,11 +53,43 @@ public:
 	virtual void parse(std::vector<std::string>& lines);
 	
 	template <typename T>
-	T Command::getOption(std::string name) {
+	T get_option(std::string name) {
 		T value = T();
-		for (auto& op : options)
-			if (op.name == name) value = op.get_option<T>();
+		for (auto& op : options) {
+			if (op.name == name) {
+				value = op.get_value<T>();
+				break;
+			}
+		}
 		return value;  
+	}
+	
+	template <typename T>
+	void set_option(std::string name, T val) {
+		bool found = false;
+		for (auto& op : options) {
+			if (op.name == name) {
+				op.set_value<T>(val);
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			std::ostringstream os;
+			os << val; 
+			options.push_back(Option(name, os.str()));
+		} 
+	} 
+	
+	bool is_option_set(std::string name) {
+		bool found = false;
+		for (auto& op :options) {
+			if (op.name == name) {
+				found = true;
+				break;
+			}
+		}
+		return found; 
 	}
 	
 	int molecule_id; 
@@ -73,25 +113,33 @@ private:
 	std::vector<Option> global_options;
 	std::vector<Command> commands; 
 	std::vector<Construct> constructs;  
-	std::map<std::string, std::function<void(Command&)> command_list;
-	std::vector<Molecule> molecules; 
+	std::map<std::string, std::function<void(Command&, Molecule&)>> command_list;
 	
 	std::shared_ptr<Fock> focker;
 	std::shared_ptr<SCF> hf; 
 	std::shared_ptr<MP2> mp2obj; 
 	std::shared_ptr<IntegralEngine> ints; 
 	
+	bool done_hf;
+	bool done_transform; 
+	
+	void runmp2(MP2& mp2obj, SCF& hf, bool calc); 
+	
 public:
 	
 	Logger log; 
-	ProgramController() { }
 	ProgramController(std::ifstream& input, std::ofstream& output, std::ostream& err); 
+	ProgramController& operator=(const ProgramController& other);
 	
 	template <typename T>
 	T get_option(std::string name) {
 		T value = T(); 
-		for (auto& op : global_options) 
-			if (op.name == name) value = op.get_value<T>();
+		for (auto& op : global_options) {
+			if (op.name == name) {
+				value = op.get_value<T>();
+				break;
+			}
+		}
 		return value;
 	}
 	
@@ -100,24 +148,41 @@ public:
 		bool found = false;
 		for (auto& op : global_options) {
 			if (op.name == name) {
-				op._value = std::to_string(val); 
+				op.set_value<T>(val); 
 				found = true;
+				break;
 			}
 		}
-		if (!found) global_options.push_back(Option(name + "," + std::to_string(val))); 
-	}	
+		if (!found) {
+			std::ostringstream os;
+			os << val; 
+			global_options.push_back(Option(name, os.str()));
+		}
+	}
+	
+	bool is_option_set(std::string name) {
+		bool found = false;
+		for (auto& op : global_options) {
+			if (op.name == name) {
+				found = true;
+				break;
+			}
+		}
+		return found; 
+	}
 	 
 	void parse(std::ifstream& input); 
 	void run(); 
 	void cleanLine(std::string& line); 
 	
-	void call_hf(Command& c);
-	void call_rhf(Command& c);
-	void call_uhf(Command& c);
-	void call_mp2(Command& c);
-	void call_ccsd(Command& c);
-	void call_almo(Command& c);
-	void call_optg(Command& c);
+	void call_hf(Command& c, Molecule& m);
+	void call_rhf(Command& c, Molecule& m);
+	void call_uhf(Command& c, Molecule& m);
+	void call_mp2(Command& c, Molecule& m);
+	void call_ccsd(Command& c, Molecule& m);
+	void call_ralmo(Command& c, Molecule& m);
+	void call_ualmo(Command& c, Molecule& m);
+	void call_optg(Command& c, Molecule& m);
 	
 };
 
