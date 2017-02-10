@@ -1,10 +1,16 @@
-basis, 6-311gdp
+direct, true
 nthreads, 4
-maxiter, 100
-geom, angstrom
-N, 0.0, 0.0, 0.0
-O, 0.0, 0.0, 1.15
-geomend
-multiplicity, 2
-integral, direct
-hf,
+molecule = {
+	 multiplicity, 2
+	 angstrom, true
+	 geometry = {
+	 	  N, 0.0, 0.0, 0.0
+		  O, 0.0, 0.0, 1.15
+         }
+	 basis = {
+	       default, avtz
+	 }
+}
+hf (
+   maxiter, 100
+)

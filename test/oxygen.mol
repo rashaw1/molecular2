@@ -1,6 +1,10 @@
-basis, o, cc-pvdz
-geom,
-o, 0.0, 0.0, 0.0
-geomend
-multiplicity, 3
-uhf,
+molecule = {
+	 multiplicity, 3
+	 geometry = {
+	 	  o, 0.0, 0.0, 0.0
+	 }
+	 basis = {
+	       default, cc-pvdz
+	 }
+}
+uhf()

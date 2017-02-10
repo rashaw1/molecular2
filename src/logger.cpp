@@ -21,7 +21,6 @@
 #include "pbf.hpp"
 #include "error.hpp"
 #include "ioutil.hpp"
-#include "filereader.hpp"
 
 // Define static constants
 const double Logger::RTOCM = 60.19969093279;
