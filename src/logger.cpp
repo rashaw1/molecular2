@@ -42,7 +42,9 @@ Logger::Logger(ProgramController& _control, std::ofstream& out, std::ostream& e)
 	// errors.
 	errs = new Error[20];
 	nerr = 0; // No errors as of yet (hopefully)!
+}
 
+void Logger::init_intfile() {
 	if (control.get_option<bool>("printeris")) { 
 		std::string intfilename = control.get_option<std::string>("intfile"); 
 		intfile.open(intfilename);

@@ -1,3 +1,4 @@
+debug, true
 molecule = {
 	 angstrom, true	 
 	 geometry = {

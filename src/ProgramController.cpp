@@ -104,12 +104,15 @@ ProgramController::ProgramController(std::ifstream& input, std::ofstream& output
 	
 	parse(input); 
 	
+	log.init_intfile();
+	
 	if (!is_option_set("memory")) set_option<double>("memory", 100.0);
 	if (!is_option_set("nthreads")) set_option<int>("nthreads", 1);
 	if (!is_option_set("printeris")) set_option<bool>("printeris", false);
 	if (!is_option_set("direct")) set_option<bool>("direct", false);
 	if (!is_option_set("intfile")) set_option<std::string>("intfile", "eris.ints"); 
-	if (!is_option_set("thrint")) set_option<double>("thrint", 1e-12); 
+	if (!is_option_set("thrint")) set_option<double>("thrint", 1e-12);
+	if (!is_option_set("bprint")) set_option<bool>("bprint", false); 
 	
 }
 

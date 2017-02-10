@@ -103,6 +103,8 @@ public:
   // Accessors
   Logger& operator=(const Logger& other);
   
+  void init_intfile();
+  
   std::ofstream& getIntFile() { return intfile; }
   
   // Overloaded print functions
