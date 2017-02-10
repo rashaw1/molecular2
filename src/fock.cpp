@@ -966,10 +966,11 @@ Vector UnrestrictedFockFragment::buildFock(Matrix& qfq, Matrix& qfp, Matrix& pfp
 	int nbfs = end - start; 
 	
 	focka = qfp.block(start, start, nbfs, nbfs) * Sxx; 
-	focka = focka + focka.transpose() + qfq.block(start, start, nbfs, nbfs) + Sxx * pfp.block(start, start, nbfs, nbfs) * Sxx; 
 	
 	Matrix e = focka - focka.transpose(); 
 	Vector err(Eigen::Map<Vector>(e.data(), e.cols()*e.rows()));
+	
+	focka = focka + focka.transpose() + qfq.block(start, start, nbfs, nbfs) + Sxx * pfp.block(start, start, nbfs, nbfs) * Sxx; 
 	
 	if (alpha) {
 		fock_alpha_ao = focka;
@@ -986,7 +987,6 @@ Vector UnrestrictedFockFragment::buildFock(Matrix& qfq, Matrix& qfp, Matrix& pfp
 			beta_focks.push_back(fock_beta_ao);
 		}	
 	}
-	
 	return err; 
 }
 

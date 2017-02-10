@@ -1,4 +1,4 @@
-!direct, true
+direct, true
 memory, 500
 molecule = {
 	 angstrom, true
@@ -15,7 +15,7 @@ molecule = {
 		   4, 6, 0, 1
 	 }
 	 basis = {
-	       default, cc-pvdz
+	       default, cc-pvqz
 	 } 
 }
 ralmo(

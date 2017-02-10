@@ -393,6 +393,154 @@ void ALMOSCF::rperturb(bool order4)
 	
 }
 
+// Calculate the perturbative correction
+void ALMOSCF::uperturb(bool order4)
+{
+	UnrestrictedFock& ufocker = dynamic_cast<UnrestrictedFock&>(focker);
+	
+	int nbfs = ufocker.getHCore().rows(); 
+	int nalpha = ufocker.getMolecule()->nalpha();
+	int nbeta = ufocker.getMolecule()->nbeta();
+	int nvirt_alpha = nbfs - nalpha;
+	int nvirt_beta = nbfs - nbeta; 
+	
+	Matrix T_alpha = Eigen::MatrixXd::Zero(nbfs, nalpha); 
+	Matrix V_alpha = Eigen::MatrixXd::Zero(nbfs, nvirt_alpha);
+	Matrix T_beta = Eigen::MatrixXd::Zero(nbfs, nbeta); 
+	Matrix V_beta = Eigen::MatrixXd::Zero(nbfs, nvirt_beta);
+	int row_offset = 0; 
+	int occ_col_offset_alpha = 0; int virt_col_offset_alpha = 0;
+	int occ_col_offset_beta = 0; int virt_col_offset_beta = 0;
+	for (auto f : ufragments) {
+		Matrix& f_cp_alpha = f.getCPAlpha(); 
+		Matrix& f_cp_beta = f.getCPBeta(); 
+		int f_nalpha = f.getMolecule()->nalpha();
+		int f_nbeta = f.getMolecule()->nbeta();
+		int f_nbfs = f.getHCore().rows(); 
+		int f_nvirt_alpha = f_nbfs - f_nalpha; 
+		int f_nvirt_beta = f_nbfs - f_nbeta; 
+		
+		T_alpha.block(row_offset, occ_col_offset_alpha, f_nbfs, f_nalpha) = f_cp_alpha.block(0, 0, f_nbfs, f_nalpha); 
+		V_alpha.block(row_offset, virt_col_offset_alpha, f_nbfs, f_nvirt_alpha) = f_cp_alpha.block(0, f_nalpha, f_nbfs, f_nvirt_alpha);
+		T_beta.block(row_offset, occ_col_offset_beta, f_nbfs, f_nbeta) = f_cp_beta.block(0, 0, f_nbfs, f_nbeta); 
+		V_beta.block(row_offset, virt_col_offset_beta, f_nbfs, f_nvirt_beta) = f_cp_beta.block(0, f_nbeta, f_nbfs, f_nvirt_beta);
+		
+		row_offset += f_nbfs; 
+		occ_col_offset_alpha += f_nalpha; 
+		virt_col_offset_alpha += f_nvirt_alpha; 
+		occ_col_offset_beta += f_nbeta; 
+		virt_col_offset_beta += f_nvirt_beta; 
+	}
+	
+	// Form MO overlap matrix
+	Matrix& S = ufocker.getS();
+	Matrix sigma_alpha(nbfs, nbfs);
+	Matrix sigma_beta(nbfs, nbfs);
+	sigma_alpha.block(0, 0, nalpha, nalpha) = T_alpha.transpose() * S * T_alpha; 
+	sigma_alpha.block(nalpha, 0, nvirt_alpha, nalpha) = V_alpha.transpose() * S * T_alpha;
+	sigma_alpha.block(nalpha, nalpha, nvirt_alpha, nvirt_alpha) = V_alpha.transpose() * S * V_alpha;
+	sigma_beta.block(0, 0, nbeta, nbeta) = T_beta.transpose() * S * T_beta; 
+	sigma_beta.block(nbeta, 0, nvirt_beta, nbeta) = V_beta.transpose() * S * T_beta;
+	sigma_beta.block(nbeta, nbeta, nvirt_beta, nvirt_beta) = V_beta.transpose() * S * V_beta;
+	 
+	// Cholesky decompose
+	LLT llt_alpha(sigma_alpha);
+	LLT llt_beta(sigma_beta); 
+	Matrix C0_alpha = llt_alpha.matrixL();
+	C0_alpha = C0_alpha.inverse();
+	Matrix C0_beta = llt_beta.matrixL();
+	C0_beta = C0_beta.inverse();
+	
+	Matrix CMI_alpha(nbfs, nbfs);
+	CMI_alpha.block(0, 0, nbfs, nalpha) = T_alpha;
+	CMI_alpha.block(0, nalpha, nbfs, nvirt_alpha) = V_alpha;
+	C0_alpha = CMI_alpha * C0_alpha.transpose(); 
+	Matrix CMI_beta(nbfs, nbfs);
+	CMI_beta.block(0, 0, nbfs, nbeta) = T_beta;
+	CMI_beta.block(0, nbeta, nbfs, nvirt_beta) = V_beta;
+	C0_beta = CMI_beta * C0_beta.transpose(); 
+	
+	Matrix& F_alpha = ufocker.getFockAlphaAO();
+	sigma_alpha = C0_alpha.transpose() * F_alpha * C0_alpha; 
+	Matrix F0occ_alpha = sigma_alpha.block(0, 0, nalpha, nalpha);
+	Matrix F0virt_alpha = sigma_alpha.block(nalpha, nalpha, nvirt_alpha, nvirt_alpha); 
+	Matrix Fov_alpha = sigma_alpha.block(0, nalpha, nalpha, nvirt_alpha); 
+	EigenSolver es_occ_alpha(F0occ_alpha);
+	EigenSolver es_virt_alpha(F0virt_alpha);
+	T_alpha = es_occ_alpha.eigenvectors();
+	V_alpha = es_virt_alpha.eigenvectors(); 
+	Fov_alpha = T_alpha.transpose() * Fov_alpha * V_alpha; 
+	Vector eps_i_alpha = es_occ_alpha.eigenvalues(); 
+	Vector eps_a_alpha = es_virt_alpha.eigenvalues();
+	
+	Matrix& F_beta = ufocker.getFockBetaAO();
+	sigma_beta = C0_beta.transpose() * F_beta * C0_beta; 
+	Matrix F0occ_beta = sigma_beta.block(0, 0, nbeta, nbeta);
+	Matrix F0virt_beta = sigma_beta.block(nbeta, nbeta, nvirt_beta, nvirt_beta); 
+	Matrix Fov_beta = sigma_beta.block(0, nbeta, nbeta, nvirt_beta); 
+	EigenSolver es_occ_beta(F0occ_beta);
+	EigenSolver es_virt_beta(F0virt_beta);
+	T_beta = es_occ_beta.eigenvectors();
+	V_beta = es_virt_beta.eigenvectors(); 
+	Fov_beta = T_beta.transpose() * Fov_beta * V_beta; 
+	Vector eps_i_beta = es_occ_beta.eigenvalues(); 
+	Vector eps_a_beta = es_virt_beta.eigenvalues();
+	
+	if (order4) {
+		e_pert_2 = 0.0; 
+		e_pert_4 = 0.0;
+		
+		Matrix Fvo_alpha = V_alpha.transpose() * sigma_alpha.block(nalpha, 0, nvirt_alpha, nalpha) * T_alpha;
+		for (int i = 0; i < nalpha; i++) {
+			double sum1 = 0.0, sum2 = 0.0;
+			for (int a = 0; a < nvirt_alpha; a++) {
+				auto delta = eps_i_alpha(i) - eps_a_alpha(a);
+				auto val = Fov_alpha(i, a) * Fov_alpha(i, a) / delta; 
+				e_pert_2 += val;
+				sum1 += val; 
+				sum2 += val / delta;
+				
+				for (int b = 0; b < nvirt_alpha; b++) {
+					for (int j = 0; j < nalpha; j++) {
+						if (i == j) continue;
+						e_pert_4 += Fov_alpha(i, a) * Fvo_alpha(a, j) * Fov_alpha(j, b) * Fvo_alpha(b, i) / ( delta * (eps_i_alpha(i) - eps_i_alpha(j)) * (eps_i_alpha(i) - eps_a_alpha(b)) ); 
+					}
+				}
+			}
+			e_pert_4 -= sum1 * sum2; 
+		}
+		
+		Matrix Fvo_beta = V_beta.transpose() * sigma_beta.block(nbeta, 0, nvirt_beta, nbeta) * T_beta;
+		for (int i = 0; i < nbeta; i++) {
+			double sum1 = 0.0, sum2 = 0.0;
+			for (int a = 0; a < nvirt_beta; a++) {
+				auto delta = eps_i_beta(i) - eps_a_beta(a);
+				auto val = Fov_beta(i, a) * Fov_beta(i, a) / delta; 
+				e_pert_2 += val;
+				sum1 += val; 
+				sum2 += val / delta;
+				
+				for (int b = 0; b < nvirt_beta; b++) {
+					for (int j = 0; j < nbeta; j++) {
+						if (i == j) continue;
+						e_pert_4 += Fov_beta(i, a) * Fvo_beta(a, j) * Fov_beta(j, b) * Fvo_beta(b, i) / ( delta * (eps_i_beta(i) - eps_i_beta(j)) * (eps_i_beta(i) - eps_a_beta(b)) ); 
+					}
+				}
+			}
+			e_pert_4 -= sum1 * sum2; 
+		}
+	} else {
+		e_pert_2 = 0.0;
+		for (int i = 0; i < nalpha; i++)
+			for (int a = 0; a < nvirt_alpha; a++)
+				e_pert_2 += Fov_alpha(i, a) * Fov_alpha(i, a) / (eps_i_alpha(i) - eps_a_alpha(a)); 
+		for (int i = 0; i < nbeta; i++)
+			for (int a = 0; a < nvirt_beta; a++)
+				e_pert_2 += Fov_beta(i, a) * Fov_beta(i, a) / (eps_i_beta(i) - eps_a_beta(a)); 
+	}
+	
+}
+
 void ALMOSCF::rscf()
 {
 	P = Matrix::Zero(focker.getHCore().rows(), focker.getHCore().rows());
@@ -466,6 +614,19 @@ void ALMOSCF::uscf()
 		double energy = dimer_energy;
 		for (auto en : monomer_energies) energy -= en; 
 		molecule->control->log.result("ALMO Interaction Energy", energy * Logger::TOKCAL, "kcal / mol"); 
+		
+		int perturbation = cmd.get_option<int>("perturb"); 
+		if (perturbation > 0) {
+			bool fourth = perturbation == 2; 
+			uperturb(fourth); 
+			molecule->control->log.result("E(2)", e_pert_2 * Logger::TOKCAL, "kcal /mol"); 
+			
+			if (fourth)
+				molecule->control->log.result("E(4)", e_pert_4 * Logger::TOKCAL, "kcal / mol"); 
+			else
+				e_pert_4 = 0.0;
+			molecule->control->log.result("Total ALMO+CT interaction energy", (energy + e_pert_2 + e_pert_4) * Logger::TOKCAL, "kcal / mol");
+		}
 	} else {
 		molecule->control->log.result("ALMO SCF failed to converge");
 	}
