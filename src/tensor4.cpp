@@ -194,7 +194,9 @@ S8EvenTensor4::S8EvenTensor4(int _w, double val)
 S8EvenTensor4::S8EvenTensor4(const S8EvenTensor4& other)
 {
   w = other.w;
-  int size = w*(w+1)*(w+2)*(3*w+1) / 24;
+	long long size = w*(w+1)*(w+2);
+	size *= (3*w+1);
+	size /= 24; 
   data.resize(size);
   updateMults();
   for (int i = 0; i < w; i++){
@@ -211,7 +213,9 @@ S8EvenTensor4::S8EvenTensor4(const S8EvenTensor4& other)
 void S8EvenTensor4::resize(int _w)
 {
 	w = _w;
- 	int size = w*(w+1)*(w+2)*(3*w+1) / 24;
+  	long long size = w*(w+1)*(w+2);
+	size *= (3*w+1);
+	size /= 24; 
   	data.resize(size);
 	updateMults();
 }
@@ -219,7 +223,9 @@ void S8EvenTensor4::resize(int _w)
 void S8EvenTensor4::assign(int _w, double val)
 {
 	w = _w;
-  	int size = w*(w+1)*(w+2)*(3*w+1) / 24;
+  	long long size = w*(w+1)*(w+2);
+	size *= (3*w+1);
+	size /= 24; 
   	data.resize(size);
   	std::fill(data.begin(), data.end(), val);
 	updateMults();

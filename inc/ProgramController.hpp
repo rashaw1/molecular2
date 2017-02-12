@@ -183,6 +183,7 @@ public:
 	void call_ralmo(Command& c, SharedMolecule m);
 	void call_ualmo(Command& c, SharedMolecule m);
 	void call_optg(Command& c, SharedMolecule m);
+	void call_nuctest(Command& c, SharedMolecule m);
 	
 };
 

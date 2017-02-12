@@ -151,6 +151,7 @@ void SCF::rhf(bool print)
 			iter++;
 		}
 		focker.diagonalise();
+		std::cout << (focker.getIntegrals().getKinetic() * focker.getDens()).trace(); 
 	
 		if (!converged) { 
 			molecule->control->log.result("SCF failed to converge.");

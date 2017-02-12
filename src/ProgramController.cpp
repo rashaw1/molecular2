@@ -101,6 +101,7 @@ ProgramController::ProgramController(std::ifstream& input, std::ofstream& output
 	command_list["ralmo"] = std::bind(&ProgramController::call_ralmo, this, _1, _2); 
 	command_list["ualmo"] = std::bind(&ProgramController::call_ualmo, this, _1, _2); 
 	command_list["optg"] = std::bind(&ProgramController::call_optg, this, _1, _2); 
+	command_list["nuctest"] = std::bind(&ProgramController::call_nuctest, this, _1, _2);
 	
 	parse(input); 
 	
@@ -372,6 +373,145 @@ void ProgramController::call_ualmo(Command& c, SharedMolecule m) {
 void ProgramController::call_optg(Command& c, SharedMolecule m) {
 	// To be implemented
 }
+
+void ProgramController::call_nuctest(Command& c, SharedMolecule m) {
+	
+	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
+	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
+	
+	Atom& a = m->getAtom(0); 
+	int Z = a.getCharge(); 
+	double mZ = a.getMass() * 1836.15267389;
+	 
+	
+	Matrix TE = ints->getKinetic();
+	Matrix TN = ints->getKinetic() / mZ; 
+	Matrix S = ints->getOverlap(); 
+	
+	int nbfs = TE.rows();
+	int nocc = m->getNel() / 2; 
+	
+	EigenSolver es_orthog(S);
+	Matrix U = es_orthog.eigenvectors();
+	Vector lambda = es_orthog.eigenvalues();  
+	Matrix orthog = Matrix::Zero(nbfs, nbfs);
+	for (int i = 0; i < nbfs; i++)
+		orthog(i, i) = 1.0/(std::sqrt(lambda(i)));
+	orthog = U * orthog * U.transpose();
+	
+	Matrix VE = Matrix::Zero(nbfs, nbfs);
+	Matrix VE_tilde = Matrix::Zero(nbfs, nbfs);
+	Matrix VN_tilde = Matrix::Zero(nbfs, nbfs); 
+	Matrix FE_mo = orthog.transpose() * TE * orthog;
+	Matrix FE_ao = Matrix::Zero(nbfs, nbfs); 
+	Matrix FN_mo = orthog.transpose() * TN * orthog; 
+	Matrix FN_ao = Matrix::Zero(nbfs, nbfs);	
+	
+	EigenSolver es_E(FE_mo);
+	Matrix CP_E = orthog * es_E.eigenvectors();
+	Vector eps_E = es_E.eigenvalues();
+	EigenSolver es_N(FN_mo);
+	Matrix CP_N = orthog * es_N.eigenvectors();
+	Vector eps_N = es_N.eigenvalues(); 
+	
+	Matrix DE = 2.0 * CP_E.block(0, 0, nbfs, nocc) * CP_E.transpose().block(0, 0, nocc, nbfs); 
+	Matrix DN = CP_N.block(0, 0, nbfs, 1) * CP_N.transpose().block(0, 0, 1, nbfs); 
+	
+	for (int u = 0; u < nbfs; u++) {
+		for (int v = 0; v < nbfs ; v++) {
+			for (int s = 0; s < nbfs; s++) {
+				for (int l = 0; l < nbfs; l++) {
+					VE(u, v) += 0.5 * DE(l, s)* (ints->getERI(u, v, s, l) - 0.5*ints->getERI(u, l, s, v));
+					VN_tilde(u, v) -= Z * DE(l, s) * ints->getERI(u, v, s, l); 
+					VE_tilde(u, v) -= Z * DN(l, s) * ints->getERI(s, l, u, v);
+				}
+			}
+		}
+	}
+	
+	FE_ao = TE + 2.0*VE + VE_tilde; 
+	FN_ao = TN + VN_tilde; 
+	FE_mo = orthog.transpose() * FE_ao * orthog;
+	FN_mo = orthog.transpose() * FN_ao * orthog; 
+	
+	double en_elec = ((TE + VE + VE_tilde) * DE).trace(); 
+	double en_kin_nuc = (TN * DN).trace(); 
+	double energy = en_elec + en_kin_nuc; 
+	
+	int MAXITER = c.get_option<int>("maxiter");
+	double CONVERGE = c.get_option<double>("converge"); 
+	
+	int iter = 0;
+	bool converged = false; 
+	
+	log.title("Nuclear SCF test");
+	log.initIteration(); 
+	double old_energy = energy; 
+	
+	while (!converged && iter < MAXITER) {
+		
+		es_E.compute(FE_mo);
+		CP_E = orthog * es_E.eigenvectors();
+		eps_E = es_E.eigenvalues();
+		es_N.compute(FN_mo);
+		CP_N = orthog * es_N.eigenvectors();
+		eps_N = es_N.eigenvalues(); 
+	
+		DE = 2.0 * CP_E.block(0, 0, nbfs, nocc) * CP_E.transpose().block(0, 0, nocc, nbfs); 
+		DN = CP_N.block(0, 0, nbfs, 1) * CP_N.transpose().block(0, 0, 1, nbfs); 
+		
+		VE = Matrix::Zero(nbfs, nbfs);
+		VN_tilde = Matrix::Zero(nbfs, nbfs);
+		VE_tilde = Matrix::Zero(nbfs, nbfs);
+		for (int u = 0; u < nbfs; u++) {
+			for (int v = 0; v < nbfs ; v++) {
+				for (int s = 0; s < nbfs; s++) {
+					for (int l = 0; l < nbfs; l++) {
+						VE(u, v) += 0.5 * DE(l, s)* (ints->getERI(u, v, s, l) - 0.5*ints->getERI(u, l, s, v));
+						VN_tilde(u, v) -= Z * DE(l, s) * ints->getERI(u, v, s, l); 
+						VE_tilde(u, v) -= Z * DN(l, s) * ints->getERI(s, l, u, v); 
+					}
+				}
+			}
+		}
+	
+		FE_ao = TE + 2.0*VE + VE_tilde; 
+		FN_ao = TN + VN_tilde; 
+		FE_mo = orthog.transpose() * FE_ao * orthog;
+		FN_mo = orthog.transpose() * FN_ao * orthog; 
+	
+		en_elec = ((TE + VE + VE_tilde) * DE).trace(); 
+		en_kin_nuc = (TN * DN).trace(); 
+		energy = en_elec + en_kin_nuc; 
+		double delta_e = energy - old_energy; 
+		old_energy = energy; 
+		
+		std::cout << (TE * DE).trace() << std::endl;
+		
+		log.iteration(iter, energy, delta_e, en_elec);
+		converged = fabs(delta_e) < CONVERGE;
+		iter++; 
+	}
+	
+	es_E.compute(FE_mo);
+	CP_E = orthog * es_E.eigenvectors();
+	eps_E = es_E.eigenvalues();
+	es_N.compute(FN_mo);
+	CP_N = orthog * es_N.eigenvectors();
+	eps_N = es_N.eigenvalues(); 
+	
+	if (!converged)
+		log.result("Failed to converge.");
+	else {
+		log.print("\nElectronic energy (Hartree) = " + std::to_string(en_elec));
+		log.print("\nNuclear kinetic energy (Hartree) = " + std::to_string(en_kin_nuc)); 
+		log.print("\n");
+		log.orbitals(eps_E, nocc*2, false); 
+		log.result("Energy", energy, "Hartree"); 
+	}
+	
+}
+
 
 void ProgramController::runmp2(MP2& mp2obj, SCF& hf, bool calc) {
 	if (calc)

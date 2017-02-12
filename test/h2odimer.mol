@@ -21,3 +21,4 @@ molecule = {
 ralmo(
 	perturb, 2
 )
+!rhf()
