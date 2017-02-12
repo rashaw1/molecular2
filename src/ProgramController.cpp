@@ -486,8 +486,6 @@ void ProgramController::call_nuctest(Command& c, SharedMolecule m) {
 		double delta_e = energy - old_energy; 
 		old_energy = energy; 
 		
-		std::cout << (TE * DE).trace() << std::endl;
-		
 		log.iteration(iter, energy, delta_e, en_elec);
 		converged = fabs(delta_e) < CONVERGE;
 		iter++; 
@@ -507,6 +505,7 @@ void ProgramController::call_nuctest(Command& c, SharedMolecule m) {
 		log.print("\nNuclear kinetic energy (Hartree) = " + std::to_string(en_kin_nuc)); 
 		log.print("\n");
 		log.orbitals(eps_E, nocc*2, false); 
+		log.print(eps_N);
 		log.result("Energy", energy, "Hartree"); 
 	}
 	
