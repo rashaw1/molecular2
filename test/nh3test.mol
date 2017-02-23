@@ -1,4 +1,3 @@
-debug, true
 molecule = {
 	 angstrom, true	 
 	 geometry = {
@@ -16,4 +15,6 @@ nthreads, 4
 printeris, true
 intfile, test/nh3.ints
 rhf()
-mp2()
+ccsd(
+	triples, true
+)

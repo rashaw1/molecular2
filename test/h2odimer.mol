@@ -15,10 +15,10 @@ molecule = {
 		   4, 6, 0, 1
 	 }
 	 basis = {
-	       default, cc-pvqz
+	       default, avdz
 	 } 
 }
+optg()
 ralmo(
 	perturb, 2
 )
-!rhf()

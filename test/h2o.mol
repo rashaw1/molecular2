@@ -11,10 +11,11 @@ molecule = {
 	       default, cc-pvdz
 	 }
 }
-hf (
-diis,true
-converge, 1e-6
-)
-ccsd (
-     triples, true
-)
+optg ()
+!hf (
+!diis,true
+!converge, 1e-6
+!)
+!ccsd (
+!     triples, true
+!)

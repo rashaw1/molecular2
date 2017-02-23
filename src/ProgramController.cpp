@@ -371,7 +371,13 @@ void ProgramController::call_ualmo(Command& c, SharedMolecule m) {
 }
 
 void ProgramController::call_optg(Command& c, SharedMolecule m) {
-	// To be implemented
+	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true); 
+	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 8);
+	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
+	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
+	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12);
+	
+	conjugate_scf(c, m); 
 }
 
 void ProgramController::call_nuctest(Command& c, SharedMolecule m) {

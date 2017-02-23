@@ -64,13 +64,13 @@ Vector quadratic(Matrix& hessian, Vector& gradient) {
 		tval = 2 * lambda * sum / (1.0 + alpha*dqnorm*dqnorm); 
 		alpha += 2 * (0.4 * dqnorm - dqnorm*dqnorm) / tval; 
 		
-			std::cout << tval << " " << dqnorm << " " << alpha << "\n"; 
+		std::cout << tval << " " << dqnorm << " " << alpha << "\n"; 
 	}
 	if (!converged) std::cout << "Not converged\n";
 	return dq; 
 }
 
-void quadratic_scf(Command& cmd, SharedMolecule mol, Fock& blah)
+void quadratic_scf(Command& cmd, SharedMolecule mol)
 {
 	Logger& log = mol->control->log;
 	log.title("QUADRATIC GEOMETRY OPTIMIZATION"); 
@@ -114,6 +114,89 @@ void quadratic_scf(Command& cmd, SharedMolecule mol, Fock& blah)
 				mol->updateBasisPositions();
 				offset+=3; 
 			} 
+		}
+	}
+	
+	if (converged) {
+		log.print("Converged geometry:\n");
+		for (int i = 0; i <mol->getNAtoms(); i++) log.print(mol->getAtom(i));
+		log.result("HF Energy", energy, "Hartree");
+	} else {
+		log.result("Geometry optimisation failed to converge.");
+	}
+}
+
+Vector ConjugateGradient::compute(Vector& gk) {
+	Vector next_step; 
+	
+	double gk_norm = gk.norm(); 
+	grad_norms.push_back(gk_norm); 
+	
+	/*if (first) {
+		next_step = -gk; 
+		first = false;
+	} else {
+		double gk1_norm = grad_norms[grad_norms.size() - 2]; 
+		step_size = gk_norm / gk1_norm; 
+		step_size *= step_size; 
+		
+		next_step = -gk + step_size * prev_step; 
+	}*/
+
+	next_step = -gk;
+	prev_grad = gk;
+	prev_step = next_step; 
+	
+	return next_step; 
+}
+
+void conjugate_scf(Command& cmd, SharedMolecule mol) {
+	Logger& log = mol->control->log;
+	log.title("CONJUGATE GEOMETRY OPTIMIZATION"); 
+	
+	bool unrestricted = (mol->getMultiplicity() > 1) || (mol->getNel()%2 != 0);
+	
+	double grad_norm = 1.0;
+	double old_e = 0.0;
+	double energy = 0.0; 
+	int iter = 0;
+	bool converged = false;
+	int MAXITER = cmd.get_option<int>("maxiter");
+	double CONVERGE = cmd.get_option<double>("converge");
+	
+	ConjugateGradient cg_solver; 
+	
+	while (!converged && iter < MAXITER) {
+		
+		IntegralEngine ints(mol, false);
+		Fock f(cmd, ints, mol);
+		SCF hf(cmd, mol, f); 
+		if (unrestricted) hf.uhf(false);
+		else hf.rhf(false);
+		energy = hf.getEnergy();
+		
+		std::vector<Atom> atomlist; 
+		for (int i = 0; i < mol->getNAtoms(); i++) atomlist.push_back(mol->getAtom(i));
+		f.getDens() = 0.5 * f.getDens();
+		f.compute_forces(atomlist, mol->getNel()/2);
+		Matrix g = f.getForces().transpose(); 
+		Vector gradient(Eigen::Map<Vector>(g.data(), g.cols()*g.rows()));
+		
+		Vector step = cg_solver.compute(gradient); 
+		double delta_e = energy - old_e; 
+		grad_norm = cg_solver.grad_norms[cg_solver.grad_norms.size()-1]; 
+		log.iteration(iter++, energy, delta_e, grad_norm);
+		old_e = energy; 
+		
+		converged = fabs(delta_e) < CONVERGE; 
+		
+		if (!converged) {	
+			int offset = 0; 
+			for (int i = 0; i < mol->getNAtoms(); i++) {
+				mol->getAtom(i).translate(step[offset], step[offset+1], step[offset+2]);
+				offset+=3; 
+			} 
+			mol->updateBasisPositions();
 		}
 	}
 	
