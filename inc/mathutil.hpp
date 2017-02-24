@@ -26,6 +26,8 @@
 #define MATHUTILHEADERDEF
 
 #include "eigen_wrapper.hpp"
+#include "tensor4.hpp"
+#include <vector>
 
 // Functions to calculate the factorial and double factorial of an integer i
 unsigned long int fact(int i);
@@ -57,9 +59,16 @@ void formTransMat(Matrix& mat, int row, int col, int l, int m);
 Vector rmultiply(const Matrix& mat, const Vector& v);
 Vector lmultiply(const Vector& v, const Matrix& mat);
 
-Matrix build_F(Matrix& x, Matrix& y); 
+Matrix pseudo_inverse(Matrix& mat, double threshold = 1e-8); 
+
+Vector get_quat(const Matrix& x, const Matrix& y); 
+std::vector<Matrix> get_q_der(const Matrix& x, const Matrix& y); 
+Tensor4 get_R_der(const Matrix& x, const Matrix& y); 
+Tensor4 get_F_der(const Matrix& x, const Matrix& y); 
+Matrix build_F(const Matrix& x, const Matrix& y); 
 bool is_linear(const Matrix& xyz, const Matrix& x0); 
 Vector get_exp_map(const Matrix& xyz, const Matrix& x0); 
+std::vector<Matrix> get_exp_map_der(const Matrix& xyz, const Matrix& x0); 
 
 
 

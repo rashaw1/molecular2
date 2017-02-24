@@ -58,7 +58,8 @@ struct Rotator {
 	
 	std::vector<int> atoms; 
 	Matrix x0, valXYZ, derXYZ;
-	Vector stored_value, deriv, axis; 
+	std::vector<Matrix> stored_deriv;
+	Vector stored_value, axis; 
 	double norm, dot2; 
 	bool linear; 
 	
@@ -78,13 +79,23 @@ struct Rotator {
 	bool operator!=(const Rotator& other) { return !(*this == other); }
 	
 	void calcAxis(); 
+	Vector make_sub_mats(Matrix& subXYZ, Matrix& subX0, const Matrix& xyz); 
 	Vector value(const Matrix& xyz); 
-	Matrix derivative(const Matrix& xyz); 
+	std::vector<Matrix> derivative(const Matrix& xyz); 
 	
 };
 
+struct RotationXYZ {
+	int atom;
+	Matrix x0; 
+	double weight;
+	Rotator
+};
 
-class InternalCoordinates {
+
+struct InternalCoordinates {
+	
+	
 	
 };
 
