@@ -13,7 +13,7 @@ molecule = {
 		  S, 0.0, 0.0, 0.102
 	 }
 	 basis = {
-	       default, cc-pvdz
+	       default, avqz
 	 }
 }
 hf (

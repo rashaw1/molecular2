@@ -57,4 +57,11 @@ void formTransMat(Matrix& mat, int row, int col, int l, int m);
 Vector rmultiply(const Matrix& mat, const Vector& v);
 Vector lmultiply(const Vector& v, const Matrix& mat);
 
+Matrix build_F(Matrix& x, Matrix& y); 
+bool is_linear(const Matrix& xyz, const Matrix& x0); 
+Vector get_exp_map(const Matrix& xyz, const Matrix& x0); 
+
+
+
+
 #endif

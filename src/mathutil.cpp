@@ -336,4 +336,36 @@ Vector rmultiply(const Matrix& mat, const Vector& v)
   }
   return rVec;
 }
+
+// Buildl the F-matrix for constructing the rotation quaternion
+Matrix build_F(Matrix& x, Matrix& y) {
+	Matrix R = build_correlation(x, y); 
+	Matrix F = Matrix::Zero(4, 4); 
+}
+
+bool is_linear(const Matrix& xyz, const Matrix& x0) {
+	bool linear = false; 
+	
+	int natoms = xyz.rows(); 
+	
+	Vector xmean(3), ymean(3);
+	for (int i = 0; i < 3; i++) {
+		xmean[i] = xyz.col(i).sum() / ((double) natoms);
+		ymean[i] = x0.col(i).sum() / ((double) natoms); 
+	}
+	
+	Matrix x = xyz;
+	Matrix y = x0; 
+	for (int i = 0; i < natoms; i++) {
+		x.row(i) -= xmean;
+		y.row(i) -= ymean; 
+	}
+	
+	Matrix F = build_F(x, y);
+	EigenSolver es(F);
+	Vector& L = es.eigenvalues();
+	
+	if (L[0]/L[1] < 1.01 && L[0]/L[1] > 0.0) linear = true;
+	return linear;
+}
       

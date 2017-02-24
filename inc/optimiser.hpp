@@ -8,18 +8,6 @@
 #include "ProgramController.hpp"
 #include <vector>
 
-void quadratic_scf(Command& cmd, SharedMolecule mol);
-void conjugate_scf(Command& cmd, SharedMolecule mol);
-Vector quadratic(Matrix& hessian, Vector& gradient);
-
-struct ConjugateGradient {
-	std::vector<double> grad_norms;
-	Vector prev_grad, prev_step; 
-	double step_size; 
-	bool first; 
-	
-	ConjugateGradient() : first(true) {}
-	Vector compute(Vector& gk);
-};
+void optimise(Command& cmd, SharedMolecule m); 
 
 #endif
