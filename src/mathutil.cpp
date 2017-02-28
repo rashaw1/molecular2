@@ -338,6 +338,42 @@ Vector rmultiply(const Matrix& mat, const Vector& v)
   return rVec;
 }
 
+Vector cross(const Vector& v1, const Vector& v2) {
+	Eigen::Vector3d u1, u2;
+	u1[0] = v1[0]; u2[0] = v2[0];
+	u1[1] = v1[1]; u2[1] = v2[1];
+	u1[2] = v1[2]; u2[2] = v2[2];
+	return u1.cross(u2); 
+}
+
+Matrix d_cross(const Vector& v1, const Vector& v2) {
+	Matrix dc = Matrix::Zero(3, 3); 
+	for (int i = 0; i < 3; i++) {
+		Vector ei = Vector::Zero(3);
+		ei[i] = 1.0;
+		dc.row(i) = cross(ei, v2); 
+	}
+	return dc;
+}
+
+Matrix d_cross_ab(const Vector& v1, const Vector& v2, const Matrix& da, const Matrix& db) {
+	int nrow = da.rows(); 
+	Matrix dnc = Matrix::Zero(nrow, 3); 
+	for (int i = 0; i < nrow; i++)
+		dnc.row(i) = cross(v1, db.row(i)) + cross(da.row(i), v2); 
+	return dnc;
+}
+
+double ncross(const Vector& v1, const Vector& v2) {
+	return cross(v1, v2).norm(); 
+}
+
+Vector d_ncross(const Vector& v1, const Vector& v2) {
+	double nv1v2 = cross(v1, v2).norm();
+	Vector result = v1 * v2.dot(v2) - v2 * v1.dot(v2); 
+	return result / nv1v2; 
+}
+
 Matrix pseudo_inverse(Matrix& mat, double threshold) {
 	Eigen::JacobiSVD<Matrix> svd(mat, Eigen::ComputeThinU | Eigen::ComputeThinV); 
 	double tolerance = threshold * std::max(mat.cols(), mat.rows()) * svd.singularValues().array().abs()(0); 

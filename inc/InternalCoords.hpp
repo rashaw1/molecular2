@@ -7,7 +7,7 @@ enum Axis {
 	X = 0,
 	Y = 1,
 	Z = 2
-}
+};
 
 struct CartesianXYZ {
 	
@@ -86,12 +86,53 @@ struct Rotator {
 };
 
 struct RotationXYZ {
-	int atom;
-	Matrix x0; 
-	double weight;
-	Rotator
+
 };
 
+struct Distance {
+	int a, b; 
+	bool isAngular, isPeriodic; 
+	
+	Distance(int _a, int _b) : a(_a), b(_b), isAngular(false), isPeriodic(false) { }
+	
+	bool operator==(const Distance& other) { return (a == other.a && b == other.b) || (a == other.b && b == other.a); }
+	bool operator!=(const Distance& other) { return !(*this == other); }
+	
+	double value(const Matrix& xyz) {
+		Vector dv = xyz.row(a) - xyz.row(b); 
+		return dv.norm(); 
+	}
+	
+	Matrix derivative(const Matrix& xyz) {
+		Matrix derivs = Matrix::Zero(xyz.rows(), xyz.cols()); 
+		Vector dv = (xyz.row(a) - xyz.row(b)).normalized();
+		derivs.row(a) = dv;
+		derivs.row(b) = -dv; 
+		return derivs; 
+	}
+};
+
+struct Angle {
+	int a, b, c; 
+	bool isAngular, isPeriodic; 
+	
+	Angle(int _a, int _b, int _c) : a(_a), b(_b), c(_c), isAngular(true), isPeriodic(false) { }
+	
+	bool operator==(const Angle& other) { 
+		return (b == other.b) && ( (a == other.a && c == other.c) || (a == other.c && c == other.a) ); 
+	}
+	bool operator!=(const Angle& other) { return !(*this == other); }
+	
+	double value(const Matrix& xyz);
+	Vector normal_vector(const Matrix& xyz); 
+	Matrix derivative(const Matrix& xyz); 
+};
+
+struct LinearAngle {
+	int a, b, c;
+	bool isAngular, isPeriodic; 
+
+};
 
 struct InternalCoordinates {
 	

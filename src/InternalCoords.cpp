@@ -17,7 +17,7 @@ void Rotator::calcAxis() {
 		else if (theta_y < theta_x && theta_y < theta_z) e0[1] = 1.0;
 		else e0[2] = 1.0; 
 		
-		axis = vy.cross(e0).normalized(); 
+		axis = cross(vy, e0).normalized(); 
 	}
 }
 
@@ -68,15 +68,15 @@ Vector Rotator::make_sub_mats(Matrix& subXYZ, Matrix& subX0, const Matrix& xyz) 
 		dot2 *= dot2; 
 		
 		// Add dummy atom one Bohr from molecular center
-		Vector xdum = vx.cross(axis).normalized();
-		Vector ydum = vy.cross(axis).normalized();
+		Vector xdum = cross(vx, axis).normalized();
+		Vector ydum = cross(vy, axis).normalized();
 		
 		subXYZ.conservativeResize(subXYZ.rows() + 1, Eigen::NoChange); 
 		subX0.conservativeResize(subX0.rows() + 1, Eigen::NoChange); 
 		subXYZ.row(natoms) = xdum+xmean;
 		subX0.row(natoms) = ydum+ymean; 
 		
-		xdum = vx.cross(axis);
+		xdum = cross(vx, axis);
 		double dummy_norm = xdum.norm();
 		Vector dxdum = d_cross(vx, axis); 
 		Vector dnxdum = d_ncross(vx, axis); 
@@ -123,3 +123,60 @@ std::vector<Matrix> Rotator::derivative(const Matrix& xyz) {
 	return derivatives; 
 }
 
+double Angle::value(const Matrix& xyz) {
+	Vector v1 = xyz.row(a) - xyz.row(b);
+	Vector v2 = xyz.row(c) - xyz.row(b); 
+	double n1 = v1.norm();
+	double n2 = v2.norm();
+	
+	double cosx = v1.dot(v2) / (n1 * n2); 
+	double value = 0.0;
+	
+	if (cosx + 1.0 < 1e-12)
+		value = M_PI; 
+	else if (cosx - 1.0 > 1e-12)
+		value = 0.0; 
+	else
+		value = acos(cosx);  
+	
+	return value;
+}
+
+Vector Angle::normal_vector(const Matrix& xyz) {
+	Vector v1 = xyz.row(a) - xyz.row(b);
+	Vector v2 = xyz.row(c) - xyz.row(b); 
+	return cross(v1, v2).normalized(); 
+}
+
+Matrix Angle::derivative(const Matrix& xyz) {
+	Matrix derivs = Matrix::Zero(xyz.rows(), xyz.cols()); 
+	
+	Vector u = xyz.row(a) - xyz.row(b);
+	Vector v = xyz.row(c) - xyz.row(b);
+	double unorm = u.norm();
+	double vnorm = v.norm();
+	u /= unorm;
+	v /= vnorm;
+
+	double osq3 = 1.0 / sqrt(3.0); 
+	Vector v1 = {  osq3, -osq3, osq3 };
+	Vector v2 = { -osq3,  osq3, osq3 }; 
+	
+	Vector w; 
+	if ( (u+v).norm() < 1e-10 || (u-v).norm() < 1e-10) {
+		// Check if parallel
+		if ((u+v1).norm() < 1e-10 || (u-v2).norm() < 1e-10) w = cross(u, v1).normalized();
+		else w = cross(u, v2).normalized(); 
+	} else {
+		w = cross(u, v).normalized(); 
+	}
+	
+	Vector term1 = cross(u, w) / unorm; 
+	Vector term2 = cross(w, v) / vnorm; 
+	
+	derivs.row(a) = term1;
+	derivs.row(b) = term2;
+	derivs.row(c) = -(term1 + term2); 
+	
+	return derivs; 
+}

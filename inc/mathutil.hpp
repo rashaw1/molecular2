@@ -58,6 +58,11 @@ void formTransMat(Matrix& mat, int row, int col, int l, int m);
 
 Vector rmultiply(const Matrix& mat, const Vector& v);
 Vector lmultiply(const Vector& v, const Matrix& mat);
+Vector cross(const Vector& v1, const Vector& v2);
+Matrix d_cross(const Vector& v1, const Vector& v2);
+Matrix d_cross_ab(const Vector& v1, const Vector& v2, const Matrix& da, const Matrix& db); 
+double ncross(const Vector& v1, const Vector& v2);
+Vector d_ncross(const Vector& v1, const Vector& v2);
 
 Matrix pseudo_inverse(Matrix& mat, double threshold = 1e-8); 
 
