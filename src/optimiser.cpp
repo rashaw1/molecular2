@@ -5,7 +5,7 @@
 #include "integrals.hpp"
 #include <vector>
 
-void optimise(Command& cmd, SharedMolecule m) {
+void optimise(Command& cmd, SharedMolecule mol) {
 	Logger& log = mol->control->log;
 	log.title("CONJUGATE GEOMETRY OPTIMIZATION"); 
 	
@@ -64,7 +64,7 @@ void optimise(Command& cmd, SharedMolecule m) {
 		// Check coordinate system evern (N) steps
 		// Update the hessian
 		
-		double delta_e = energy - old_e; 
+/*		double delta_e = energy - old_e; 
 		grad_norm = cg_solver.grad_norms[cg_solver.grad_norms.size()-1]; 
 		log.iteration(iter++, energy, delta_e, grad_norm);
 		old_e = energy; 
@@ -78,7 +78,7 @@ void optimise(Command& cmd, SharedMolecule m) {
 				offset+=3; 
 			} 
 			mol->updateBasisPositions();
-		}
+		}*/
 	}
 	
 	if (converged) {

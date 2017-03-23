@@ -14,8 +14,6 @@
  *                    errs - an array of Error messages that have been thrown
  *                    intfile - the file to print two electron integrals to if wanted
  *              data: nerr - the number of errors accumulated
- *                    timer - a boost::timer::cpu_timer for keeping track of time elapsed, and the time
- *                            that the log was instantiated at
  *                    last_time - the last time that timer.elapsed was called
  *              fundamental constants:
  *                    M_PI - a definition of pi, in case one is not available for some reason
@@ -60,7 +58,6 @@
 #endif
 
 // Includes
-#include <boost/timer/timer.hpp>
 #include <string>
 #include <fstream>
 #include <iostream>
@@ -69,6 +66,7 @@
 #include "molecule.hpp"
 #include "eigen_wrapper.hpp"
 #include <vector>
+#include <chrono>
 
 // Declare forward dependencies
 class BF;
@@ -84,8 +82,7 @@ private:
   std::ostream& errstream;
   Error* errs;
   int nerr;
-  boost::timer::cpu_timer timer;
-  boost::timer::nanosecond_type last_time;
+  std::chrono::steady_clock::time_point last_time, first_time;
   
 public:
   // Conversion factors

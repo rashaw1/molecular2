@@ -2,7 +2,9 @@
 #define INTERNAL_COORD_HEAD
 
 #include <vector>
+#include "eigen_wrapper.hpp"
 
+/*
 enum Axis { 
 	X = 0,
 	Y = 1,
@@ -139,5 +141,5 @@ struct InternalCoordinates {
 	
 	
 };
-
+*/
 #endif

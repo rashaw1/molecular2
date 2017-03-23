@@ -2,6 +2,7 @@
 #include "mathutil.hpp"
 #include <cmath>
 
+/*
 void Rotator::calcAxis() {
 	// Assumes molecule is linear 
 	int natoms = atoms.size();
@@ -179,4 +180,4 @@ Matrix Angle::derivative(const Matrix& xyz) {
 	derivs.row(c) = -(term1 + term2); 
 	
 	return derivs; 
-}
+}*/

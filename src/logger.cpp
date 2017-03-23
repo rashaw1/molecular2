@@ -35,7 +35,8 @@ const double Logger::TOBOHR = 1.889726124565;
 Logger::Logger(ProgramController& _control, std::ofstream& out, std::ostream& e) : control(_control), outfile(out), errstream(e)
 {
 	// Timer is started on initialisation of logger.
-	last_time = 0;
+	first_time = std::chrono::steady_clock::now(); 
+	last_time = first_time;
 
 	// Initialise error array - fixed maximum of 20 errors, because any more than that and the 
 	// whole idea is pointless really! Dynamic memory seems an unecessary overhead for just storing
@@ -62,7 +63,7 @@ Logger& Logger::operator=(const Logger& other) {
 		errs = new Error[nerr];
 		for (int i = 0; i < nerr; i++) errs[i] = other.errs[i]; 
 	}
-	timer = other.timer;
+	first_time = other.first_time;
 	last_time = other.last_time;
 	return *this;
 }
@@ -569,8 +570,8 @@ void Logger::orbitals(const Vector& eps, int nel, bool one)
 // Print time elapsed since last call
 void Logger::localTime()
 {
-	boost::timer::nanosecond_type temp = timer.elapsed().wall;
-	outfile << "Time taken: " <<  ((double)(temp - last_time))/(1e9)
+	auto temp = std::chrono::steady_clock::now(); 
+	outfile << "Time taken: " <<  std::chrono::duration<double, std::deci>(temp - last_time).count()
 		<< " seconds\n";
 	last_time = temp;
 }
@@ -578,29 +579,32 @@ void Logger::localTime()
 // Print total time taken
 void Logger::globalTime()
 {
-	outfile << "Total time: " << ((double)(timer.elapsed().wall))/(1e9) 
+	auto temp = std::chrono::steady_clock::now() - first_time; 
+	outfile << "Total time: " << std::chrono::duration<double, std::deci>(temp).count()
 		<< " seconds\n";
 }
 
 // Print time at which error occured
 void Logger::errTime()
 {
-	errstream << "Error after " << ((double)(timer.elapsed().wall))/(1e9) 
+	auto temp = std::chrono::steady_clock::now() - first_time; 
+	errstream << "Error after " << std::chrono::duration<double, std::deci>(temp).count()
 		<< " seconds\n";
 }
 
 // Return the localTime/globalTime, instead of printing
 double Logger::getLocalTime() 
 {
-	boost::timer::nanosecond_type temp = timer.elapsed().wall;
-	boost::timer::nanosecond_type rval = temp - last_time;
+	auto temp = std::chrono::steady_clock::now(); 
+	auto rval = temp - last_time;
 	last_time = temp;
-	return ((double)(rval))/(1e9);
+	return std::chrono::duration<double, std::deci>(rval).count(); 
 }
 
 double Logger::getGlobalTime()
 {
-	return ((double)(timer.elapsed().wall))/(1e9);
+	auto temp = std::chrono::steady_clock::now() - first_time;
+	return std::chrono::duration<double, std::deci>(temp).count(); 
 }
 
 // Flush the output streams

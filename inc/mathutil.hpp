@@ -35,11 +35,6 @@ unsigned long int fact2(int i);
 void factArray(int i, double *values);
 void fact2Array(int i, double *values);
 
-// Boys function calculator for the evaluation of molecular integrals over
-// gaussian type basis functions. Returns a vector of F_m(x) for m in the range
-// mmax to mmin (it uses downwards recursion).
-Vector boys(double x, int mmax, int mmin = 0, double PRECISION=1e-14);
-
 // Calculates the binomial coefficient (n m)T
 unsigned long int binom(int n, int m); 
 
