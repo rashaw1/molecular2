@@ -34,7 +34,7 @@ class GaussianShell;
 * @param dfac - a vector of double factorials up to 2*lmax
 * @return a matrix S(l, l+m) of the spherical harmonic values
 */
-static TwoIndex<double> realSphericalHarmonics(int lmax, double x, double phi, std::vector<double> &fac, std::vector<double> &dfac);  
+TwoIndex<double> realSphericalHarmonics(int lmax, double x, double phi, std::vector<double> &fac, std::vector<double> &dfac);  
 
 /**
 * \ingroup MINTS
@@ -47,6 +47,10 @@ struct ShellPairData {
 	double A[3], B[3];
 	double A2, Am, B2, Bm, RAB2, RABm;
 };
+
+void G000(ECP& U, GaussianShell& shellA, GaussianShell& shellB, ShellPairData& data, ThreeIndex<double>& values);
+void G001(ECP& U, GaussianShell& shellA, GaussianShell& shellB, ShellPairData& data, ThreeIndex<double>& values);
+void G002(ECP& U, GaussianShell& shellA, GaussianShell& shellB, ShellPairData& data, ThreeIndex<double>& values);
 
 /** 
 * \ingroup MINTS

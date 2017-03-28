@@ -6,10 +6,12 @@
 #include <algorithm>
 #include <functional>
 #include <cmath>
+#include "Faddeeva.hpp"
+#include "mathutil.hpp"
 
 // Compute all the real spherical harmonics Slm(theta, phi) for l,m up to lmax
 // x = cos (theta)
-static TwoIndex<double> realSphericalHarmonics(int lmax, double x, double phi, std::vector<double> &fac, std::vector<double> &dfac){
+TwoIndex<double> realSphericalHarmonics(int lmax, double x, double phi, std::vector<double> &fac, std::vector<double> &dfac){
 	TwoIndex<double> rshValues(lmax+1, 2*lmax+1, 0.0);
 
 	if (lmax > 0) {
@@ -512,6 +514,7 @@ void RadialIntegral::buildF(GaussianShell &shell, double A, int lstart, int lend
 }
 
 void RadialIntegral::type2(int l, int l1start, int l1end, int l2start, int l2end, int N, ECP &U, GaussianShell &shellA, GaussianShell &shellB, ShellPairData &data, TwoIndex<double> &values) {
+	
 	std::function<double(double, double*, int)> intgd = integrand; 
 
 	int npA = shellA.nprimitive();
@@ -519,7 +522,7 @@ void RadialIntegral::type2(int l, int l1start, int l1end, int l2start, int l2end
 	
 	double A = data.Am;
 	double B = data.Bm;
-	
+
 	// Start with the small grid
 	// Pretabulate U
 	int gridSize = smallGrid.getN();
@@ -617,7 +620,6 @@ void RadialIntegral::type2(int l, int l1start, int l1end, int l2start, int l2end
 		}
 		
 	}
-	
 }
 
 //***************************************** ECP INTEGRAL ***********************************************
@@ -741,88 +743,197 @@ void ECPIntegral::type2(int lam, ECP& U, GaussianShell &shellA, GaussianShell &s
 	int L = LA + LB;	
 	int maxLBasis = data.maxLBasis;
 	
-	ThreeIndex<double> radials(L+1, lam + LA + 1, lam + LB + 1); 
-	TwoIndex<double> temp;
-	boost::timer::nanosecond_type start = timer.elapsed().wall;
-	for (int N = 0; N < L+1; N++) {
-		radInts.type2(lam, 0, lam + LA, 0, lam + LB, N, U, shellA, shellB, data, temp); 
-		for (int l1 = 0; l1 < lam + LA + 1; l1++)
-			for (int l2 = 0; l2 < lam + LB + 1; l2++)
-				radials(N, l1, l2) = temp(l1, l2); 
-	}
-	boost::timer::nanosecond_type end = timer.elapsed().wall;
-	time += (double)((end - start)/(1e9)); 
-	
-	std::vector<double> fac = facArray(2*(lam + maxLBasis) + 1);
-	std::vector<double> dfac = dfacArray(2*(lam + maxLBasis) + 1);
 	double Ax = data.A[0]; double Ay = data.A[1]; double Az = data.A[2];
 	double Bx = data.B[0]; double By = data.B[1]; double Bz = data.B[2];
 	double Am = data.Am; double Bm = data.Bm;
-	double xA = Am > 0 ? Az / Am : 0.0;
-	double xB = Bm > 0 ? Bz / Bm : 0.0;
-	double phiA = atan2(Ay, Ax);
-	double phiB = atan2(By, Bx);
-	TwoIndex<double> SA = realSphericalHarmonics(lam+LA, xA, phiA, fac, dfac);
-	TwoIndex<double> SB = realSphericalHarmonics(lam+LB, xB, phiB, fac, dfac);
 	
 	int z1, z2;
 	double C, val1, val2;
 	int na = 0; 
-	
-	for (int x1 = LA; x1 >= 0; x1--) {
-		for (int r1 = LA-x1; r1 >= 0; r1--) {
-			z1 = LA - x1 - r1; 
+
+	if (Am < 1e-7 && Bm < 1e-7) {
+		double prefactor = 4.0 * M_PI; 
+		int npA = shellA.nprimitive();
+		int npB = shellB.nprimitive();
+		int npC = U.getN(); 
+		
+		double zA, zB, zC, dA, dB, dC, p; 
+		int nC;
+		for (int x1 = LA; x1 >= 0; x1--) {
+			for (int r1 = LA-x1; r1 >= 0; r1--) {
+				z1 = LA - x1 - r1; 
 			
-			int nb = 0;
-			for (int x2 = LB; x2 >= 0; x2--) {
-				for (int y2 = LB - x2; y2 >= 0; y2--) {
-					z2 = LB - x2 - y2; 
+				int nb = 0;
+				for (int x2 = LB; x2 >= 0; x2--) {
+					for (int y2 = LB - x2; y2 >= 0; y2--) {
+						z2 = LB - x2 - y2; 
+						
+						for (int mu = -lam; mu <= lam; mu++) {
+						
+							double angular = prefactor * angInts.getIntegral(x1, r1, z1, lam, mu, 0, 0) * angInts.getIntegral(x2, y2, z2, lam, mu, 0, 0); 
+						
+							double value = 0.0;
+							for (int c = 0; c < npC; c++) {
+								GaussianECP& g = U.getGaussian(c);
+								if (g.l == lam) {
+									zC = g.a;
+									dC = g.d;
+									nC = g.n; 
+ 
+									for (int a = 0; a < npA; a++) {
+										zA = shellA.exp(a);
+										dA = shellA.coef(a);
+									
+										for (int b = 0; b < npB; b++) {
+											zB = shellB.exp(b);
+											dB = shellB.coef(b); 
+										
+											p = zA + zB + zC;
+										
+											double o_root_p = 1.0 / sqrt(p);
+											int N = 2 + LA + LB + nC;
+											value += 0.5*dA*dB*dC*GAMMA[N]*pow(o_root_p, N+1); 
+										}
+									}
+								}
+							}
+							values(na, nb, lam+mu) = angular * value; 
+						}
+						nb++; 
+					}
+				}
+				
+				na++;
+			}
+		}
+		
+	} else if ((Am < 1e-7 || Bm < 1e-7) && 1==0 ) { 
+		/*GaussianShell& newShellA, newShellB; 
+		ShellPairData newData; 
+		TwoIndex<double> newSA, newSB; 
+		
+		if (Am < 1e-7) {
+		newShellA = shellA;
+		newShellB = shellB;
+		newData = data;
+		newSA = SA;
+		newSB = SB;
+		} else {
+		newShellA = shellB;
+		newShellB = shellA;
+		newSA = SB;
+		newSB = SA; 
+			
+		newData.LA = LB;
+		newData.LB = LA;
+		newData.maxLBasis = data.maxLBasis;
+		newData.ncartA = data.ncartB;
+		newData.ncartB = data.ncartA;
+		newData.A = data.B;
+		newData.B = data.A;
+		newData.A2 = data.B2;
+		newData.B2 = data.A2;
+		newData.Am = Bm;
+		newData.Bm = Am;
+			
+		Am = Bm;
+		Bm = newData.Bm;
+		LA = LB;
+		LB = newData.LB; 
+		}*/
+		
+		
+	} else if (Am > 1e-7 && Bm > 1e-7 && LA+LB == 0 && lam < 3) {
+		switch(lam) {
+			case 1: {
+				G001(U, shellA, shellB, data, values);
+				break;
+			}
+			
+			case 2: {
+				G002(U, shellA, shellB, data, values);
+				break;
+			}
+			
+			default: 
+				G000(U, shellA, shellB, data, values);
+		}
+	} else {
+		
+		ThreeIndex<double> radials(L+1, lam + LA + 1, lam + LB + 1); 
+		TwoIndex<double> temp;
+		for (int N = 0; N < L+1; N++) {
+			radInts.type2(lam, 0, lam + LA, 0, lam + LB, N, U, shellA, shellB, data, temp); 
+			for (int l1 = 0; l1 < lam + LA + 1; l1++)
+				for (int l2 = 0; l2 < lam + LB + 1; l2++)
+					radials(N, l1, l2) = temp(l1, l2); 
+		}
+				
+		std::vector<double> fac = facArray(2*(lam + maxLBasis) + 1);
+		std::vector<double> dfac = dfacArray(2*(lam + maxLBasis) + 1);
+		double xA = Am > 0 ? Az / Am : 0.0;
+		double xB = Bm > 0 ? Bz / Bm : 0.0;
+		double phiA = atan2(Ay, Ax);
+		double phiB = atan2(By, Bx);
+		TwoIndex<double> SA = realSphericalHarmonics(lam+LA, xA, phiA, fac, dfac);
+		TwoIndex<double> SB = realSphericalHarmonics(lam+LB, xB, phiB, fac, dfac);
+			
+	
+		for (int x1 = LA; x1 >= 0; x1--) {
+			for (int r1 = LA-x1; r1 >= 0; r1--) {
+				z1 = LA - x1 - r1; 
+			
+				int nb = 0;
+				for (int x2 = LB; x2 >= 0; x2--) {
+					for (int y2 = LB - x2; y2 >= 0; y2--) {
+						z2 = LB - x2 - y2; 
 					
-					for (int alpha_x = 0; alpha_x <= x1; alpha_x++) {
-						for (int alpha_y = 0; alpha_y <= r1; alpha_y++) {
-							for (int alpha_z = 0; alpha_z <= z1; alpha_z++) {
-								int alpha = alpha_x + alpha_y + alpha_z; 
+						for (int alpha_x = 0; alpha_x <= x1; alpha_x++) {
+							for (int alpha_y = 0; alpha_y <= r1; alpha_y++) {
+								for (int alpha_z = 0; alpha_z <= z1; alpha_z++) {
+									int alpha = alpha_x + alpha_y + alpha_z; 
 								
-								for (int beta_x = 0; beta_x <= x2; beta_x++) {
-									for (int beta_y = 0; beta_y <= y2; beta_y++) {
-										for (int beta_z = 0; beta_z <= z2; beta_z++) {
-											int beta = beta_x + beta_y + beta_z; 
-											int N = alpha + beta; 
-											C = CA(0, na, alpha_x, alpha_y, alpha_z) * CB(0, nb, beta_x, beta_y, beta_z); 
+									for (int beta_x = 0; beta_x <= x2; beta_x++) {
+										for (int beta_y = 0; beta_y <= y2; beta_y++) {
+											for (int beta_z = 0; beta_z <= z2; beta_z++) {
+												int beta = beta_x + beta_y + beta_z; 
+												int N = alpha + beta; 
+												C = CA(0, na, alpha_x, alpha_y, alpha_z) * CB(0, nb, beta_x, beta_y, beta_z); 
 											
-											if (fabs(C) > 1e-15) {
-											for (int lam1 = 0; lam1 <= lam + alpha; lam1++) {
-												for (int lam2 = 0; lam2 <= lam + beta; lam2++) {
-													val1 = prefac * C * radials(N, lam1, lam2);
+												if (fabs(C) > 1e-15) {
+													for (int lam1 = 0; lam1 <= lam + alpha; lam1++) {
+														for (int lam2 = 0; lam2 <= lam + beta; lam2++) {
+															val1 = prefac * C * radials(N, lam1, lam2);
 													
-													for (int mu1 = -lam1; mu1 <= lam1; mu1++) {
-														for (int mu2 = -lam2; mu2 <= lam2; mu2++) {
+															for (int mu1 = -lam1; mu1 <= lam1; mu1++) {
+																for (int mu2 = -lam2; mu2 <= lam2; mu2++) {
 															
-															val2 = val1 * SA(lam1, lam1+mu1) * SB(lam2, lam2+mu2);
+																	val2 = val1 * SA(lam1, lam1+mu1) * SB(lam2, lam2+mu2);
 															
-															for (int mu = -lam; mu <= lam; mu++)
-																values(na, nb, lam+mu) += val2 * angInts.getIntegral(alpha_x, alpha_y, alpha_z, lam, mu, lam1, mu1) * angInts.getIntegral(beta_x, beta_y, beta_z, lam, mu, lam2, mu2);
+																	for (int mu = -lam; mu <= lam; mu++)
+																		values(na, nb, lam+mu) += val2 * angInts.getIntegral(alpha_x, alpha_y, alpha_z, lam, mu, lam1, mu1) * angInts.getIntegral(beta_x, beta_y, beta_z, lam, mu, lam2, mu2);
 														
+																}
+															}
 														}
 													}
 												}
-											}
-										}
 											
+											}
 										}
 									}
 								}
 							}
 						}
-					}
 					
-					nb++;
+						nb++;
+					}
 				}
-			}
 			
-			na++; 
+				na++; 
+			}
 		}
-	}
+	}		
 }
 
 void ECPIntegral::compute_shell_pair(ECP &U, GaussianShell &shellA, GaussianShell &shellB, TwoIndex<double> &values, int shiftA, int shiftB) {
@@ -885,7 +996,6 @@ Matrix ECPIntegral::compute_pair(GaussianShell &shellA, GaussianShell &shellB) {
 			for (int nb = 0; nb < shellB.ncartesian(); nb++) values(na, nb) += tempValues(na, nb);
 		} 
 	}
-	//std::cout << time << std::endl; 
 	return values;
 }
 
