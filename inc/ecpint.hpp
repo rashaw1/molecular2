@@ -19,7 +19,7 @@ REFERENCES:
 #include "ecp.hpp"
 #include "bessel.hpp"
 #include "eigen_wrapper.hpp"
-#include <boost/timer/timer.hpp>
+#include <chrono>
 
 //namespace psi {
 
@@ -51,6 +51,7 @@ struct ShellPairData {
 void G000(ECP& U, GaussianShell& shellA, GaussianShell& shellB, ShellPairData& data, ThreeIndex<double>& values);
 void G001(ECP& U, GaussianShell& shellA, GaussianShell& shellB, ShellPairData& data, ThreeIndex<double>& values);
 void G002(ECP& U, GaussianShell& shellA, GaussianShell& shellB, ShellPairData& data, ThreeIndex<double>& values);
+void G003(ECP& U, GaussianShell& shellA, GaussianShell& shellB, ShellPairData& data, ThreeIndex<double>& values);
 
 /** 
 * \ingroup MINTS
@@ -311,8 +312,7 @@ private:
 	double calcC(int a, int m, double A, std::vector<double> &fac) const;
 
 public:
-	double time; 
-	boost::timer::cpu_timer timer;
+	double time_total, time_sub; 
 	void makeC(FiveIndex<double> &C, int L, double *A, std::vector<double> &fac);
 	/// Constructor declares reference to the ECP basis
 	ECPIntegral(ECPBasis &basis, int maxLB, int maxLU, int deriv=0);
