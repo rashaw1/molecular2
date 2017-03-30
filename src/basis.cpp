@@ -210,6 +210,7 @@ Basis& Basis::operator=(const Basis& other)
   charges = other.charges;
   shells = other.shells;
   lnums = other.lnums;
+  maxl = other.maxl; 
   ecps = other.ecps;
   
   // Copy across bfs

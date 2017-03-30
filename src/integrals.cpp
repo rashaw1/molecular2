@@ -76,6 +76,7 @@ IntegralEngine::IntegralEngine(SharedMolecule m, bool print) : molecule(m)
 	naints = compute_1body_ints(shells, libint2::Operator::nuclear, atoms);
 
 	if(molecule->getBasis().hasECPS()) {
+		buildTransMat();
 		naints = naints + compute_ecp_ints(shells);
 	}
 	
@@ -264,13 +265,13 @@ void IntegralEngine::buildTransMat()
 	auto &shells = molecule->getBasis().getIntShells();
 	
 	int natoms = molecule->getNAtoms();
-	int ncart = nbasis(shells); // No. of cartesian basis functions
+	int ncar = ncart(shells); // No. of cartesian basis functions
 	int nspher = 0; // No. of spherical basis functions
 	for (int i = 0; i < natoms; i++){
 		nspher += molecule->getAtom(i).getNSpherical();
 	}
 	
-	transmat = Matrix::Zero(nspher, ncart);
+	transmat = Matrix::Zero(nspher, ncar);
 	int row = 0; int col_offset = 0; 
 	for (auto s : shells) {
 		int lam = s.contr[0].l; 
@@ -280,20 +281,20 @@ void IntegralEngine::buildTransMat()
 				break; 
 			}
 			case 1: { // l-type 
-				transmat(row++, col_offset) = 1.0;
 				transmat(row++, col_offset+1) = 1.0;
 				transmat(row++, col_offset+2) = 1.0;
+				transmat(row++, col_offset) = 1.0;
 				break; 
 			}
 			case 2: { // d-type
+				transmat(row++, col_offset + 1) = std::sqrt(3.0); 
+				transmat(row++, col_offset + 4) = std::sqrt(3.0);
 				transmat(row, col_offset) = -0.5;
 				transmat(row, col_offset + 3) = -0.5;
 				transmat(row++, col_offset + 5) = 1.0;
-				transmat(row++, col_offset + 1) = std::sqrt(3.0); 
 				transmat(row++, col_offset + 2) = std::sqrt(3.0);
 				transmat(row, col_offset) = 0.5*std::sqrt(3.0);
 				transmat(row++, col_offset + 3) = -0.5*std::sqrt(3.0); 
-				transmat(row++, col_offset + 4) = std::sqrt(3.0);
 				break;
 			}
 			case 3: { // f-type
@@ -316,6 +317,13 @@ size_t IntegralEngine::nbasis(const std::vector<libint2::Shell>& shells) {
 	size_t n = 0;
 	for (const auto& shell: shells)
 		n += shell.size();
+	return n;
+}
+
+size_t IntegralEngine::ncart(const std::vector<libint2::Shell>& shells) {
+	size_t n = 0;
+	for (const auto& shell: shells)
+		n += shell.cartesian_size();
 	return n;
 }
 
@@ -342,6 +350,19 @@ std::vector<size_t> IntegralEngine::map_shell_to_basis_function(const std::vecto
 	for (auto shell: shells) {
 		result.push_back(n);
 		n += shell.size();
+	}
+
+	return result;
+}
+
+std::vector<size_t> IntegralEngine::map_shell_to_cart_basis_function(const std::vector<libint2::Shell>& shells) {
+	std::vector<size_t> result;
+	result.reserve(shells.size());
+
+	size_t n = 0;
+	for (auto shell: shells) {
+		result.push_back(n);
+		n += shell.cartesian_size();
 	}
 
 	return result;
@@ -603,7 +624,7 @@ Matrix IntegralEngine::compute_schwarz_ints( const std::vector<libint2::Shell> &
  }
  
  Matrix IntegralEngine::compute_ecp_ints(const std::vector<libint2::Shell>& shells, int deriv_order) {
- 	const auto n = nbasis(shells);
+	const auto n = ncart(shells);
 	Matrix ecps = Matrix::Zero(n, n);
 	
 	// Initialise ecp integral engine
@@ -612,7 +633,7 @@ Matrix IntegralEngine::compute_schwarz_ints( const std::vector<libint2::Shell> &
 	molecule->control->log.localTime();
 	
 	ECPBasis& ecpset = molecule->getECPBasis();
-	auto shell2bf = map_shell_to_basis_function(shells);
+	auto shell2bf = map_shell_to_cart_basis_function(shells);
 	
 	// loop over shells
 	for(auto s1=0; s1!=shells.size(); ++s1) {
@@ -652,6 +673,6 @@ Matrix IntegralEngine::compute_schwarz_ints( const std::vector<libint2::Shell> &
 		bf1 += n1; 
 	}
 
-	return ecps;
+	return makeSpherical(ecps);
  }
  

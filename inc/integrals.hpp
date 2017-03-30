@@ -110,9 +110,11 @@ public:
 	void buildTransMat(); 
 
 	size_t nbasis(const std::vector<libint2::Shell>& shells);
+	size_t ncart(const std::vector<libint2::Shell>& shells);
 	size_t max_nprim(const std::vector<libint2::Shell>& shells);
 	int max_l(const std::vector<libint2::Shell>& shells);
 	std::vector<size_t> map_shell_to_basis_function(const std::vector<libint2::Shell>& shells);
+	std::vector<size_t> map_shell_to_cart_basis_function(const std::vector<libint2::Shell>& shells);
 	std::vector<long> map_shell_to_atom(const std::vector<Atom>& atoms, const std::vector<libint2::Shell>& shells);
   
 	shellpair_list_t compute_shellpair_list(const std::vector<libint2::Shell>& bs1, 

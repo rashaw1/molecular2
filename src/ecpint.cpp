@@ -843,7 +843,7 @@ void ECPIntegral::type2(int lam, ECP& U, GaussianShell &shellA, GaussianShell &s
 		}*/
 		
 		
-	} else if (Am > 1e-7 && Bm > 1e-7 && LA+LB == 0 && lam < 3) {
+	} else if (Am > 1e-7 && Bm > 1e-7 && LA+LB == 0 && lam < 2) {
 		switch(lam) {
 			case 1: {
 				G001(U, shellA, shellB, data, values);
