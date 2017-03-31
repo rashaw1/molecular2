@@ -404,8 +404,6 @@ void RadialIntegral::type1(int maxL, int N, int offset, ECP &U, GaussianShell &s
 	int npA = shellA.nprimitive();
 	int npB = shellB.nprimitive();
 	
-	buildParameters(shellA, shellB, data);
-	
 	int gridSize = bigGrid.getN();
 
 	// Now pretabulate integrand
@@ -829,6 +827,7 @@ void ECPIntegral::type2(int lam, ECP& U, GaussianShell &shellA, GaussianShell &s
 				G000(U, shellA, shellB, data, values);
 		}
 	} else {
+		radInts.buildParameters(shellA, shellB, data);
 		auto start_inner = std::chrono::steady_clock::now();
 		ThreeIndex<double> radials(L+1, lam + LA + 1, lam + LB + 1); 
 		TwoIndex<double> temp;
@@ -836,8 +835,9 @@ void ECPIntegral::type2(int lam, ECP& U, GaussianShell &shellA, GaussianShell &s
 			radInts.type2(lam, 0, lam + LA, 0, lam + LB, N, U, shellA, shellB, data, temp); 
 			for (int l1 = 0; l1 < lam + LA + 1; l1++)
 				for (int l2 = 0; l2 < lam + LB + 1; l2++)
-					radials(N, l1, l2) = temp(l1, l2); 
+					radials(N, l1, l2) = temp(l1, l2);
 		}
+		
 				
 		std::vector<double> fac = facArray(2*(lam + maxLBasis) + 1);
 		std::vector<double> dfac = dfacArray(2*(lam + maxLBasis) + 1);
@@ -869,7 +869,7 @@ void ECPIntegral::type2(int lam, ECP& U, GaussianShell &shellA, GaussianShell &s
 												int beta = beta_x + beta_y + beta_z; 
 												int N = alpha + beta; 
 												C = CA(0, na, alpha_x, alpha_y, alpha_z) * CB(0, nb, beta_x, beta_y, beta_z); 
-											
+												
 												if (fabs(C) > 1e-15) {
 													for (int lam1 = 0; lam1 <= lam + alpha; lam1++) {
 														for (int lam2 = 0; lam2 <= lam + beta; lam2++) {
@@ -882,7 +882,7 @@ void ECPIntegral::type2(int lam, ECP& U, GaussianShell &shellA, GaussianShell &s
 															
 																	for (int mu = -lam; mu <= lam; mu++)
 																		values(na, nb, lam+mu) += val2 * angInts.getIntegral(alpha_x, alpha_y, alpha_z, lam, mu, lam1, mu1) * angInts.getIntegral(beta_x, beta_y, beta_z, lam, mu, lam2, mu2);
-														
+																	
 																}
 															}
 														}
@@ -947,8 +947,8 @@ void ECPIntegral::compute_shell_pair(ECP &U, GaussianShell &shellA, GaussianShel
 	makeC(CB, data.LB, data.B, fac);
 	
 	// Calculate type1 integrals
-	type1(U, shellA, shellB, data, CA, CB, values);
-
+	//type1(U, shellA, shellB, data, CA, CB, values);
+	values.assign(data.ncartA, data.ncartB, 0.0);
 	// Now all the type2 integrals
 	ThreeIndex<double> t2vals(data.ncartA, data.ncartB, 2*U.getL() + 1);
 	for (int l = 0; l < U.getL(); l++) {

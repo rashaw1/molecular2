@@ -75,11 +75,12 @@ IntegralEngine::IntegralEngine(SharedMolecule m, bool print) : molecule(m)
 	tints = compute_1body_ints(shells, libint2::Operator::kinetic);
 	naints = compute_1body_ints(shells, libint2::Operator::nuclear, atoms);
 	
-	std::cout << naints + tints << std::endl << std::endl;
+	//std::cout << naints + tints << std::endl << std::endl;
 	if(molecule->getBasis().hasECPS()) {
 		buildTransMat();
 		naints = naints + compute_ecp_ints(shells);
 	}
+	//std::cout << std::endl << naints + tints << std::endl;
 	
   	if (print) {
 		molecule->control->log.print("One electron integrals complete\n");
@@ -299,22 +300,22 @@ void IntegralEngine::buildTransMat()
 				break;
 			}
 			case 3: { // f-type
-				transmat(row, col_offset+1) = 0.75*std::sqrt(2.0);
+				transmat(row, col_offset+1) = 0.75*std::sqrt(10.0);
 				transmat(row++, col_offset+6) = -0.25*std::sqrt(10.0);
-				transmat(row++, col_offset+4) = std::sqrt(3.0);
-				transmat(row, col_offset+1) = -0.25*sqrt(1.2); 
+				transmat(row++, col_offset+4) = std::sqrt(15.0);
+				transmat(row, col_offset+1) = -0.25*sqrt(6.0); 
 				transmat(row, col_offset + 6) = -0.25*sqrt(6.0);
-				transmat(row++, col_offset + 8) = std::sqrt(1.2);
-				transmat(row, col_offset+2) = -1.5/std::sqrt(5.0);
-				transmat(row, col_offset+7) = -1.5/std::sqrt(5.0);
+				transmat(row++, col_offset + 8) = std::sqrt(6.0);
+				transmat(row, col_offset+2) = -1.5;
+				transmat(row, col_offset+7) = -1.5;
 				transmat(row++, col_offset+9) = 1.0;
 				transmat(row, col_offset) = -0.25*std::sqrt(6.0);
-				transmat(row, col_offset+3) = -0.25*std::sqrt(1.2);
-				transmat(row++, col_offset+5) = std::sqrt(1.2); 
-				transmat(row, col_offset+2) = 0.5*std::sqrt(3.0);
-				transmat(row++, col_offset+7) = -0.5*std::sqrt(3.0);
+				transmat(row, col_offset+3) = -0.25*std::sqrt(6.0);
+				transmat(row++, col_offset+5) = std::sqrt(6.0); 
+				transmat(row, col_offset+2) = 0.5*std::sqrt(15.0);
+				transmat(row++, col_offset+7) = -0.5*std::sqrt(15.0);
 				transmat(row, col_offset) = 0.25 * std::sqrt(10.0);
-				transmat(row++, col_offset+3) = -0.75*std::sqrt(2.0); 
+				transmat(row++, col_offset+3) = -0.75*std::sqrt(10.0); 
 				break;
 			}
 			case 4: { // g-type
@@ -690,7 +691,7 @@ Matrix IntegralEngine::compute_schwarz_ints( const std::vector<libint2::Shell> &
 		bf1 += n1; 
 	}
 	
-	std::cout << ecps << std::endl; 
+	//std::cout << ecps << std::endl; 
 	
 	molecule->control->log.print("\nTotal ECP time: " + std::to_string(ecpint.time_total) + "\n");
 	molecule->control->log.print("\nQuad ECP time: " + std::to_string(ecpint.time_sub) + "\n");

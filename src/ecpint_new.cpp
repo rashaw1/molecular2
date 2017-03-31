@@ -281,7 +281,7 @@ void G003(ECP& U, GaussianShell& shellA, GaussianShell& shellB, ShellPairData& d
 					P1_2 = P1 * P1;
 					P2_2 = P2 * P2;
 					aAbB = zA*A2 + zB*B2; 
-					Kab = 1.0 / (zA * A * zB * B);
+					Kab = ROOT_PI / (16.0*zA * A * zB * B*root_p);
 					X1 = exp(p*P1_2 - aAbB) * Kab;
 					X2 = exp(p*P2_2 - aAbB) * Kab; 
 					
@@ -296,7 +296,9 @@ void G003(ECP& U, GaussianShell& shellA, GaussianShell& shellB, ShellPairData& d
 					double temp = p*p*p*G5 - 3.0*p*p*(bB + 2.0*p*J)*H4;
 					temp += 3.0*p*(bB*bB + 1.5*p + 5.0*p*p*J*J)*G3;
 					temp -= (bB*bB*bB + 15.0*p*p*p*J*J*J + 1.5*bB*p + 4.5*p*p*J)*H2;
-					temp /= (aA * aA * aA * root_p);
+					temp /= (aA * aA * aA);
+					
+					temp = temp < 1e-12 ? 0.0 : temp;
 					
 					radial_value += dA * dB * dC * temp; 
 				}
@@ -314,7 +316,7 @@ void G003(ECP& U, GaussianShell& shellA, GaussianShell& shellB, ShellPairData& d
 	TwoIndex<double> SA = realSphericalHarmonics(3, xA, phiA, fac, dfac);
 	TwoIndex<double> SB = realSphericalHarmonics(3, xB, phiB, fac, dfac);
 	
-	radial_value *= ROOT_PI * M_PI * M_PI;
+	radial_value *= 16.0* M_PI * M_PI;
 	values(0, 0, 0) = radial_value * SA(3, 0) * SB(3, 0);
 	values(0, 0, 1) = radial_value * SA(3, 1) * SB(3, 1);
 	values(0, 0, 2) = radial_value * SA(3, 2) * SB(3, 2); 

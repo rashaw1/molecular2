@@ -15,7 +15,7 @@ COMPILE_OPTIONS = $(OPTIM)
 HEADERS = -I./inc -I/usr/local/Cellar/eigen/3.3.1/include/eigen3 -I/usr/local/libint/2.3.0-beta.3/include -I/usr/local/libint/2.3.0-beta.3/include/libint2
 
 # Libraries for linking
-LIBS = -L/usr/local/libint/2.3.0-beta.3/lib -lboost_system -lboost_timer -lint2 -std=c++11
+LIBS = -L/usr/local/libint/2.3.0-beta.3/lib -lint2 -std=c++11
 
 # Dependency options
 DEPENDENCY_OPTIONS = -MM

@@ -8,7 +8,10 @@ molecule = {
 	       default, cc-pvdz-pp
 	 }
 	 ecp = {
-	       ag, ecp28mdf
+	      ag, ecp28mdf
 	 }
 }
 rhf()
+ccsd(
+	triples,true
+)
