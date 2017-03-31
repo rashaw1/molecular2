@@ -459,6 +459,7 @@ void CCSD::compute()
 	log.localTime();
 	
 	log.print("\nBeginning CC iterations:\n\n");
+	log.flush();
 	bool converged = false; 
 	int MAXITER = cmd.get_option<int>("maxiter");
 	double CONVERGE = cmd.get_option<double>("converge");

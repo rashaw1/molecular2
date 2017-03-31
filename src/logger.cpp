@@ -529,7 +529,7 @@ void Logger::iterationCC(int iter, double energy, double delta_e, double delta_s
 	outfile << std::setw(15) << t_iter;
 	outfile << "\n";
   
-	if (iter % 5 == 0) flush();
+	flush();
 }
 
 // Print out the orbitals from an SCF calculation

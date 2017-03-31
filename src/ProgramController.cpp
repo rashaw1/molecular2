@@ -523,6 +523,7 @@ void ProgramController::runmp2(MP2& mp2obj, SCF& hf, bool calc) {
 		log.title("MP2 CALCULATION");
 	else
 		log.title("INTEGRAL TRANSFORMATION");
+	
 	mp2obj.transformIntegrals();
 	log.print("Integral transformation complete.\n");
 	log.localTime();
