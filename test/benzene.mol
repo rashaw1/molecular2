@@ -1,6 +1,6 @@
 memory, 4000
 nthreads, 8
-direct, true
+!direct, true
 molecule = {
 	 angstrom, true
 	 geometry = {
@@ -18,8 +18,8 @@ molecule = {
    	   	  H, -2.139, 1.235, 0.000
 	 }
 	 basis = {
-	       default, sto-3g
+	       default, cc-pvdz
 	 }
 }
 hf()
-mp2()
+!mp2()

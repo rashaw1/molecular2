@@ -10,6 +10,7 @@
 #define TENSOR4HEADERDEF
 
 #include <vector>
+#include <string>
 
 class Tensor4
 {
@@ -45,6 +46,13 @@ public:
   Tensor4 operator+(const Tensor4& other) const;
   Tensor4 operator-(const Tensor4& other) const;
   Tensor4 operator*=(const double& scalar) const; 
+  
+  size_t data_size; 
+  std::string file_name; 
+  
+  virtual int writeToFile(std::string filename); 
+  virtual int readFromFile();
+  
   friend double fnorm(const Tensor4& t);
 };
 
