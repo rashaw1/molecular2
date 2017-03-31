@@ -628,6 +628,7 @@ ECPIntegral::ECPIntegral(ECPBasis &_basis, int maxLB, int maxLU, int deriv) : ba
 	angInts.compute();
 	radInts.init(2*(maxLB+deriv) + maxLU, 1e-15, 256, 1024);
 	time_total = time_sub = 0.0;
+	ntotal = nsub = 0;
 };
 
 double ECPIntegral::calcC(int a, int m, double A, std::vector<double> &fac) const {
@@ -806,6 +807,7 @@ void ECPIntegral::type2(int lam, ECP& U, GaussianShell &shellA, GaussianShell &s
 				na++;
 			}
 		}
+		nsub++; 
 	} else if (Am > 1e-7 && Bm > 1e-7 && LA+LB == 0 && lam < 4) {
 		switch(lam) {
 			case 1: {
@@ -826,6 +828,7 @@ void ECPIntegral::type2(int lam, ECP& U, GaussianShell &shellA, GaussianShell &s
 			default: 
 				G000(U, shellA, shellB, data, values);
 		}
+		nsub++;
 	} else {
 		radInts.buildParameters(shellA, shellB, data);
 		auto start_inner = std::chrono::steady_clock::now();
@@ -910,6 +913,7 @@ void ECPIntegral::type2(int lam, ECP& U, GaussianShell &shellA, GaussianShell &s
 	auto end_outer = std::chrono::steady_clock::now();
 	auto diff_outer = end_outer - start_outer;
 	time_total += std::chrono::duration<double, std::deci>(diff_outer).count()/10.0; 
+	ntotal++;
 }
 
 void ECPIntegral::compute_shell_pair(ECP &U, GaussianShell &shellA, GaussianShell &shellB, TwoIndex<double> &values, int shiftA, int shiftB) {

@@ -693,8 +693,10 @@ Matrix IntegralEngine::compute_schwarz_ints( const std::vector<libint2::Shell> &
 	
 	//std::cout << ecps << std::endl; 
 	
-	molecule->control->log.print("\nTotal ECP time: " + std::to_string(ecpint.time_total) + "\n");
-	molecule->control->log.print("\nQuad ECP time: " + std::to_string(ecpint.time_sub) + "\n");
+	molecule->control->log.print("\nTotal ECP time: " + std::to_string(ecpint.time_total));
+	molecule->control->log.print("\nQuad ECP time: " + std::to_string(ecpint.time_sub));
+	molecule->control->log.print("\nNumber of Type 2 ints: " + std::to_string(ecpint.nsub) + " / " + std::to_string(ecpint.ntotal) + "\n" );
+	
 	return makeSpherical(ecps);
  }
  

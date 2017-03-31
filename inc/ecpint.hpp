@@ -313,6 +313,7 @@ private:
 
 public:
 	double time_total, time_sub; 
+	int ntotal, nsub; 
 	void makeC(FiveIndex<double> &C, int L, double *A, std::vector<double> &fac);
 	/// Constructor declares reference to the ECP basis
 	ECPIntegral(ECPBasis &basis, int maxLB, int maxLU, int deriv=0);
