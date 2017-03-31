@@ -571,7 +571,7 @@ void Logger::orbitals(const Vector& eps, int nel, bool one)
 void Logger::localTime()
 {
 	auto temp = std::chrono::steady_clock::now(); 
-	outfile << "Time taken: " <<  std::chrono::duration<double, std::deci>(temp - last_time).count()
+	outfile << "Time taken: " <<  std::chrono::duration<double, std::deci>(temp - last_time).count()/10.0
 		<< " seconds\n";
 	last_time = temp;
 }
@@ -580,7 +580,7 @@ void Logger::localTime()
 void Logger::globalTime()
 {
 	auto temp = std::chrono::steady_clock::now() - first_time; 
-	outfile << "Total time: " << std::chrono::duration<double, std::deci>(temp).count()
+	outfile << "Total time: " << std::chrono::duration<double, std::deci>(temp).count()/10.0
 		<< " seconds\n";
 }
 
@@ -588,7 +588,7 @@ void Logger::globalTime()
 void Logger::errTime()
 {
 	auto temp = std::chrono::steady_clock::now() - first_time; 
-	errstream << "Error after " << std::chrono::duration<double, std::deci>(temp).count()
+	errstream << "Error after " << std::chrono::duration<double, std::deci>(temp).count()/10.0
 		<< " seconds\n";
 }
 
@@ -598,13 +598,13 @@ double Logger::getLocalTime()
 	auto temp = std::chrono::steady_clock::now(); 
 	auto rval = temp - last_time;
 	last_time = temp;
-	return std::chrono::duration<double, std::deci>(rval).count(); 
+	return std::chrono::duration<double, std::deci>(rval).count()/10.0; 
 }
 
 double Logger::getGlobalTime()
 {
 	auto temp = std::chrono::steady_clock::now() - first_time;
-	return std::chrono::duration<double, std::deci>(temp).count(); 
+	return std::chrono::duration<double, std::deci>(temp).count()/10.0; 
 }
 
 // Flush the output streams

@@ -12,6 +12,4 @@ molecule = {
 	 }
 }
 rhf()
-ccsd(
-	triples,true
-)
+mp2()

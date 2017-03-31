@@ -905,11 +905,11 @@ void ECPIntegral::type2(int lam, ECP& U, GaussianShell &shellA, GaussianShell &s
 		}
 		auto end_inner = std::chrono::steady_clock::now();
 		auto diff_inner = end_inner - start_inner;
-		time_sub += std::chrono::duration<double, std::deci>(diff_inner).count();
+		time_sub += std::chrono::duration<double, std::deci>(diff_inner).count()/10.0;
 	}
 	auto end_outer = std::chrono::steady_clock::now();
 	auto diff_outer = end_outer - start_outer;
-	time_total += std::chrono::duration<double, std::deci>(diff_outer).count(); 
+	time_total += std::chrono::duration<double, std::deci>(diff_outer).count()/10.0; 
 }
 
 void ECPIntegral::compute_shell_pair(ECP &U, GaussianShell &shellA, GaussianShell &shellB, TwoIndex<double> &values, int shiftA, int shiftB) {
