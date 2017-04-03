@@ -123,6 +123,8 @@ IntegralEngine::IntegralEngine(SharedMolecule m, bool print) : molecule(m)
 			printERI(molecule->control->log.getIntFile(), M);
 		}	
 	} 
+	
+	molecule->control->log.flush();
 }
 
 IntegralEngine::IntegralEngine(SharedMolecule m, const IntegralEngine& ints, int start, int finish) : molecule(m)

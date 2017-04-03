@@ -1,0 +1,22 @@
+direct, true
+molecule = {
+	 angstrom,true
+	 geometry = {
+	 	  Ag, 0.0, 1.5864, 0.0
+		  Ag, 1.3739, -0.7932, 0.0
+		  Ag, 2.6523, 1.5313, 0.0
+		  Ag, 0.0, -3.0626, 0.0
+		  Ag, -2.6523, 1.5313, 0.0
+		  Ag, -1.3739, -0.7932, 0.0
+ 	 }
+	 basis = {
+	       default, avdz-pp
+	 }
+	 ecp = {
+	      ag, ecp28mdf
+	 }
+}
+rhf()
+!ccsd (
+!     triples, true
+!)

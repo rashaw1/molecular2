@@ -137,7 +137,7 @@ void Molecule::init(Construct& c)
 				
 				geom_found = true; 
 				atoms = new Atom[natoms];
-				nel = 0; 
+				nel = -charge; 
 				
 				int i = 0;
 				for (auto& line : sc.content) {
@@ -243,7 +243,7 @@ void Fragment::init(Atom* as, int nat, int q, int mult, bool _has_ecps, const Ba
 	} else {
 		bfset = _bfset; 
 		
-		nel = 0;
+		nel = -charge;
 		for (int i = 0; i < natoms; i++) 
 			nel += atoms[i].getCharge();
 	}
