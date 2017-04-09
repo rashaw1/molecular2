@@ -159,8 +159,12 @@ void MP2::calculateEnergy()
 
 	double ediff, etemp;
 	energy = 0.0;
-	for (int i = 0; i < nocc; i++){
-		for (int j = 0; j < nocc; j++){
+	int occ_min = 0; 
+	for (int i = 0; i < nocc; i++)
+		if (eps[i] >= -1.0) { occ_min = i; break; } 
+	
+	for (int i = occ_min; i < nocc; i++){
+		for (int j = occ_min; j < nocc; j++){
 			
 			for (int a = nocc; a < N; a++){	
 				for (int b = nocc; b < N; b++){

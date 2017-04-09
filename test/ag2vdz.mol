@@ -12,6 +12,7 @@ molecule = {
 	 }
 }
 rhf()
+!mp2()
 ccsd (
-     triples, true
+     triples, false
 )

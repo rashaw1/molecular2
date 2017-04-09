@@ -12,10 +12,12 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include "mpi.h"
 #include "ProgramController.hpp"
 
 int main (int argc, char* argv[])
 {
+	MPI_Init(&argc, &argv);
 	if (argc == 1) { 
 		std::cerr << "You must provide an input file.\nUSAGE: ./molecular inputfile.mol\n";
 	} else {
@@ -47,7 +49,7 @@ int main (int argc, char* argv[])
 			err.close();
 		}
 	}
-
+	MPI_Finalize();
 	return 0;
 }
 
