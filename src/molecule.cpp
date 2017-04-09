@@ -333,6 +333,24 @@ Fragment& Fragment::operator=(const Fragment& other) {
 
 // Routines
 
+
+//Get number of core/valence electrons in molecule
+
+int Molecule::getNCore() const 
+{
+	return nel - getNValence(); 
+}
+
+int Molecule::getNValence() const
+{
+	int nvalence = -charge; 
+	
+	for (int i = 0; i < natoms; i++)
+		nvalence += getAtomValence(atoms[i].getCharge());
+	
+	return nvalence; 
+}
+
 // rotate(Matrix U) rotates the coordinate system according
 // to the transformation specified by the unitary matrix U
 // U needs to be 3x3

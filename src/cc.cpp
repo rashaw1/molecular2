@@ -10,8 +10,8 @@
 
 // Constructor
 CCSD::CCSD(Command& c, MP2& _mp2) : cmd(c), mp2(_mp2) {
-	N = 2*mp2.getN();
-	nocc = 2*mp2.getNocc();
+	N = mp2.getN();
+	nocc = mp2.getNocc(); 
 	energy = 0.0;
 	triples_energy = 0.0;
 	delta_e = 0.0;
@@ -25,67 +25,11 @@ CCSD::CCSD(Command& c, MP2& _mp2) : cmd(c), mp2(_mp2) {
 	diis.init(maxDiis, doDiis);
 }
 
-void CCSD::build_fock() {
-	// Transform hcore to MO basis
-	Matrix hcore_spatial = mp2.getFock().getCP().transpose() * mp2.getFock().getHCore() * mp2.getFock().getCP();
-	Matrix hcore = Matrix::Zero(N, N);
-	for (int p = 0; p < N; p++)
-	for (int q = p; q < N; q++) {
-		hcore(p, q) = hcore_spatial(p/2, q/2) * (p%2 == q%2);
-		hcore(q, p) = hcore(p, q);
-	}
-	
-	S8OddTensor4& spinInts = mp2.getSpinInts();
-	
-	// Assign the spin-Fock matrix
-	spinFock = Matrix::Zero(N, N);
-	// Build 
-	for (int p = 0; p < N; p++) {
-		for (int q = p; q < N; q++) {
-			spinFock(p, q) = hcore(p, q);
-			for (int m = 0; m < nocc; m++) spinFock(p, q) += spinInts(p, m, q, m);
-			spinFock(q, p) = spinFock(p, q);
-		}
-	}
-
-	// Now build denominator arrays
-	Dia.resize(nocc, N-nocc);
-	Dijab.resize(nocc, N-nocc);
-	for (int i = 0; i < nocc; i++)
-	for (int a = 0; a < N-nocc; a++) {
-		
-		Dia(i, a) = spinFock(i, i) - spinFock(a+nocc, a+nocc);
-			
-		for (int j = 0; j <= i; j++)
-			for (int b = 0; b <= a; b++)
-				Dijab.set(i, j, a, b, Dia(i, a) + spinFock(j, j) - spinFock(b+nocc, b+nocc) );  
-	}
+double divide(double a, double b){
+	return a/b;
 }
 
-void CCSD::build_guess() {
-	// Assign singles amplitudes as zero
-	singles = Matrix::Zero(nocc, N-nocc);
-	
-	// Assign and build doubles amplitudes
-	S8OddTensor4& spinInts = mp2.getSpinInts();
-	Vector& eps = mp2.getFock().getEps();
-	doubles.assign(nocc, N-nocc, 0.0);
-	for (int i = 0; i < nocc; i++) {
-		for (int j = 0; j <= i; j++) {
-			auto eocc = eps[i/2] + eps[j/2];
-			
-			for (int a = nocc; a < N; a++)
-			for (int b = nocc; b <= a; b++) {
-				auto resolvent = eocc - eps[a/2] - eps[b/2];
-				doubles.set(i, j, a-nocc, b-nocc, spinInts(i, j, a, b) / resolvent );
-			}
-			
-		}
-	}
-	
-	mp2.calculateEnergy(doubles);	
-}
-
+/*
 void CCSD::build_intermediates(Matrix& F, Tensor4& W, S4OddTensor4& tau, S4OddTensor4& tautilde) {
 	// Construct tau tensors from amplitudes	
 	for (int i = 0; i < nocc; i++)
@@ -322,10 +266,10 @@ void CCSD::build_amplitudes(Matrix& F, Tensor4& W, S4OddTensor4& tau, S4OddTenso
 	calculateError(newSingles, newDoubles);
 	singles = newSingles;
 	doubles = newDoubles;
-}
+}*/
 
 void CCSD::calculateError(Matrix& newSingles, S4OddTensor4& newDoubles) {
-	Matrix ds = newSingles - singles;
+/*	Matrix ds = newSingles - singles;
 	S4OddTensor4 dd = newDoubles -  doubles;
 	
 	delta_singles = ds.norm();
@@ -356,87 +300,40 @@ void CCSD::calculateError(Matrix& newSingles, S4OddTensor4& newDoubles) {
 		}
 		
 	}
+	*/
 }
 
-void CCSD::calculateEnergy() { 
-	double newEnergy = 0.0;
-	
-	S8OddTensor4& spinInts = mp2.getSpinInts();
-	
-	double sum1 = 0.0, sum2 = 0.0;
-	for (int i = 0; i < nocc; i++) {
-		for (int a = nocc; a < N; a++) {
-			newEnergy += spinFock(i, a) * singles(i, a-nocc);
-			
-			for (int  j = 0; j < nocc; j++) {
-				for (int b = nocc; b < N; b++) {
-					sum1 += spinInts(i, j, a, b) * doubles(i, j, a-nocc, b-nocc);
-					sum2 += spinInts(i, j, a, b) * singles(i, a-nocc) * singles(j, b-nocc);
-				}
-			}
-		}
-	}
-	newEnergy += 0.25*sum1 + 0.5*sum2; 
-	
-	delta_e = newEnergy - energy;
-	energy = newEnergy; 
-}
-
-void CCSD::calculateTriples() {
+void CCSD::calculateTriples(Integrals &V, Amplitudes &T) {
 	
 	int nvirt = N-nocc;
-	int nvirt2 = nvirt * nvirt;
+	int shapeASAS[6] = {AS,NS,NS,AS,NS,NS};
 	
-	S8OddTensor4& spinInts = mp2.getSpinInts();
-	double fijk, Dijk, tijkd, tijkc;
-	int A, B, C;
-	for (int i = 0; i < nocc; i++)
-		for (int j = 0; j <= i; j++)
-	for (int k = 0; k <= j; k++) {
-		fijk = spinFock(i, i) + spinFock(j, j) + spinFock(k, k);
-				
-		// Build Dijk and connected/disconnected tijk
-		for (int a = 0; a < nvirt; a++) {
-			A = a+nocc;
-			for (int b = 0; b <= a; b++) {
-				B = b+nocc;
-				for (int c = 0; c <= b; c++) {
-					C = c+nocc;
-					Dijk = fijk - spinFock(A, A) - spinFock(B, B) - spinFock(C, C);
-							
-					tijkd= singles(i, a) * spinInts(j, k, B, C) - singles(j, a) * spinInts(i, k, B, C)
-						- singles(k, a) * spinInts(j, i, B, C) - singles(i, b) * spinInts(j, k, A, C)
-							+ singles(j, b) * spinInts(i, k, A, C) + singles(k, b) * spinInts(j, i, A, C)
-								- singles(i, c) * spinInts(j, k, B, A) + singles(j, c) * spinInts(i, k, B, A)
-									+ singles(k, c) * spinInts(j, i, B, A);
-					tijkd /= Dijk;
-							
-					tijkc = 0.0;
-					int E;
-					for (int e = 0; e < nvirt; e++) {
-						E = e + nocc;
-						tijkc += doubles(j, k, a, e)*spinInts(E, i, B, C) - doubles(i, k, a, e)*spinInts(E, j, B, C)
-							- doubles(j, i, a, e)*spinInts(E, k, B, C) - doubles(j, k, b, e)*spinInts(E, i, A, C)
-								+ doubles(i, k, b, e)*spinInts(E, j, A, C) + doubles(j, i, b, e)*spinInts(E, k, A, C)
-									- doubles(j, k, c, e)*spinInts(E, i, B, A) + doubles(i, k, c, e)*spinInts(E, j, B, A)
-										+ doubles(j, i, c, e)*spinInts(E, k, B, A);
-					}
-					for (int m = 0; m < nocc; m++) {
-						tijkc += -doubles(i, m, b, c)*spinInts(m, A, j, k) + doubles(j, m, b, c)*spinInts(m, A, i, k)
-							+ doubles(k, m, b, c)*spinInts(m, A, j, i) + doubles(i, m, a, c)*spinInts(m, B, j, k)
-								- doubles(j, m, a, c)*spinInts(m, B, i, k) - doubles(k, m, a, c)*spinInts(m, B, j, i)
-									+ doubles(i, m, b, a)*spinInts(m, C, j, k) - doubles(j, m, b, a)*spinInts(m, C, i, k)
-										- doubles(k, m, b, a)*spinInts(m, C, j, i);
-					}
-							
-					tijkc /= Dijk;
+	int vvvooo[6] = {nvirt, nvirt, nvirt, nocc, nocc, nocc}; 
+	CTF::Tensor<> T3(6, vvvooo, shapeASAS, mp2.dw, "Tabcijk", 1); 
+	CTF::Tensor<> Z3(6, vvvooo, shapeASAS, mp2.dw, "Tabcijk", 1); 
+	
+	Z3["abcijk"]  = V["bcek"]*T["aeij"];
+	Z3["abcijk"] -= V["amij"]*T["bcmk"];
 
-					triples_energy += tijkc * Dijk * (tijkc + tijkd);
-				}
-			}
-		}			
-	}			
+	T3 = Z3;
+	
+	int sh_sym[6] = {SH, NS, NS, SH, NS, NS};
+	CTF::Tensor<> Dabcijk(6, T3.lens, sh_sym, *V.dw);
+ 
+	Dabcijk["abcijk"] += V["i"];
+	Dabcijk["abcijk"] += V["j"];
+	Dabcijk["abcijk"] += V["k"];
+	Dabcijk["abcijk"] -= V["a"];
+	Dabcijk["abcijk"] -= V["b"];
+	Dabcijk["abcijk"] -= V["c"];
 
+	CTF::Function<> fctr(&divide);
+
+	T3.contract(1.0, Z3, "abcijk", Dabcijk, "abcijk", 0.0, "abcijk", fctr);
+	
+	Z3["abcijk"] += V["abij"]*T["ck"]; 
+	
+	triples_energy = (1.0/36.0) * T3["efgmno"] * Z3["efgmno"]; 
 }
 
 void CCSD::compute()
@@ -445,274 +342,57 @@ void CCSD::compute()
 	
 	log.title("CCSD CALCULATION");
 	
-	log.print("Transforming MO integrals to spin basis\n");
-	mp2.spatialToSpin(); 
-	log.localTime();
-	
-	log.print("Building guess amplitudes and spin-basis Fock matrix\n");
-	build_guess();
-	build_fock();
-	log.localTime();
-	
-	mp2.calculateEnergy(doubles);
+	mp2.calculateEnergy();
 	log.print("MP2 Energy = " + std::to_string(mp2.getEnergy()) + "\n");
 	log.localTime();
-	
-	int rank, np; 
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &np);
-	
-	CTF::World dw;
-	{
-		S8OddTensor4& spinInts = mp2.getSpinInts();
-		int nvirt = N - nocc; 
-		Integrals V(nocc, nvirt, dw); 
-		Matrix& F = spinFock; 
-	
-		int64_t sz, *indices;
-		double *values;
-	
-		V.aa->read_local(&sz, &indices, &values);
-		for (int a = 0; a < nvirt; a++) values[a] = F(a+nocc, a+nocc); 
-		V.aa->write(sz, indices, values); 
-	
-		V.ii->read_local(&sz, &indices, &values); 
-		for (int i = 0; i < nocc; i++) values[i] = F(i, i); 
-		V.ii->write(sz, indices, values); 
-	
-		V.ab->read_local(&sz, &indices, &values);
-		int ctr = 0;  
-		for (int a = 0; a < nvirt; a++) { 
-			for (int b = 0; b < a; b++) {
-				values[ctr] = F(b+nocc, a+nocc); 
-				ctr++; 
-			}
-		}
-		V.ab->write(sz, indices, values); 
-	
-		V.ai->read_local(&sz, &indices, &values);
-		ctr = 0;  
-		for (int i = 0; i < nocc; i++) { 
-			for (int a = 0; a < nvirt; a++) {
-				values[ctr] = F(a+nocc, i); 
-				ctr++; 
-			}
-		}
-		V.ai->write(sz, indices, values); 
-	
-		V.ia->read_local(&sz, &indices, &values);
-		ctr = 0;  
-		for (int a = 0; a < nvirt; a++) { 
-			for (int i = 0; i < nocc; i++) {
-				values[ctr] = F(i, a+nocc); 
-				ctr++; 
-			}
-		}
-		V.ia->write(sz, indices, values); 
-	
-		V.ij->read_local(&sz, &indices, &values);
-		ctr = 0;  
-		for (int i = 0; i < nocc; i++) { 
-			for (int j = 0; j < i; j++) {
-				values[ctr] = F(j, i); 
-				ctr++; 
-			}
-		}
-		V.ij->write(sz, indices, values); 
-	
-		V.abcd->read_local(&sz, &indices, &values);
-		ctr = 0;
-		for (int a = nocc; a < N; a++) 
-			for (int b = nocc; b < a; b++)
-				for (int c = nocc; c < N; c++)
-					for (int d = nocc; d < c; d++) {
-						values[ctr] = spinInts(d, c, b, a);
-						ctr++; 
-					}				
-		V.abcd->write(sz, indices, values);
-	
-		V.abci->read_local(&sz, &indices, &values);
-		ctr = 0;
-		for (int i = 0; i < nocc; i++) 
-			for (int c = nocc; c < N; c++)
-				for (int b = nocc; b < N; b++)
-		for (int a = nocc; a < b; a++) {
-			values[ctr] = spinInts(a, b, c, i);
-			ctr++; 
-		}
-		V.abci->write(sz, indices, values);
-	
-		V.aibc->read_local(&sz, &indices, &values);
-		ctr = 0;
-		for (int c = nocc; c < N; c++) 
-			for (int b = nocc; b < c; b++)
-				for (int i = 0; i < nocc; i++)
-		for (int a = nocc; a < N; a++) {
-			values[ctr] = spinInts(a, i, b, c);
-			ctr++; 
-		}
-		V.aibc->write(sz, indices, values);
-	
-		V.aibj->read_local(&sz, &indices, &values);
-		ctr = 0;
-		for (int j = 0; j < nocc; j++) 
-			for (int b = nocc; b < N; b++)
-				for (int i = 0; i < nocc; i++)
-		for (int a = nocc; a < N; a++) {
-			values[ctr] = spinInts(a, i, b, j);
-			ctr++; 
-		}
-		V.aibj->write(sz, indices, values);
-	
-		V.abij->read_local(&sz, &indices, &values);
-		ctr = 0;
-		for (int j = 0; j < nocc; j++) 
-			for (int i = 0; i < j; i++)
-				for (int b = nocc; b < N; b++)
-		for (int a = nocc; a < b; a++) {
-			values[ctr] = spinInts(a, b, i, j);
-			ctr++; 
-		}
-		V.abij->write(sz, indices, values);
 			
-		V.ijab->read_local(&sz, &indices, &values);
-		ctr = 0;
-		for (int b = nocc; b < N; b++) 
-			for (int a = nocc; a < b; a++)
-				for (int j = 0; j < nocc; j++)
-		for (int i = 0; i < j; i++) {
-			values[ctr] = spinInts(i, j, a, b);
-			ctr++; 
-		}
-		V.ijab->write(sz, indices, values);	
-	
-		V.aijk->read_local(&sz, &indices, &values);
-		ctr = 0;
-		for (int k = 0; k < nocc; k++) 
-			for (int j = 0; j < k; j++)
-				for (int i = 0; i < nocc; i++)
-		for (int a = nocc; a < N; a++) {
-			values[ctr] = spinInts(a, i, j, k);
-			ctr++; 
-		}
-		V.aijk->write(sz, indices, values);
-	
-		V.ijak->read_local(&sz, &indices, &values);
-		ctr = 0;
-		for (int k = 0; k < nocc; k++) 
-			for (int a = nocc; a < N; a++)
-				for (int j = 0; j < nocc; j++)
-		for (int i = 0; i < j; i++) {
-			values[ctr] = spinInts(i, j, a, k);
-			ctr++; 
-		}
-		V.ijak->write(sz, indices, values);
-	
-		V.ijkl->read_local(&sz, &indices, &values);
-		ctr = 0;
-		for (int l = 0; l < nocc; l++) 
-			for (int k = 0; k < l; k++)
-				for (int j = 0; j < nocc; j++)
-		for (int i = 0; i < j; i++) {
-			values[ctr] = spinInts(i, j, k, l);
-			ctr++; 
-		}
-		V.ijkl->write(sz, indices, values);
-	
-		Amplitudes T(nocc, nvirt, dw); 
-		T.ai->read_local(&sz, &indices, &values); 
-		for (int i = 0; i < sz; i++) values[i] = 0.0;
-		T.ai->write(sz, indices, values); 
-	
-		T.abij->read_local(&sz, &indices, &values); 
-		ctr = 0;
-		for (int j = 0; j < nocc; j++)
-			for (int i = 0; i < j; i++)
-				for (int b = 0; b < nvirt; b++)
-					for (int a = 0; a < b; a++)
-						values[ctr++] = doubles(i, j, a, b); 
-		T.abij->write(sz, indices, values); 
+	log.print("\nBeginning CC iterations:\n\n");
+	log.flush();
+	bool converged = false; 
+	int MAXITER = cmd.get_option<int>("maxiter");
+	double CONVERGE = cmd.get_option<double>("converge");
+	iter = 1;
 		
-		double mp2energy = 0.25 * V["abij"] * T["abij"]; 
-		std::cout << mp2energy << std::endl;
-	
+	Amplitudes& T = *(mp2.getAmplitudes());
+	Integrals& V = *(mp2.getSpinInts()); 
 		
-		log.print("\nBeginning CC iterations:\n\n");
-		log.flush();
-		bool converged = false; 
-		int MAXITER = cmd.get_option<int>("maxiter");
-		double CONVERGE = cmd.get_option<double>("converge");
-		iter = 1;
-		
-		log.initIterationCC();
-		double time_tot; 
-		double new_en; 
-		double nt1 = T.ai->norm2();
-		double nt2 = T.abij->norm2();
-		double newnt1, newnt2; 
-		while (!converged && iter < MAXITER) {
-			new_ccsd(V, T, 0); 
-			new_en = V["ai"]*T["ai"] + 0.25*V["abij"]*(T["abij"] + 0.5*T["ai"]*T["bj"]); 
-			delta_e = new_en - energy;
-			energy = new_en; 
-			newnt1 = T.ai->norm2();
-			newnt2 = T.abij->norm2();
-			time_tot = log.getLocalTime();
-			delta_singles = nt1 - newnt1;
-			delta_doubles = nt2 - newnt2;
-			nt1 = newnt1;
-			nt2 = newnt2; 
-			log.iterationCC(iter, energy, delta_e, delta_singles, delta_doubles, -1, -1, time_tot); 
-			converged = (fabs(delta_e) < CONVERGE) && (fabs(delta_doubles) < CONVERGE); 
-			iter++;
-	      //  T["ai"] = (1./T.ai->norm2())*T["ai"];
-	      //  T["abij"] = (1./T.abij->norm2())*T["abij"];
-		}
-	
-		/*
-		Matrix F = Matrix::Zero(N, N);
-		Tensor4 W(N, N, N, N, 0.0);
-		S4OddTensor4 tau(nocc, N-nocc, 0.0);
-		S4OddTensor4 tautilde(nocc, N-nocc, 0.0);
-	
-		double time_interms, time_amps, time_en;
-		//log.initIterationCC();
-		while (!converged && iter < MAXITER) {
-		
-		build_intermediates(F, W, tau, tautilde);
-		time_interms = log.getLocalTime();
-		build_amplitudes(F, W, tau, tautilde);
-		if (iter == 1) doubles.print(); 
-		time_amps = log.getLocalTime();
-		calculateEnergy();
-		time_en = log.getLocalTime();
-		
-		log.iterationCC(iter, energy, delta_e, delta_singles, delta_doubles, time_interms, time_amps, time_interms+time_amps+time_en);
-		converged = (fabs(delta_e) < CONVERGE) && (fabs(delta_doubles) < CONVERGE);
+	log.initIterationCC();
+	double time_tot; 
+	double new_en; 
+	double nt1 = T.ai->norm2();
+	double nt2 = T.abij->norm2();
+	double newnt1, newnt2; 
+	while (!converged && iter < MAXITER) {
+		ccsd_iteration(V, T, 0); 
+		new_en = V["ai"]*T["ai"] + 0.25*V["abij"]*(T["abij"] + 0.5*T["ai"]*T["bj"]); 
+		delta_e = new_en - energy;
+		energy = new_en; 
+		newnt1 = T.ai->norm2();
+		newnt2 = T.abij->norm2();
+		time_tot = log.getLocalTime();
+		delta_singles = nt1 - newnt1;
+		delta_doubles = nt2 - newnt2;
+		nt1 = newnt1;
+		nt2 = newnt2; 
+		log.iterationCC(iter, energy, delta_e, delta_singles, delta_doubles, -1, -1, time_tot); 
+		converged = (fabs(delta_e) < CONVERGE) && (fabs(delta_doubles) < CONVERGE); 
 		iter++;
-		} */
-	
-	
-	
-		if (converged){
-			log.result("CCSD correlation energy", energy, "Hartree");
-			if (withTriples) {
-				log.print("Calculating triples... \n");
-				calculateTriples();
-				log.localTime();
-				log.result("(T) correction", triples_energy, "Hartree");
-				log.result("CCSD(T) correlation energy", energy + triples_energy, "Hartree");
-			}
-		} else log.result("CCSD failed to converge");
 	}
+	
+	if (converged){
+		log.result("CCSD correlation energy", energy, "Hartree");
+		if (withTriples) {
+			log.print("Calculating triples... \n");
+			calculateTriples(V, T);
+			log.localTime();
+			log.result("(T) correction", triples_energy, "Hartree");
+			log.result("CCSD(T) correlation energy", energy + triples_energy, "Hartree");
+		}
+	} else log.result("CCSD failed to converge");
 		
 }
 
-double divide(double a, double b){
-  return a/b;
-}
-
-void CCSD::new_ccsd(Integrals   &V,
+void CCSD::ccsd_iteration(Integrals   &V,
 Amplitudes  &T,
 int sched_nparts){
 	int rank;   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -792,11 +472,10 @@ int sched_nparts){
 	Dabij["abij"] -= V["a"];
 	Dabij["abij"] -= V["b"];
 
-
 	CTF::Function<> fctr(&divide);
 
 	T.ai->contract(1.0, Zai, "ai", Dai, "ai", 0.0, "ai", fctr);
-	T.abij->contract(0.5, Zabij, "abij", Dabij, "abij", 0.0, "abij", fctr);
+	T.abij->contract(1.0, Zabij, "abij", Dabij, "abij", 0.0, "abij", fctr);
 } 
 
 					

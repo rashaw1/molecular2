@@ -1,5 +1,6 @@
 memory, 500
 direct, false
+!withcore, true
 molecule = {
 	 angstrom, true
 	 geometry = {
@@ -17,6 +18,6 @@ converge, 1e-6
 )
 !mp2()
 ccsd (
-     triples, false
+     triples, true
      diis, false
 )

@@ -65,47 +65,249 @@ void MP2::transformIntegrals()
 		
 		focker.getIntegrals().clearTwoInts();
 	}
-}
-
-void MP2::spatialToSpin() {
-	if (!spinBasis) {
-		if (focker.getMolecule()->control->get_option<bool>("direct")) {
-			Error e("MP2TRANS", "Integral direct CC not implemented yet.");
-			focker.getMolecule()->control->log.error(e);
-			nocc = 0;
-		} else if (moInts.getW() == 0) {
-			Error e("SPINTRANS", "Integrals have not yet been transformed to the MO basis");
-			focker.getMolecule()->control->log.error(e);
-			nocc = 0;
-		} else {
-			spinInts.assign(2*N, 0.0);
-			for (int p = 0; p < N; p++){ 
-				for (int q = 0; q < N; q++) {
-					for (int r = 0; r < N; r++) {
-						for (int s = 0; s < N; s++) {
-							auto val1 = moInts(p, r, q, s);
-							auto val2 = moInts(p, s, q, r);
-							auto diff = val1 - val2; 
+	
+	S8OddTensor4 tempSpinInts(2*N, 0.0); 
+	
+	for (int p = 0; p < N; p++){ 
+		for (int q = 0; q < N; q++) {
+			for (int r = 0; r < N; r++) {
+				for (int s = 0; s < N; s++) {
+					auto val1 = moInts(p, r, q, s);
+					auto val2 = moInts(p, s, q, r);
+					auto diff = val1 - val2; 
 							
-							int P = 2*p; int Q = 2*q; int R = 2*r; int S = 2*s;
+					int P = 2*p; int Q = 2*q; int R = 2*r; int S = 2*s;
 							
-							spinInts.set(P, Q, R, S, diff);
-							spinInts.set(P, Q+1, R, S+1, val1);
-							spinInts.set(P, Q+1, R+1, S, -val2);
-							spinInts.set(P+1, Q, R+1, S, val1);
-							spinInts.set(P+1, Q, R, S+1, -val2);
-							spinInts.set(P+1, Q+1, R+1, S+1, diff); 
+					tempSpinInts.set(P, Q, R, S, diff);
+					tempSpinInts.set(P, Q+1, R, S+1, val1);
+					tempSpinInts.set(P, Q+1, R+1, S, -val2);
+					tempSpinInts.set(P+1, Q, R+1, S, val1);
+					tempSpinInts.set(P+1, Q, R, S+1, -val2);
+					tempSpinInts.set(P+1, Q+1, R+1, S+1, diff); 
 							
-						}
+				}
 						
-					}
+			}
+		}
+	}
+	spinBasis = true;
+	moInts.resize(0);
+	
+	N *= 2;
+	nocc *= 2;
+	int nvirt = N-nocc; 
+	int offset = 0;
+	
+	if(!focker.getMolecule()->control->get_option<bool>("withcore")) {
+		offset = nocc - focker.getMolecule()->getNValence(); 
+		nocc -= offset; 
+		N = nocc + nvirt; 
+	}
+	
+	int offnocc = nocc + offset; 
+	int offN = N + offset; 
+	
+	focker.getMolecule()->control->log.print("No. of occ. orbitals: " + std::to_string(nocc));
+	focker.getMolecule()->control->log.print("No. of virt. orbitals: " + std::to_string(nvirt)); 
+	
+	spinInts = std::make_shared<Integrals>(nocc, nvirt,  dw);
+	Integrals& V = *spinInts; 
+	
+	int64_t sz, *indices;
+	double *values;
+	int ctr;
+	
+	V.abcd->read_local(&sz, &indices, &values);
+	ctr = 0;
+	for (int a = offnocc; a < offN; a++) 
+		for (int b = offnocc; b < a; b++)
+			for (int c = offnocc; c < offN; c++)
+	for (int d = offnocc; d < c; d++) {
+		values[ctr] = tempSpinInts(d, c, b, a);
+		ctr++; 
+	}				
+	V.abcd->write(sz, indices, values);
+
+	V.abci->read_local(&sz, &indices, &values);
+	ctr = 0;
+	for (int i = offset; i < offnocc; i++) 
+		for (int c = offnocc; c < offN; c++)
+			for (int b = offnocc; b < offN; b++)
+	for (int a = offnocc; a < b; a++) {
+		values[ctr] = tempSpinInts(a, b, c, i);
+		ctr++; 
+	}
+	V.abci->write(sz, indices, values);
+
+	V.aibc->read_local(&sz, &indices, &values);
+	ctr = 0;
+	for (int c = offnocc; c < offN; c++) 
+		for (int b = offnocc; b < c; b++)
+			for (int i = offset; i < offnocc; i++)
+	for (int a = offnocc; a < offN; a++) {
+		values[ctr] = tempSpinInts(a, i, b, c);
+		ctr++; 
+	}
+	V.aibc->write(sz, indices, values);
+
+	V.aibj->read_local(&sz, &indices, &values);
+	ctr = 0;
+	for (int j = offset; j < offnocc; j++) 
+		for (int b = offnocc; b < offN; b++)
+			for (int i = offset; i < offnocc; i++)
+	for (int a = offnocc; a < offN; a++) {
+		values[ctr] = tempSpinInts(a, i, b, j);
+		ctr++; 
+	}
+	V.aibj->write(sz, indices, values);
+
+	V.abij->read_local(&sz, &indices, &values);
+	ctr = 0;
+	for (int j = offset; j < offnocc; j++) 
+		for (int i = offset; i < j; i++)
+			for (int b = offnocc; b < offN; b++)
+	for (int a = offnocc; a < b; a++) {
+		values[ctr] = tempSpinInts(a, b, i, j);
+		ctr++; 
+	}
+	V.abij->write(sz, indices, values);
+		
+	V.ijab->read_local(&sz, &indices, &values);
+	ctr = 0;
+	for (int b = offnocc; b < offN; b++) 
+		for (int a = offnocc; a < b; a++)
+			for (int j = offset; j < offnocc; j++)
+	for (int i = offset; i < j; i++) {
+		values[ctr] = tempSpinInts(i, j, a, b);
+		ctr++; 
+	}
+	V.ijab->write(sz, indices, values);	
+
+	V.aijk->read_local(&sz, &indices, &values);
+	ctr = 0;
+	for (int k = offset; k < offnocc; k++) 
+		for (int j = offset; j < k; j++)
+			for (int i = offset; i < offnocc; i++)
+	for (int a = offnocc; a < offN; a++) {
+		values[ctr] = tempSpinInts(a, i, j, k);
+		ctr++; 
+	}
+	V.aijk->write(sz, indices, values);
+
+	V.ijak->read_local(&sz, &indices, &values);
+	ctr = 0;
+	for (int k = offset; k < offnocc; k++) 
+		for (int a = offnocc; a < offN; a++)
+			for (int j = offset; j < offnocc; j++)
+	for (int i = offset; i < j; i++) {
+		values[ctr] = tempSpinInts(i, j, a, k);
+		ctr++; 
+	}
+	V.ijak->write(sz, indices, values);
+
+	V.ijkl->read_local(&sz, &indices, &values);
+	ctr = 0;
+	for (int l = offset; l < offnocc; l++) 
+		for (int k = offset; k < l; k++)
+			for (int j = offset; j < offnocc; j++)
+	for (int i = offset; i < j; i++) {
+		values[ctr] = tempSpinInts(i, j, k, l);
+		ctr++; 
+	}
+	V.ijkl->write(sz, indices, values);
+	
+	// Transform core Hamiltonian
+	Matrix hcore_spatial = focker.getCP().transpose() * focker.getHCore() * focker.getCP();
+	Matrix hcore = Matrix::Zero(N, N);
+	for (int p = 0; p < N; p++)
+	for (int q = p; q < N; q++) {
+		hcore(p, q) = hcore_spatial((p+offset)/2, (q+offset)/2) * (p%2 == q%2);
+		hcore(q, p) = hcore(p, q);
+	}
+	
+	// Assign the spin-Fock matrix
+	Matrix F = Matrix::Zero(N, N);
+	// Build 
+	for (int p = 0; p < N; p++) {
+		for (int q = p; q < N; q++) {
+			F(p, q) = hcore(p, q);
+			for (int m = 0; m < offnocc; m++) F(p, q) += tempSpinInts(p+offset, m, q+offset, m);
+			F(q, p) = F(p, q);
+		}
+	}
+	
+	V.aa->read_local(&sz, &indices, &values);
+	for (int a = 0; a < nvirt; a++) values[a] = F(a+nocc, a+nocc); 
+	V.aa->write(sz, indices, values); 
+
+	V.ii->read_local(&sz, &indices, &values); 
+	for (int i = 0; i < nocc; i++) values[i] = F(i, i); 
+	V.ii->write(sz, indices, values); 
+
+	V.ab->read_local(&sz, &indices, &values);
+	ctr = 0;  
+	for (int a = 0; a < nvirt; a++) { 
+		for (int b = 0; b < a; b++) {
+			values[ctr] = F(b+nocc, a+nocc); 
+			ctr++; 
+		}
+	}
+	V.ab->write(sz, indices, values); 
+
+	V.ai->read_local(&sz, &indices, &values);
+	ctr = 0;  
+	for (int i = 0; i < nocc; i++) { 
+		for (int a = 0; a < nvirt; a++) {
+			values[ctr] = F(a+nocc, i); 
+			ctr++; 
+		}
+	}
+	V.ai->write(sz, indices, values); 
+
+	V.ia->read_local(&sz, &indices, &values);
+	ctr = 0;  
+	for (int a = 0; a < nvirt; a++) { 
+		for (int i = 0; i < nocc; i++) {
+			values[ctr] = F(i, a+nocc); 
+			ctr++; 
+		}
+	}
+	V.ia->write(sz, indices, values); 
+
+	V.ij->read_local(&sz, &indices, &values);
+	ctr = 0;  
+	for (int i = 0; i < nocc; i++) { 
+		for (int j = 0; j < i; j++) {
+			values[ctr] = F(j, i); 
+			ctr++; 
+		}
+	}
+	V.ij->write(sz, indices, values);
+	
+	Vector& eps = focker.getEps();
+	amplitudes = std::make_shared<Amplitudes>(nocc, nvirt, dw); 
+	Amplitudes& T = *amplitudes;
+	 
+	T.ai->read_local(&sz, &indices, &values); 
+	for (int i = 0; i < sz; i++) values[i] = 0.0;
+	T.ai->write(sz, indices, values); 
+
+	T.abij->read_local(&sz, &indices, &values); 
+	ctr = 0;
+	for (int j = offset; j < offnocc; j++){
+		for (int i = offset; i < j; i++){
+			auto eocc = eps[i/2] + eps[j/2];
+			
+			for (int b = offnocc; b < offN; b++){ 
+				for (int a = offnocc; a < b; a++) {
+					auto resolvent = eocc - eps[a/2] - eps[b/2];
+					values[ctr++] = tempSpinInts(i, j, a, b) / resolvent;
 				}
 			}
-			spinBasis = true;
-			moInts.resize(0);
 		}
-	
 	}
+	T.abij->write(sz, indices, values);
+	
 }
 void MP2::transformThread(int start, int end, Tensor4& moTemp)
 {
@@ -155,37 +357,9 @@ void MP2::transformThread(int start, int end, Tensor4& moTemp)
 // Determine the MP2 energy
 void MP2::calculateEnergy()
 {
-	Vector& eps = focker.getEps();
-
-	double ediff, etemp;
-	energy = 0.0;
-	int occ_min = 0; 
-	for (int i = 0; i < nocc; i++)
-		if (eps[i] >= -1.0) { occ_min = i; break; } 
-	
-	for (int i = occ_min; i < nocc; i++){
-		for (int j = occ_min; j < nocc; j++){
-			
-			for (int a = nocc; a < N; a++){	
-				for (int b = nocc; b < N; b++){
-					ediff = eps[i] + eps[j] - eps[a] - eps[b];
-					etemp = moInts(i, a, j, b)*(2.0*moInts(a, i, b, j) - moInts(a, j, b, i));
-					
-					energy += etemp/ediff;
-				} // b
-			} // a
-		} // j
-	} // i
+	Amplitudes& T = *amplitudes;
+	Integrals& V = *spinInts; 
+	energy = 0.25 * V["abij"] * T["abij"]; 
 }
 
-void MP2::calculateEnergy(const S4OddTensor4& t) {
-	energy = 0.0;
-	
-	for (int i = 0; i < 2*nocc; i++)
-		for (int j = 0; j < 2*nocc; j++)
-			for (int a = 2*nocc; a < 2*N; a++)
-				for (int b = 2*nocc; b < 2*N; b++) energy += spinInts(i, j, a, b) * t(i, j, a-2*nocc, b-2*nocc);
-	
-	energy *= 0.25;
-}	
 					

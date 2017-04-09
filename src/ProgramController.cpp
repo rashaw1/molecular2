@@ -114,6 +114,7 @@ ProgramController::ProgramController(std::ifstream& input, std::ofstream& output
 	if (!is_option_set("intfile")) set_option<std::string>("intfile", "eris.ints"); 
 	if (!is_option_set("thrint")) set_option<double>("thrint", 1e-12);
 	if (!is_option_set("bprint")) set_option<bool>("bprint", false); 
+	if (!is_option_set("withcore")) set_option<bool>("withcore", false); 
 	
 }
 
@@ -337,7 +338,6 @@ void ProgramController::call_ccsd(Command& c, SharedMolecule m) {
 			done_transform = true;
 		}
 		
-		mp2obj->spatialToSpin();
 		CCSD ccobj(c, *mp2obj); 
 		ccobj.compute();
 		log.result("Total Energy = ", hf->getEnergy() + ccobj.getEnergy() + ccobj.getETriples(), "Hartree");

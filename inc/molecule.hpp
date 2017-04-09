@@ -99,6 +99,8 @@ public:
   int getCharge() const { return charge; }
   int getNel() const { return nel; }
   int getMultiplicity() const { return multiplicity; }
+  int getNCore() const; 
+  int getNValence() const;
   double getEnuc() const { return enuc; }
   Atom& getAtom(int i) { return atoms[i]; } // Return atom i
   BF& getBF(int q, int i) { return bfset.getBF(q, i); } // Return basis func. i of atom q

@@ -38,6 +38,21 @@ double getAtomMass(int q)
  	return masses[q-1];
 }
 
+int getAtomValence(int q) {
+	// Array of ground state valencies for Hydrogen to Meitnerium
+	int valences[109] = { 1, 2, 1, 2, 3, 4, 5, 6, 7, 8,
+		1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 
+		9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 1, 2, 3, 
+		4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 
+		18, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 
+		14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+		26, 27, 28, 29, 30, 31, 32, 1, 2, 3, 4, 5, 6, 7,
+		8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+		21, 22, 23}; 
+	return valences[q-1]; 
+}
+
+
 // Return the text version of atom with atomic number q -
 // all caps is used for ease of parsing
 // e.g., 6 -> C,   20 -> CA, etc.
