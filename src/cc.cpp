@@ -9,14 +9,19 @@
 #include <thread>
 
 // Constructor
-CCSD::CCSD(MP2& _mp2, bool _triples, bool _doDiis) : mp2(_mp2), doDiis(_doDiis),  withTriples(_triples) {
+CCSD::CCSD(Command& c, MP2& _mp2) : cmd(c), mp2(_mp2) {
 	N = 2*mp2.getN();
 	nocc = 2*mp2.getNocc();
 	energy = 0.0;
+	triples_energy = 0.0;
 	delta_e = 0.0;
 	delta_singles = 0.0;
 	delta_doubles = 0.0;
-	maxDiis = 5;
+	
+	maxDiis = cmd.get_option<int>("maxdiis");
+	doDiis = cmd.get_option<bool>("diis");
+	withTriples = cmd.get_option<bool>("triples"); 
+	
 	diis.init(maxDiis, doDiis);
 }
 
@@ -25,10 +30,10 @@ void CCSD::build_fock() {
 	Matrix hcore_spatial = mp2.getFock().getCP().transpose() * mp2.getFock().getHCore() * mp2.getFock().getCP();
 	Matrix hcore = Matrix::Zero(N, N);
 	for (int p = 0; p < N; p++)
-		for (int q = p; q < N; q++) {
-			hcore(p, q) = hcore_spatial(p/2, q/2) * (p%2 == q%2);
-			hcore(q, p) = hcore(p, q);
-		}
+	for (int q = p; q < N; q++) {
+		hcore(p, q) = hcore_spatial(p/2, q/2) * (p%2 == q%2);
+		hcore(q, p) = hcore(p, q);
+	}
 	
 	S8OddTensor4& spinInts = mp2.getSpinInts();
 	
@@ -47,14 +52,14 @@ void CCSD::build_fock() {
 	Dia.resize(nocc, N-nocc);
 	Dijab.resize(nocc, N-nocc);
 	for (int i = 0; i < nocc; i++)
-		for (int a = 0; a < N-nocc; a++) {
+	for (int a = 0; a < N-nocc; a++) {
 		
-			Dia(i, a) = spinFock(i, i) - spinFock(a+nocc, a+nocc);
+		Dia(i, a) = spinFock(i, i) - spinFock(a+nocc, a+nocc);
 			
-			for (int j = 0; j <= i; j++)
-				for (int b = 0; b <= a; b++)
-					Dijab.set(i, j, a, b, Dia(i, a) + spinFock(j, j) - spinFock(b+nocc, b+nocc) );  
-		}
+		for (int j = 0; j <= i; j++)
+			for (int b = 0; b <= a; b++)
+				Dijab.set(i, j, a, b, Dia(i, a) + spinFock(j, j) - spinFock(b+nocc, b+nocc) );  
+	}
 }
 
 void CCSD::build_guess() {
@@ -70,10 +75,10 @@ void CCSD::build_guess() {
 			auto eocc = eps[i/2] + eps[j/2];
 			
 			for (int a = nocc; a < N; a++)
-				for (int b = nocc; b <= a; b++) {
-					auto resolvent = eocc - eps[a/2] - eps[b/2];
-					doubles.set(i, j, a-nocc, b-nocc, spinInts(i, j, a, b) / resolvent );
-				}
+			for (int b = nocc; b <= a; b++) {
+				auto resolvent = eocc - eps[a/2] - eps[b/2];
+				doubles.set(i, j, a-nocc, b-nocc, spinInts(i, j, a, b) / resolvent );
+			}
 			
 		}
 	}
@@ -86,11 +91,11 @@ void CCSD::build_intermediates(Matrix& F, Tensor4& W, S4OddTensor4& tau, S4OddTe
 	for (int i = 0; i < nocc; i++)
 		for (int j = 0; j <= i; j++)
 			for (int a = 0; a < N-nocc; a++)
-				for (int b = 0; b <= a; b++) {
-					auto delta = singles(i, a) * singles(j, b) - singles(i, b) * singles(j, a);
-					tau.set(i, j, a, b, doubles(i, j, a, b) + delta );
-					tautilde.set(i, j, a, b, doubles(i, j, a, b) + 0.5*delta );
-				}
+	for (int b = 0; b <= a; b++) {
+		auto delta = singles(i, a) * singles(j, b) - singles(i, b) * singles(j, a);
+		tau.set(i, j, a, b, doubles(i, j, a, b) + delta );
+		tautilde.set(i, j, a, b, doubles(i, j, a, b) + 0.5*delta );
+	}
 					
 	S8OddTensor4& spinInts = mp2.getSpinInts();		
 	// Build F
@@ -227,20 +232,20 @@ void CCSD::build_amplitudes(Matrix& F, Tensor4& W, S4OddTensor4& tau, S4OddTenso
 			double sum =0.0;
 			for (int e = nocc; e < N; e++) sum += singles(i, e-nocc) * F(a, e);
 			for (int m = 0; m < nocc; m++){
-				 sum -= singles(m, a-nocc) * F(m, i);
-				 for (int e = nocc; e < N; e++) {
-					 sum += doubles(i, m, a-nocc, e-nocc) * F(m, e);
-					 sum -= singles(m, e-nocc) * spinInts(m, a, i, e);
+				sum -= singles(m, a-nocc) * F(m, i);
+				for (int e = nocc; e < N; e++) {
+					sum += doubles(i, m, a-nocc, e-nocc) * F(m, e);
+					sum -= singles(m, e-nocc) * spinInts(m, a, i, e);
 					 
-					 double sum2 = 0.0;
-					 for (int f = nocc; f < N; f++) sum2 += doubles(i, m, e-nocc, f-nocc) * spinInts(m, a, e, f);
-					 for (int n = 0; n < nocc; n++) sum2 += doubles(m, n, a-nocc, e-nocc) * spinInts(n, m, e, i);
-					 sum -= 0.5*sum2;
-				 }
-			 }
+					double sum2 = 0.0;
+					for (int f = nocc; f < N; f++) sum2 += doubles(i, m, e-nocc, f-nocc) * spinInts(m, a, e, f);
+					for (int n = 0; n < nocc; n++) sum2 += doubles(m, n, a-nocc, e-nocc) * spinInts(n, m, e, i);
+					sum -= 0.5*sum2;
+				}
+			}
 			 
-			 newSingles(i, a-nocc) += sum;
-			 newSingles(i, a-nocc) /= Dia(i, a-nocc);
+			newSingles(i, a-nocc) += sum;
+			newSingles(i, a-nocc) /= Dia(i, a-nocc);
 		}
 	}
 	
@@ -378,7 +383,6 @@ void CCSD::calculateEnergy() {
 }
 
 void CCSD::calculateTriples() {
-	triples_energy = 0.0; 
 	
 	int nvirt = N-nocc;
 	int nvirt2 = nvirt * nvirt;
@@ -388,56 +392,56 @@ void CCSD::calculateTriples() {
 	int A, B, C;
 	for (int i = 0; i < nocc; i++)
 		for (int j = 0; j <= i; j++)
-			for (int k = 0; k <= j; k++) {
-				fijk = spinFock(i, i) + spinFock(j, j) + spinFock(k, k);
+	for (int k = 0; k <= j; k++) {
+		fijk = spinFock(i, i) + spinFock(j, j) + spinFock(k, k);
 				
-				// Build Dijk and connected/disconnected tijk
-				for (int a = 0; a < nvirt; a++) {
-					A = a+nocc;
-					for (int b = 0; b <= a; b++) {
-						B = b+nocc;
-						for (int c = 0; c <= b; c++) {
-							C = c+nocc;
-							Dijk = fijk - spinFock(A, A) - spinFock(B, B) - spinFock(C, C);
+		// Build Dijk and connected/disconnected tijk
+		for (int a = 0; a < nvirt; a++) {
+			A = a+nocc;
+			for (int b = 0; b <= a; b++) {
+				B = b+nocc;
+				for (int c = 0; c <= b; c++) {
+					C = c+nocc;
+					Dijk = fijk - spinFock(A, A) - spinFock(B, B) - spinFock(C, C);
 							
-							tijkd= singles(i, a) * spinInts(j, k, B, C) - singles(j, a) * spinInts(i, k, B, C)
-									- singles(k, a) * spinInts(j, i, B, C) - singles(i, b) * spinInts(j, k, A, C)
-										+ singles(j, b) * spinInts(i, k, A, C) + singles(k, b) * spinInts(j, i, A, C)
-											- singles(i, c) * spinInts(j, k, B, A) + singles(j, c) * spinInts(i, k, B, A)
-												+ singles(k, c) * spinInts(j, i, B, A);
-							tijkd /= Dijk;
+					tijkd= singles(i, a) * spinInts(j, k, B, C) - singles(j, a) * spinInts(i, k, B, C)
+						- singles(k, a) * spinInts(j, i, B, C) - singles(i, b) * spinInts(j, k, A, C)
+							+ singles(j, b) * spinInts(i, k, A, C) + singles(k, b) * spinInts(j, i, A, C)
+								- singles(i, c) * spinInts(j, k, B, A) + singles(j, c) * spinInts(i, k, B, A)
+									+ singles(k, c) * spinInts(j, i, B, A);
+					tijkd /= Dijk;
 							
-							tijkc = 0.0;
-							int E;
-							for (int e = 0; e < nvirt; e++) {
-								E = e + nocc;
-								tijkc += doubles(j, k, a, e)*spinInts(E, i, B, C) - doubles(i, k, a, e)*spinInts(E, j, B, C)
-										- doubles(j, i, a, e)*spinInts(E, k, B, C) - doubles(j, k, b, e)*spinInts(E, i, A, C)
-											+ doubles(i, k, b, e)*spinInts(E, j, A, C) + doubles(j, i, b, e)*spinInts(E, k, A, C)
-												- doubles(j, k, c, e)*spinInts(E, i, B, A) + doubles(i, k, c, e)*spinInts(E, j, B, A)
-													+ doubles(j, i, c, e)*spinInts(E, k, B, A);
-							}
-							for (int m = 0; m < nocc; m++) {
-								tijkc += -doubles(i, m, b, c)*spinInts(m, A, j, k) + doubles(j, m, b, c)*spinInts(m, A, i, k)
-										+ doubles(k, m, b, c)*spinInts(m, A, j, i) + doubles(i, m, a, c)*spinInts(m, B, j, k)
-											- doubles(j, m, a, c)*spinInts(m, B, i, k) - doubles(k, m, a, c)*spinInts(m, B, j, i)
-												+ doubles(i, m, b, a)*spinInts(m, C, j, k) - doubles(j, m, b, a)*spinInts(m, C, i, k)
-													- doubles(k, m, b, a)*spinInts(m, C, j, i);
-							}
-							
-							tijkc /= Dijk;
-
-							triples_energy += tijkc * Dijk * (tijkc + tijkd);
-						}
+					tijkc = 0.0;
+					int E;
+					for (int e = 0; e < nvirt; e++) {
+						E = e + nocc;
+						tijkc += doubles(j, k, a, e)*spinInts(E, i, B, C) - doubles(i, k, a, e)*spinInts(E, j, B, C)
+							- doubles(j, i, a, e)*spinInts(E, k, B, C) - doubles(j, k, b, e)*spinInts(E, i, A, C)
+								+ doubles(i, k, b, e)*spinInts(E, j, A, C) + doubles(j, i, b, e)*spinInts(E, k, A, C)
+									- doubles(j, k, c, e)*spinInts(E, i, B, A) + doubles(i, k, c, e)*spinInts(E, j, B, A)
+										+ doubles(j, i, c, e)*spinInts(E, k, B, A);
 					}
-				}			
-			}			
+					for (int m = 0; m < nocc; m++) {
+						tijkc += -doubles(i, m, b, c)*spinInts(m, A, j, k) + doubles(j, m, b, c)*spinInts(m, A, i, k)
+							+ doubles(k, m, b, c)*spinInts(m, A, j, i) + doubles(i, m, a, c)*spinInts(m, B, j, k)
+								- doubles(j, m, a, c)*spinInts(m, B, i, k) - doubles(k, m, a, c)*spinInts(m, B, j, i)
+									+ doubles(i, m, b, a)*spinInts(m, C, j, k) - doubles(j, m, b, a)*spinInts(m, C, i, k)
+										- doubles(k, m, b, a)*spinInts(m, C, j, i);
+					}
+							
+					tijkc /= Dijk;
+
+					triples_energy += tijkc * Dijk * (tijkc + tijkd);
+				}
+			}
+		}			
+	}			
 
 }
 
 void CCSD::compute()
 {
-	Logger& log = mp2.getFock().getMolecule().getLog();
+	Logger& log = mp2.getFock().getMolecule()->control->log;
 	
 	log.title("CCSD CALCULATION");
 	
@@ -449,47 +453,436 @@ void CCSD::compute()
 	build_guess();
 	build_fock();
 	log.localTime();
-
+	
 	mp2.calculateEnergy(doubles);
 	log.print("MP2 Energy = " + std::to_string(mp2.getEnergy()) + "\n");
 	log.localTime();
 	
-	log.print("\nBeginning CC iterations:\n\n");
-	bool converged = false; 
-	int MAXITER = log.maxiter();
-	iter = 1;
-	Matrix F = Matrix::Zero(N, N);
-	Tensor4 W(N, N, N, N, 0.0);
-	S4OddTensor4 tau(nocc, N-nocc, 0.0);
-	S4OddTensor4 tautilde(nocc, N-nocc, 0.0);
 	
-	double time_interms, time_amps, time_en;
-	log.initIterationCC();
-	while (!converged && iter < MAXITER) {
+	int rank, np; 
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &np);
+	
+	CTF::World dw;
+	{
+		S8OddTensor4& spinInts = mp2.getSpinInts();
+		int nvirt = N - nocc; 
+		Integrals V(nocc, nvirt, dw); 
+		Matrix& F = spinFock; 
+	
+		int64_t sz, *indices;
+		double *values;
+	
+		V.aa->read_local(&sz, &indices, &values);
+		for (int a = 0; a < nvirt; a++) values[a] = F(a+nocc, a+nocc); 
+		V.aa->write(sz, indices, values); 
+	
+		V.ii->read_local(&sz, &indices, &values); 
+		for (int i = 0; i < nocc; i++) values[i] = F(i, i); 
+		V.ii->write(sz, indices, values); 
+	
+		V.ab->read_local(&sz, &indices, &values);
+		int ctr = 0;  
+		for (int a = 0; a < nvirt; a++) { 
+			for (int b = 0; b < a; b++) {
+				values[ctr] = F(b+nocc, a+nocc); 
+				ctr++; 
+			}
+		}
+		V.ab->write(sz, indices, values); 
+	
+		V.ai->read_local(&sz, &indices, &values);
+		ctr = 0;  
+		for (int i = 0; i < nocc; i++) { 
+			for (int a = 0; a < nvirt; a++) {
+				values[ctr] = F(a+nocc, i); 
+				ctr++; 
+			}
+		}
+		V.ai->write(sz, indices, values); 
+	
+		V.ia->read_local(&sz, &indices, &values);
+		ctr = 0;  
+		for (int a = 0; a < nvirt; a++) { 
+			for (int i = 0; i < nocc; i++) {
+				values[ctr] = F(i, a+nocc); 
+				ctr++; 
+			}
+		}
+		V.ia->write(sz, indices, values); 
+	
+		V.ij->read_local(&sz, &indices, &values);
+		ctr = 0;  
+		for (int i = 0; i < nocc; i++) { 
+			for (int j = 0; j < i; j++) {
+				values[ctr] = F(j, i); 
+				ctr++; 
+			}
+		}
+		V.ij->write(sz, indices, values); 
+	
+		V.abcd->read_local(&sz, &indices, &values);
+		ctr = 0;
+		for (int a = nocc; a < N; a++) 
+			for (int b = nocc; b < a; b++)
+				for (int c = nocc; c < N; c++)
+					for (int d = nocc; d < c; d++) {
+						values[ctr] = spinInts(d, c, b, a);
+						ctr++; 
+					}				
+		V.abcd->write(sz, indices, values);
+	
+		V.abci->read_local(&sz, &indices, &values);
+		ctr = 0;
+		for (int i = 0; i < nocc; i++) 
+			for (int c = nocc; c < N; c++)
+				for (int b = nocc; b < N; b++)
+		for (int a = nocc; a < b; a++) {
+			values[ctr] = spinInts(a, b, c, i);
+			ctr++; 
+		}
+		V.abci->write(sz, indices, values);
+	
+		V.aibc->read_local(&sz, &indices, &values);
+		ctr = 0;
+		for (int c = nocc; c < N; c++) 
+			for (int b = nocc; b < c; b++)
+				for (int i = 0; i < nocc; i++)
+		for (int a = nocc; a < N; a++) {
+			values[ctr] = spinInts(a, i, b, c);
+			ctr++; 
+		}
+		V.aibc->write(sz, indices, values);
+	
+		V.aibj->read_local(&sz, &indices, &values);
+		ctr = 0;
+		for (int j = 0; j < nocc; j++) 
+			for (int b = nocc; b < N; b++)
+				for (int i = 0; i < nocc; i++)
+		for (int a = nocc; a < N; a++) {
+			values[ctr] = spinInts(a, i, b, j);
+			ctr++; 
+		}
+		V.aibj->write(sz, indices, values);
+	
+		V.abij->read_local(&sz, &indices, &values);
+		ctr = 0;
+		for (int j = 0; j < nocc; j++) 
+			for (int i = 0; i < j; i++)
+				for (int b = nocc; b < N; b++)
+		for (int a = nocc; a < b; a++) {
+			values[ctr] = spinInts(a, b, i, j);
+			ctr++; 
+		}
+		V.abij->write(sz, indices, values);
+			
+		V.ijab->read_local(&sz, &indices, &values);
+		ctr = 0;
+		for (int b = nocc; b < N; b++) 
+			for (int a = nocc; a < b; a++)
+				for (int j = 0; j < nocc; j++)
+		for (int i = 0; i < j; i++) {
+			values[ctr] = spinInts(i, j, a, b);
+			ctr++; 
+		}
+		V.ijab->write(sz, indices, values);	
+	
+		V.aijk->read_local(&sz, &indices, &values);
+		ctr = 0;
+		for (int k = 0; k < nocc; k++) 
+			for (int j = 0; j < k; j++)
+				for (int i = 0; i < nocc; i++)
+		for (int a = nocc; a < N; a++) {
+			values[ctr] = spinInts(a, i, j, k);
+			ctr++; 
+		}
+		V.aijk->write(sz, indices, values);
+	
+		V.ijak->read_local(&sz, &indices, &values);
+		ctr = 0;
+		for (int k = 0; k < nocc; k++) 
+			for (int a = nocc; a < N; a++)
+				for (int j = 0; j < nocc; j++)
+		for (int i = 0; i < j; i++) {
+			values[ctr] = spinInts(i, j, a, k);
+			ctr++; 
+		}
+		V.ijak->write(sz, indices, values);
+	
+		V.ijkl->read_local(&sz, &indices, &values);
+		ctr = 0;
+		for (int l = 0; l < nocc; l++) 
+			for (int k = 0; k < l; k++)
+				for (int j = 0; j < nocc; j++)
+		for (int i = 0; i < j; i++) {
+			values[ctr] = spinInts(i, j, k, l);
+			ctr++; 
+		}
+		V.ijkl->write(sz, indices, values);
+	
+		Amplitudes T(nocc, nvirt, dw); 
+		T.ai->read_local(&sz, &indices, &values); 
+		for (int i = 0; i < sz; i++) values[i] = 0.0;
+		T.ai->write(sz, indices, values); 
+	
+		T.abij->read_local(&sz, &indices, &values); 
+		ctr = 0;
+		for (int j = 0; j < nocc; j++)
+			for (int i = 0; i < j; i++)
+				for (int b = 0; b < nvirt; b++)
+					for (int a = 0; a < b; a++)
+						values[ctr++] = doubles(i, j, a, b); 
+		T.abij->write(sz, indices, values); 
+		
+		double mp2energy = 0.25 * V["abij"] * T["abij"]; 
+		std::cout << mp2energy << std::endl;
+	
+		
+		log.print("\nBeginning CC iterations:\n\n");
+		log.flush();
+		bool converged = false; 
+		int MAXITER = cmd.get_option<int>("maxiter");
+		double CONVERGE = cmd.get_option<double>("converge");
+		iter = 1;
+		
+		log.initIterationCC();
+		double time_tot; 
+		double new_en; 
+		double nt1 = T.ai->norm2();
+		double nt2 = T.abij->norm2();
+		double newnt1, newnt2; 
+		while (!converged && iter < MAXITER) {
+			new_ccsd(V, T, 0); 
+			new_en = V["ai"]*T["ai"] + 0.25*V["abij"]*(T["abij"] + 0.5*T["ai"]*T["bj"]); 
+			delta_e = new_en - energy;
+			energy = new_en; 
+			newnt1 = T.ai->norm2();
+			newnt2 = T.abij->norm2();
+			time_tot = log.getLocalTime();
+			delta_singles = nt1 - newnt1;
+			delta_doubles = nt2 - newnt2;
+			nt1 = newnt1;
+			nt2 = newnt2; 
+			log.iterationCC(iter, energy, delta_e, delta_singles, delta_doubles, -1, -1, time_tot); 
+			converged = (fabs(delta_e) < CONVERGE) && (fabs(delta_doubles) < CONVERGE); 
+			iter++;
+	      //  T["ai"] = (1./T.ai->norm2())*T["ai"];
+	      //  T["abij"] = (1./T.abij->norm2())*T["abij"];
+		}
+	
+		/*
+		Matrix F = Matrix::Zero(N, N);
+		Tensor4 W(N, N, N, N, 0.0);
+		S4OddTensor4 tau(nocc, N-nocc, 0.0);
+		S4OddTensor4 tautilde(nocc, N-nocc, 0.0);
+	
+		double time_interms, time_amps, time_en;
+		//log.initIterationCC();
+		while (!converged && iter < MAXITER) {
 		
 		build_intermediates(F, W, tau, tautilde);
 		time_interms = log.getLocalTime();
 		build_amplitudes(F, W, tau, tautilde);
+		if (iter == 1) doubles.print(); 
 		time_amps = log.getLocalTime();
 		calculateEnergy();
 		time_en = log.getLocalTime();
 		
 		log.iterationCC(iter, energy, delta_e, delta_singles, delta_doubles, time_interms, time_amps, time_interms+time_amps+time_en);
-		converged = (fabs(delta_e) < log.converge()) && (fabs(delta_doubles) < log.converge());
+		converged = (fabs(delta_e) < CONVERGE) && (fabs(delta_doubles) < CONVERGE);
 		iter++;
-	}
+		} */
 	
-	if (converged){
-		log.result("CCSD correlation energy", energy, "Hartree");
-		if (withTriples) {
-			log.print("Calculating triples... \n");
-			calculateTriples();
-			log.localTime();
-			log.result("(T) correction", triples_energy, "Hartree");
-			log.result("CCSD(T) correlation energy", energy + triples_energy, "Hartree");
-		}
-	} else log.result("CCSD failed to converge");
+	
+	
+		if (converged){
+			log.result("CCSD correlation energy", energy, "Hartree");
+			if (withTriples) {
+				log.print("Calculating triples... \n");
+				calculateTriples();
+				log.localTime();
+				log.result("(T) correction", triples_energy, "Hartree");
+				log.result("CCSD(T) correlation energy", energy + triples_energy, "Hartree");
+			}
+		} else log.result("CCSD failed to converge");
+	}
 		
 }
+
+double divide(double a, double b){
+  return a/b;
+}
+
+void CCSD::new_ccsd(Integrals   &V,
+Amplitudes  &T,
+int sched_nparts){
+	int rank;   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+	CTF::Tensor<> Tau = CTF::Tensor<>(V.abij); 
+	CTF::Tensor<> FAE = CTF::Tensor<>(V.ab); 
+	CTF::Tensor<> FMI = CTF::Tensor<>(V.ij); 
+	CTF::Tensor<> FME = CTF::Tensor<>(V.ia);
+	CTF::Tensor<> WMNIJ = CTF::Tensor<>(V.ijkl);
+	CTF::Tensor<> WMNEJ = CTF::Tensor<>(V.ijak);
+	CTF::Tensor<> WAMIJ = CTF::Tensor<>(V.aijk);
+	CTF::Tensor<> WAMEI = CTF::Tensor<>(V.aibj);
+	
+	Tau["abij"] = T["abij"];
+	Tau["abij"] += 0.5*T["ai"]*T["bj"]; 
+	
+	// Intermediates
+	FME["me"] = V["me"]; 
+	FME["me"] += V["mnef"]*T["fn"]; 
+	
+	FMI["mi"] = V["mi"]; 
+	FMI["mi"] += 0.5*V["mnef"]*T["efin"]; 
+	FMI["mi"] += FME["me"]*T["ei"]; 
+	FMI["mi"] += V["nmfi"]*T["fn"]; 
+	
+	FAE["ae"] = V["ae"]; 
+	FAE["ae"] -= 0.5*V["mnef"]*T["afmn"];
+	FAE["ae"] -= FME["me"]*T["am"]; 
+	FAE["ae"] += V["amef"]*T["fm"]; 
+	
+	WMNIJ["mnij"] = V["mnij"]; 
+	WMNIJ["mnij"] += 0.5*V["mnef"]*Tau["efij"]; 
+	WMNIJ["mnij"] += V["mnej"]*T["ei"]; 
+	
+	WMNEJ["mnej"] = V["mnej"]; 
+	WMNEJ["mnej"] += V["mnef"]*T["fj"];
+	
+	WAMIJ["amij"] = V["amij"];
+	WAMIJ["amij"] += 0.5*V["amef"]*Tau["efij"];
+	WAMIJ["amij"] += V["amej"]*T["ei"]; 
+	
+	WAMEI["amei"] = V["amei"];
+	WAMEI["amei"] += 0.5*V["mnef"]*T["afni"];
+	WAMEI["amei"] += V["amef"]*T["fi"];
+	WAMEI["amei"] -= WMNEJ["nmei"]*T["an"]; 
+	
+	// Iteration
+	
+	CTF::Tensor<> Zai = CTF::Tensor<>(V.ai);
+	CTF::Tensor<> Zabij = CTF::Tensor<>(V.abij); 
+	
+	Zai["ai"] = V["ai"];
+	Zai["ai"] += V["ae"]*T["ei"]; 
+	Zai["ai"] -= FMI["mi"]*T["am"];
+	Zai["ai"] -= V["amei"]*T["em"]; 
+	Zai["ai"] += FME["me"]*T["aeim"];
+	Zai["ai"] += 0.5*V["amef"]*Tau["efim"]; 
+	Zai["ai"] -= 0.5*WMNEJ["mnei"]*T["eamn"]; 
+	
+	Zabij["abij"] = V["abij"];
+	Zabij["abij"] += V["abej"]*T["ei"];
+	Zabij["abij"] -= WAMIJ["amij"]*T["bm"];
+	Zabij["abij"] += FAE["ae"]*T["ebij"];
+	Zabij["abij"] -= FMI["mi"]*T["abmj"];
+	Zabij["abij"] += 0.5*V["abef"]*Tau["efij"];
+	Zabij["abij"] += 0.5*WMNIJ["mnij"]*Tau["abmn"];
+	Zabij["abij"] += WAMEI["amei"]*T["ebjm"]; 
+	
+	CTF::Tensor<> Dai(2, V.ai->lens, V.ai->sym, *V.dw);
+	int sh_sym[4] = {SH, NS, SH, NS};
+	CTF::Tensor<> Dabij(4, V.abij->lens, sh_sym, *V.dw);
+	Dai["ai"] += V["i"];
+	Dai["ai"] -= V["a"];
+ 
+	Dabij["abij"] += V["i"];
+	Dabij["abij"] += V["j"];
+	Dabij["abij"] -= V["a"];
+	Dabij["abij"] -= V["b"];
+
+
+	CTF::Function<> fctr(&divide);
+
+	T.ai->contract(1.0, Zai, "ai", Dai, "ai", 0.0, "ai", fctr);
+	T.abij->contract(0.5, Zabij, "abij", Dabij, "abij", 0.0, "abij", fctr);
+
+	/*CTF::Tensor<> T21 = CTF::Tensor<>(T.abij);
+	T21["abij"] += .5*T["ai"]*T["bj"];
+
+	CTF::Tensor<> tFme(*V["me"].parent);
+	CTF::Idx_Tensor Fme(&tFme,"me");
+	Fme += V["me"];
+	Fme += V["mnef"]*T["fn"];
+  
+	CTF::Tensor<> tFae(*V["ae"].parent);
+	CTF::Idx_Tensor Fae(&tFae,"ae");
+	Fae += V["ae"];
+	Fae -= Fme*T["am"];
+	Fae -=.5*V["mnef"]*T["afmn"];
+	Fae += V["anef"]*T["fn"];
+
+	CTF::Tensor<> tFmi(*V["mi"].parent);
+	CTF::Idx_Tensor Fmi(&tFmi,"mi");
+	Fmi += V["mi"];
+	Fmi += Fme*T["ei"];
+	Fmi += .5*V["mnef"]*T["efin"];
+	Fmi += V["mnfi"]*T["fn"];
+
+	CTF::Tensor<> tWmnei(*V["mnei"].parent);
+	CTF::Idx_Tensor Wmnei(&tWmnei,"mnei");
+	Wmnei += V["mnei"];
+	Wmnei += V["mnei"];
+	Wmnei += V["mnef"]*T["fi"];
+  
+	CTF::Tensor<> tWmnij(*V["mnij"].parent);
+	CTF::Idx_Tensor Wmnij(&tWmnij,"mnij");
+	Wmnij += V["mnij"];
+	Wmnij -= V["mnei"]*T["ej"];
+	Wmnij += V["mnef"]*T21["efij"];
+
+	CTF::Tensor<> tWamei(*V["amei"].parent);
+	CTF::Idx_Tensor Wamei(&tWamei,"amei");
+	Wamei += V["amei"];
+	Wamei -= Wmnei*T["an"];
+	Wamei += V["amef"]*T["fi"];
+	Wamei += .5*V["mnef"]*T["afin"];
+  
+	CTF::Tensor<> tWamij(*V["amij"].parent);
+	CTF::Idx_Tensor Wamij(&tWamij,"amij");
+	Wamij += V["amij"];
+	Wamij += V["amei"]*T["ej"];
+	Wamij += V["amef"]*T["efij"];
+
+	CTF::Tensor<> tZai(*V["ai"].parent);
+	CTF::Idx_Tensor Zai(&tZai,"ai");
+	Zai += V["ai"];
+	Zai -= Fmi*T["am"]; 
+	Zai += V["ae"]*T["ei"]; 
+	Zai += V["amei"]*T["em"];
+	Zai += V["aeim"]*Fme;
+	Zai += .5*V["amef"]*T21["efim"];
+	Zai -= .5*Wmnei*T21["eamn"];
+  
+	CTF::Tensor<> tZabij(*V["abij"].parent);
+	CTF::Idx_Tensor Zabij(&tZabij,"abij");
+	Zabij += V["abij"];
+	Zabij += V["abei"]*T["ej"];
+	Zabij += Wamei*T["ebmj"];
+	Zabij -= Wamij*T["bm"]; 
+	Zabij += Fae*T["ebij"];
+	Zabij -= Fmi*T["abmj"];
+	Zabij += .5*V["abef"]*T21["efij"];
+	Zabij += .5*Wmnij*T21["abmn"];
+
+	CTF::Tensor<> Dai(2, V.ai->lens, V.ai->sym, *V.dw);
+	int sh_sym[4] = {SH, NS, SH, NS};
+	CTF::Tensor<> Dabij(4, V.abij->lens, sh_sym, *V.dw);
+	Dai["ai"] += V["i"];
+	Dai["ai"] -= V["a"];
+ 
+	Dabij["abij"] += V["i"];
+	Dabij["abij"] += V["j"];
+	Dabij["abij"] -= V["a"];
+	Dabij["abij"] -= V["b"];
+
+
+	CTF::Function<> fctr(&divide);
+
+	T.ai->contract(1.0, *(Zai.parent), "ai", Dai, "ai", 0.0, "ai", fctr);
+	T.abij->contract(1.0, *(Zabij.parent), "abij", Dabij, "abij", 0.0, "abij", fctr);*/
+} 
 
 					

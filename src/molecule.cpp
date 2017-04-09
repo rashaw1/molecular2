@@ -9,101 +9,327 @@
 */
 
 #include <iostream>
-#include "logger.hpp"
 #include "molecule.hpp"
 #include "error.hpp"
 #include "basisreader.hpp"
+#include "ioutil.hpp"
 #include <cmath>
-#include <vector>
 #include <libint2.hpp>
+#include "ProgramController.hpp"
 
-// An initialisation function, for code reuse purposes
-void Molecule::init()
-{
-	// Set the data variables
-	charge = log.getCharge();
-	multiplicity = log.getMultiplicity();
-	parent = true;
+Atom Molecule::parseGeomLine(std::string line) {
+	std::string delimiter = ","; // Define the separation delimiter
+	int q, m; 
+	Vector coords(3);
+	double multiplier = (angstrom ? Logger::TOBOHR : 1.0); // Convert to bohr from angstrom?
+		
+	size_t position = line.find(delimiter); // Find first delimiter
+	std::string token = line.substr(0, position); // Tokenise
 
-	// Get the basis set     
-	bfset = log.getBasis();
+	// Get rid of whitespace, if any
+	token.erase(std::remove(token.begin(), token.end(), ' '), token.end());
+	token.erase(std::remove(token.begin(), token.end(), '\t'), token.end());
+		
+	// Get the atom type and mass
+	q = getAtomCharge(token);
+	m = getAtomMass(q);
 
-	// Now declare the array of atoms
-	natoms = log.getNatoms();
-	if (natoms != 0){
-    
-		atoms = new Atom[natoms];
-		nel = 0; // Initialise to no electrons
+	// Move on to next token
+	line.erase(0, position+delimiter.length());
+	position = line.find(delimiter);
+
+	if (position != std::string::npos){
+		token = line.substr(0, position); 
+
+		// This should now be the x coord
+		token.erase(std::remove(token.begin(), token.end(), ' '), token.end());
+		token.erase(std::remove(token.begin(), token.end(), '\t'), token.end());
+		coords[0] = multiplier*std::stod(token);  // Convert it to double
+
+		// Repeat for y and z
+		line.erase(0, position+delimiter.length());
+		position = line.find(delimiter);
+		if (position != std::string::npos) {
+			token = line.substr(0, position);
+			token.erase(std::remove(token.begin(), token.end(), ' '), token.end());
+			token.erase(std::remove(token.begin(), token.end(), '\t'), token.end());
+			coords[1] = multiplier*std::stod(token);
+			line.erase(0, position+delimiter.length());
+			if (line.length() > 0){
+				line.erase(std::remove(line.begin(), line.end(), ' '), line.end());
+				line.erase(std::remove(line.begin(), line.end(), '\t'), line.end());
+				coords[2] = multiplier*std::stod(line);
 	
-		// Populate the array, and give the atoms
-		// their basis functions. At the same time,
-		// calculate the number of electrons
-		for (int i = 0; i < natoms; i++) {
-			atoms[i] = log.getAtom(i);
-			atoms[i].setBasis(bfset);
-			nel += atoms[i].getCharge();
-		}
-
-		// Account for overall charge
-		nel -= charge;
-
-	} else { // Nothing to do
-		Error e("INIT", "There are no atoms!");
-		log.error(e);
-		atoms = NULL;
-	}
+			} else {
+				Error e2("INPUT", "Missing coordinate.");
+				control->log.error(e2);
+			}
+		} else { 
+			Error e3("INPUT", "Missing coordinate.");
+			control->log.error(e3);
+		} 
+	} else {
+		Error e4("INPUT", "Missing coordinate.");
+		control->log.error(e4);
+	}					
+	
+	return Atom(coords, q, m);
 }
 
-void Fragment::init(Atom* as, int nat, int q, int mult)
+// An initialisation function, for code reuse purposes
+void Molecule::init(Construct& c)
+{
+	std::vector<Option> options; 
+	for (auto& line : c.content)
+		options.push_back(Option(line));
+	
+	charge = 0;
+	multiplicity = 1;
+	parent = true; 
+	angstrom = false;
+	for (auto& op : options) {
+		if (op.name == "charge") charge = op.get_value<int>();
+		else if (op.name == "multiplicity") multiplicity = op.get_value<int>(); 
+		else if (op.name == "angstrom") angstrom = true; 
+	}
+	
+	bool basis_found = false;
+	bool geom_found = false; 
+	fragmented = false; 
+	has_ecps = false; 
+	std::vector<std::vector <int>> frags;
+	iVector qs; 
+	std::string token; 
+	
+	for (auto& sc : c.subconstructs) {
+		if (sc.name == "basis") {
+			// Parse basis
+			if (sc.content.size() > 0) {
+				basis_found = true; 
+				
+				for (auto& line : sc.content) {
+					size_t pos = line.find(',');
+					if (pos != std::string::npos) {
+						token = line.substr(0, pos);
+						token.erase(std::remove(token.begin(), token.end(), ' '), token.end());
+						std::transform(token.begin(), token.end(), token.begin(), ::tolower);
+						std::string token2 = line.substr(pos+1, line.length());
+						token2.erase(std::remove(token2.begin(), token2.end(), ' '), token2.end());
+						if (token == "default")
+							bnames[0] = token2;
+						else {
+							int q = getAtomCharge(token);
+							bnames[q] = token2;
+						}	
+					}
+				}
+				
+			} else {
+				Error e("INIT", "Basis specification is empty!"); 
+				control->log.error(e); 
+			}
+			
+		} else if (sc.name == "geometry") {
+			// Parse geometry
+			natoms = sc.content.size(); 
+			qs.resize(natoms);
+			if (natoms > 0) {
+				
+				geom_found = true; 
+				atoms = new Atom[natoms];
+				nel = -charge; 
+				
+				int i = 0;
+				for (auto& line : sc.content) {
+					atoms[i] = parseGeomLine(line); 
+					qs[i] = atoms[i].getCharge(); 
+					nel += atoms[i].getCharge(); 
+					i++;
+				}
+				
+			} else {
+				Error e("INIT", "There are no atoms!");
+				control->log.error(e); 
+				atoms = NULL;
+			}
+			
+		} else if (sc.name == "fragments") {
+			// Parse fragments
+			if (sc.content.size() > 0) {
+				fragmented = true;
+				
+				for (auto& line : sc.content) {
+					size_t pos = line.find(',');
+					std::vector<int> f;
+					while (pos != std::string::npos) {
+						token = line.substr(0, pos);
+						f.push_back(std::stoi(token));
+						line.erase(0, pos+1);
+						pos = line.find(',');
+					}
+					f.push_back(std::stoi(line));
+					if (f.size() > 0) {
+						f[0] -= 1;
+						frags.push_back(f);
+					}
+				}
+			}
+		} else if (sc.name == "ecp"){ 
+			// Parse ECPs
+			if (sc.content.size() > 0) {
+				has_ecps = true; 
+				
+				for (auto& line : sc.content) {
+					size_t pos = line.find(',');
+					if (pos != std::string::npos) {
+						token = line.substr(0, pos);
+						token.erase(std::remove(token.begin(), token.end(), ' '), token.end());
+						std::transform(token.begin(), token.end(), token.begin(), ::tolower);
+						std::string token2 = line.substr(pos+1, line.length());
+						token2.erase(std::remove(token2.begin(), token2.end(), ' '), token2.end());
+						int q = getAtomCharge(token);
+						bnames[-q] = token2;
+					}
+				}
+			}	
+		} else {
+			Error e("INIT", "Construct not recognised."); 
+			control->log.error(e);
+		}
+	}
+
+	// Get the basis set     
+	if (basis_found && geom_found) {
+		
+		iVector tempqs = qs;
+		std::sort(qs.data(), qs.data()+qs.size(), [](int lhs, int rhs){ return rhs > lhs; });
+		qs[0] = tempqs(0);
+		int k = 1;
+		for (int i = 1; i < natoms; i++){
+			if (tempqs(i) != qs(k-1)){
+				qs[k] = tempqs[i];
+				k++;
+			}
+		}
+		// k is now the number of unique qs, and all these unique qs are stored in qs
+		// resize to get rid of extra weight
+		qs.conservativeResize(k);
+		
+		bfset = Basis(bnames, qs, has_ecps); 
+		
+		for (int i = 0; i < natoms; i++) atoms[i].setBasis(bfset);
+		
+		if (fragmented) {
+			for(auto& f : frags) 
+				if (f.size() > 3)
+					fragments.push_back(std::make_shared<Fragment>(control, &atoms[f[0]], f[1] - f[0], bfset, bnames, has_ecps, f[2], f[3]));
+		}
+	}
+
+}
+
+void Fragment::init(Atom* as, int nat, int q, int mult, bool _has_ecps, const Basis& _bfset)
 {
 	charge = q;
 	parent = false;
 	multiplicity = mult;
 	atoms = as; 
 	natoms = nat;
+	has_ecps = _has_ecps; 
+	
 	if (nat <= 0) {
 		Error e("FRAGINIT", "There are no atoms in this fragment!");
-		log.error(e);
+		control->log.error(e);
 	} else {
-		bfset = log.getBasis();
+		bfset = _bfset; 
 		
-		nel = 0;
+		nel = -charge;
 		for (int i = 0; i < natoms; i++) 
 			nel += atoms[i].getCharge();
 	}
 }
 
 // Constructor
-Molecule::Molecule(Logger& logger, int q, bool doInit) : log(logger)
+Molecule::Molecule(SharedPC _control, Construct& c, int q) : control(_control)
 {
 	// Set the log and then initialise
-	if(doInit) init();
+	init(c);
 }
 
+Molecule::Molecule(SharedPC _control, int q) : control(_control) { }
+
 // Copy constructor
-Molecule::Molecule(const Molecule& other) : log(other.log)
+Molecule::Molecule(const Molecule& other) : control(other.control)
 {
-	init();
+	charge = other.charge;
+	nel = other.nel;
+	multiplicity = other.multiplicity;
+	natoms = other.natoms;
+	parent = other.parent;
+	angstrom = other.angstrom;
+	fragmented = other.fragmented;
+	has_ecps = other.has_ecps;
+	fragments = other.fragments; 
+	if (natoms > 0) {
+		atoms = new Atom[natoms];
+		for (int i = 0; i < natoms; i++) atoms[i] = other.atoms[i]; 
+	}
+		
+	bfset = other.bfset;
+	ecpset = other.ecpset;
+	bnames = other.bnames;
+	enuc = other.enuc;
 }
 
 
 // Destructor
 Molecule::~Molecule()
-{
-	if(log.getNatoms()!=0 && parent){
+{ 
+	if(natoms != 0 && parent){
 		delete [] atoms;
 	}
 }
 
-Fragment::Fragment(Logger& logger, Atom* as, int nat, int q, int mult) : Molecule(logger, q, false)  {
-	init(as, nat, q, mult); 
+Molecule& Molecule::operator=(const Molecule& other) {
+	control = other.control;
+	charge = other.charge;
+	nel = other.nel;
+	multiplicity = other.multiplicity;
+	natoms = other.natoms;
+	parent = other.parent;
+	angstrom = other.angstrom;
+	fragmented = other.fragmented;
+	has_ecps = other.has_ecps;
+	fragments = other.fragments; 
+	if (natoms > 0) {
+		atoms = new Atom[natoms];
+		for (int i = 0; i < natoms; i++) atoms[i] = other.atoms[i]; 
+	}
+		
+	bfset = other.bfset;
+	ecpset = other.ecpset;
+	bnames = other.bnames;
+	enuc = other.enuc;
+	return *this; 
 }
 
-Fragment::Fragment(const Fragment& other) : Molecule(other.log, other.charge, false) {
-	init(other.atoms, other.natoms, other.charge, other.multiplicity);
+Fragment::Fragment(SharedPC control, Atom* as, int nat, const Basis& _bfset, std::map<int, std::string> _bnames, bool _has_ecps, int q, int mult) : Molecule(control, q)  {
+	bnames = _bnames; 
+	init(as, nat, q, mult, _has_ecps, _bfset); 
+}
+
+Fragment::Fragment(const Fragment& other) : Molecule(other.control, other.charge) {
+	bnames = other.bnames; 
+	init(other.atoms, other.natoms, other.charge, other.multiplicity, other.has_ecps, other.bfset);
 }
 Fragment::~Fragment() { }
 
+Fragment& Fragment::operator=(const Fragment& other) {
+	control = other.control;
+	bnames = other.bnames;
+	init(other.atoms, other.natoms, other.charge, other.multiplicity, other.has_ecps, other.bfset);
+	return *this;
+}
 
 // Routines
 
@@ -114,13 +340,13 @@ void Molecule::rotate(const Matrix& U)
 {
 	// Check if 3 x 3
 	if(U.rows() == 3 && U.cols() == 3){
-		for (int i = 0; i < log.getNatoms(); i++){
+		for (int i = 0; i < natoms; i++){
 			atoms[i].rotate(U); // Do the rotation
 		}
 		updateBasisPositions();
 	} else {
 		Error e("ROTATE", "Unsuitable rotation matrix.");
-		log.error(e);
+		control->log.error(e);
 	}
 }
 
@@ -129,7 +355,7 @@ void Molecule::rotate(const Matrix& U)
 // of each atom.
 void Molecule::translate(double x, double y, double z)
 {
-	for (int i = 0; i < log.getNatoms(); i++){
+	for (int i = 0; i < natoms; i++){
 		atoms[i].translate(x, y, z);
 	}
 	updateBasisPositions();
@@ -179,7 +405,7 @@ Vector Molecule::com() const
 	// Loop over all atoms
 	double sum = 0.0;
 	double m;
-	for (int i = 0; i < log.getNatoms(); i++){
+	for (int i = 0; i < natoms; i++){
 		m = atoms[i].getMass();
 		c = c + m*atoms[i].getCoords();
 		sum += m;
@@ -206,7 +432,7 @@ Vector Molecule::getInertia(bool shift)
 
 	// Loop over all atoms
 	double m;
-	for (int i = 0; i < log.getNatoms(); i++){
+	for (int i = 0; i < natoms; i++){
 		m = atoms[i].getMass();
 		c = atoms[i].getCoords();
 
@@ -274,7 +500,7 @@ double Molecule::oopAngle(int i, int j, int k, int l) const
 	Vector elj = atoms[j].getCoords() - co;
 	Vector eli = atoms[i].getCoords() - co;
   
-  	co = cross(elj, elk);
+	co = cross(elj, elk);
 	double sinangle = co.norm();
   
 	// Normalise
@@ -319,7 +545,7 @@ std::string Molecule::rType()
 {
 	std::string rstring = "asymmetric"; // Asymm. is default case
 	// Diatomic case
-	if(log.getNatoms() == 2){
+	if(natoms == 2){
 		rstring = "diatomic";
 	} else {
 		// Calculate the principal moments of inertia
@@ -359,14 +585,14 @@ Vector Molecule::rConsts(int units)
 	}
 	// Constant Bi = K/Ii 
 	for (int i = 0; i < 3; i++){
-		if (I(i) < log.precision()) { I[i] = 0.0; }  
+		if (I(i) < control->get_option<double>("precision")) { I[i] = 0.0; }  
 		else { I[i] = K/I(i); }
 	}
 	return I;
 }
 
 void Molecule::buildShellBasis() {
-	BasisReader b(log.bnames);
+	BasisReader b(bnames);
 	for (int i = 0; i < natoms; i++) {
 		Atom &a = atoms[i];
 		double pos[3] = { a.getX(), a.getY(), a.getZ() };
@@ -376,11 +602,11 @@ void Molecule::buildShellBasis() {
 
 void Molecule::buildECPBasis() {
 	if (bfset.hasECPS()) {
-		BasisReader b(log.bnames); 
+		BasisReader b(bnames); 
 		for (int i = 0; i < natoms; i++) {
 			Atom& a = atoms[i];
-			auto it = log.bnames.find(-a.getCharge());
-			if (it != log.bnames.end()) {
+			auto it = bnames.find(-a.getCharge());
+			if (it != bnames.end()) {
 				ECP newECP = b.readECP(a.getCharge(), ecpset, a.getPos());
 				ecpset.addECP(newECP, i);
 			}

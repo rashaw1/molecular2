@@ -15,9 +15,7 @@
 #include <cmath>
 #include "mathutil.hpp"
 #include "error.hpp"
-#include <boost/math/special_functions/gamma.hpp>
-#include <boost/math/special_functions/erf.hpp>
-#include <boost/math/constants/constants.hpp>
+#include <algorithm> 
 
 // Factorial and double factorial functions
 unsigned long int fact(int i)
@@ -52,47 +50,6 @@ void fact2Array(int i, double *values) {
     values[1] = 1.0;
     for (int j = 2; j <= i; j++) values[j] = values[j-2]*j;
   }
-}
-
-// Calculate the boys function F_m(x) for a range of values of m from mmax
-// to mmin.
-// First, the mmax value is calculated using the relation to the (full)
-// incomplete gamma function, then a downward recursion is used for all
-// values of m down to mmin. If F_0 is needed, this is calculated by a
-// call to the error function instead (speedier). 
-// These relations can all be found in Helgaker, Jorgensen, Olsen,
-// "Molecular Electronic Structure Theory", Chapter 9, section 8, 
-// pages 366-371, (in the 2012 paperback edition).
-// Using boost libraries for their high accuracy and efficiency.
-
-Vector boys(double x, int mmax, int mmin, double PRECISION)
-{
-  // Initialise return array
-  Vector rvec = Vector::Zero(mmax - mmin + 1); // +1 as need to include both mmax and mmin
-
-  if(x < PRECISION) { // x ~ 0, so no need for recursion
-
-    // x = 0 implies F_m(x) = 1/(2m+1) 
-    for (int i = mmin; i <mmax + 1; i++){
-      rvec[i-mmin] = 1.0/(2.0*(double)(i) + 1.0);
-    }
-    
-  } else {
-    // For F_0, use erf
-    if (mmin == 0){
-      rvec[0] = std::sqrt(boost::math::constants::pi<double>()/(4.0*x))*boost::math::erf(std::sqrt(x));
-    }
-
-    // Calculate F_mmax value
-    rvec[mmax-mmin] = (1.0/(2.0*std::pow(x, mmax+0.5))) * boost::math::tgamma_lower(mmax+0.5, x);
-    
-    // Now use downward recursion relation to calculate all others
-    int m = (mmin == 0 ? 1 : mmin);
-    for (int i = mmax-1; i > m-1; i--){
-      rvec[i-mmin] = (1.0/(2.0*(double)(i) + 1.0)) * (2.0*x*rvec[i-mmin+1] + std::exp(-1.0*x));
-    } 
-  }
-  return rvec;
 }
 
 // Calculate the binomial coefficient (n m)T
@@ -336,4 +293,260 @@ Vector rmultiply(const Matrix& mat, const Vector& v)
   }
   return rVec;
 }
-      
+
+/*
+Vector cross(const Vector& v1, const Vector& v2) {
+	Eigen::Vector3d u1, u2;
+	u1[0] = v1[0]; u2[0] = v2[0];
+	u1[1] = v1[1]; u2[1] = v2[1];
+	u1[2] = v1[2]; u2[2] = v2[2];
+	return u1.cross(u2); 
+}
+
+Matrix d_cross(const Vector& v1, const Vector& v2) {
+	Matrix dc = Matrix::Zero(3, 3); 
+	for (int i = 0; i < 3; i++) {
+		Vector ei = Vector::Zero(3);
+		ei[i] = 1.0;
+		dc.row(i) = cross(ei, v2); 
+	}
+	return dc;
+}
+
+Matrix d_cross_ab(const Vector& v1, const Vector& v2, const Matrix& da, const Matrix& db) {
+	int nrow = da.rows(); 
+	Matrix dnc = Matrix::Zero(nrow, 3); 
+	for (int i = 0; i < nrow; i++)
+		dnc.row(i) = cross(v1, db.row(i)) + cross(da.row(i), v2); 
+	return dnc;
+}
+
+double ncross(const Vector& v1, const Vector& v2) {
+	return cross(v1, v2).norm(); 
+}
+
+Vector d_ncross(const Vector& v1, const Vector& v2) {
+	double nv1v2 = cross(v1, v2).norm();
+	Vector result = v1 * v2.dot(v2) - v2 * v1.dot(v2); 
+	return result / nv1v2; 
+}
+
+Matrix pseudo_inverse(Matrix& mat, double threshold) {
+	Eigen::JacobiSVD<Matrix> svd(mat, Eigen::ComputeThinU | Eigen::ComputeThinV); 
+	double tolerance = threshold * std::max(mat.cols(), mat.rows()) * svd.singularValues().array().abs()(0); 
+	return svd.matrixV() *  (svd.singularValues().array().abs() > tolerance).select(svd.singularValues().array().inverse(), 0).matrix().asDiagonal() * svd.matrixU().adjoint();
+}
+
+// Build the F-matrix for constructing the rotation quaternion
+Matrix build_F(const Matrix& x, const Matrix& y) {
+	Matrix R = x.transpose() * y; 
+	Matrix F = Matrix::Zero(4, 4); 
+	
+	F(0, 0) = R.trace(); 
+	F(0, 1) = F(1, 0) = R(1, 2) - R(2, 1); 
+	F(0, 2) = F(2, 0) = R(2, 0) - R(0, 2);
+	F(0, 3) = F(3, 0) = R(0, 1) - R(1, 0);
+	F(1, 1) = R(0, 0) - R(1, 1) - R(2, 2);
+	F(1, 2) = F(2, 1) = R(0, 1) + R(1, 0); 
+	F(1, 3) = F(3, 1) = R(0, 2) + R(2, 0);
+	F(2, 2) = R(1, 1) - R(2, 2) - R(0, 0);
+	F(2, 3) = F(3, 2) = R(1, 2) + R(2, 1);
+	F(3, 3) = R(2, 2) - R(0, 0) - R(1, 1); 
+	
+	return F; 
+}
+
+bool is_linear(const Matrix& xyz, const Matrix& x0) {
+	bool linear = false; 
+	
+	int natoms = xyz.rows(); 
+	
+	Vector xmean(3), ymean(3);
+	for (int i = 0; i < 3; i++) {
+		xmean[i] = xyz.col(i).sum() / ((double) natoms);
+		ymean[i] = x0.col(i).sum() / ((double) natoms); 
+	}
+	
+	Matrix x = xyz;
+	Matrix y = x0; 
+	for (int i = 0; i < natoms; i++) {
+		x.row(i) -= xmean;
+		y.row(i) -= ymean; 
+	}
+	
+	Matrix F = build_F(x, y);
+	EigenSolver es(F);
+	Vector& L = es.eigenvalues();
+	
+	if (L[0]/L[1] < 1.01 && L[0]/L[1] > 0.0) linear = true;
+	return linear;
+}
+
+// Quaternion that rotates into y, minimizing RMSD
+Vector get_quat(const Matrix& x, const Matrix& y) {
+	int natoms = xyz.rows(); 
+	
+	Vector xmean(3), ymean(3);
+	for (int i = 0; i < 3; i++) {
+		xmean[i] = xyz.col(i).sum() / ((double) natoms);
+		ymean[i] = x0.col(i).sum() / ((double) natoms); 
+	}
+	
+	Matrix x = xyz;
+	Matrix y = x0; 
+	for (int i = 0; i < natoms; i++) {
+		x.row(i) -= xmean;
+		y.row(i) -= ymean; 
+	}
+	
+	Matrix F = build_F(x, y); 
+	EigenSolver es(F);
+	
+	Vector q = es.eigenvectors().col(0); 
+	if (q[0] < 0) q *= -1.0;
+	
+	return q;
+}
+
+Tensor4 get_R_der(const Matrix& x, const Matrix& y) {
+	int natoms = x.rows();
+	
+	Tensor4 ADiffR(natoms, 3, 3, 3, 0.0); 
+	for (int u = 0; u < natoms; u++)
+		for (int w = 0; w < 3 w++) 
+			for (int j = 0; j < 3; j++) ADiffR(u, w, w, j) = y(u, j); 
+	
+	return ADiffR; 
+}
+
+Tensor4 get_F_der(const Matrix& x, const Matrix& y) {
+	int natoms = x.rows();
+	
+	Tensor4 dR = get_R_der(x, y); 
+	Tensor4 dF(natoms, 3, 4, 4, 0.0); 
+	
+	double dr11, dr12, dr13, dr21, dr22, dr23, dr31, dr32, dr33; 
+	for (int u = 0; u < natoms; u++) {
+		for (int w = 0; w < 3; w++) {
+			dr11 = dR(u, w, 0, 0); 
+			dr12 = dR(u, w, 0, 1);
+			dr13 = dR(u, w, 0, 2);
+			dr21 = dR(u, w, 1, 0);
+			dr22 = dR(u, w, 1, 1);
+			dr23 = dR(u, w, 1, 2);
+			dr31 = dR(u, w, 2, 0);
+			dr32 = dR(u, w, 2, 1);
+			dr33 = dR(u, w, 2, 2);
+			
+			dF(u, w, 0, 0) = dr11 + dr22 + dr33;
+			dF(u, w, 0, 1) = dF(u, w, 1, 0) = dr23 - dr32; 
+			dF(u, w, 0, 2) = dF(u, w, 2, 0) = dr31 - dr13;
+			dF(u, w, 0, 3) = dF(u, w, 3, 0) = dr12 - dr21;
+			dF(u, w, 1, 1) = dr11 - dr22 - dr33;
+			dF(u, w, 1, 2) = dF(u, w, 2, 1) = dr12 + dr21;
+			dF(u, w, 1, 3) = dF(u, w, 3, 1) = dr13 + dr31; 
+			dF(u, w, 2, 2) = dr22 - dr33 - dr11;
+			dF(u, w, 2, 3) = dF(u, w, 3, 2) = dr23 + dr32; 
+			dF(u, w, 3, 3) = dr33 - dr11 - dr22; 
+		}
+	}
+	return dF; 
+}
+
+std::vector<Matrix> get_q_der(const Matrix& x, const Matrix& y) {
+	int natoms = xyz.rows(); 
+	
+	Vector xmean(3), ymean(3);
+	for (int i = 0; i < 3; i++) {
+		xmean[i] = xyz.col(i).sum() / ((double) natoms);
+		ymean[i] = x0.col(i).sum() / ((double) natoms); 
+	}
+	
+	Matrix x = xyz;
+	Matrix y = x0; 
+	for (int i = 0; i < natoms; i++) {
+		x.row(i) -= xmean;
+		y.row(i) -= ymean; 
+	}
+	
+	Matrix F = build_F(x, y); 
+	Tensor4 dF = get_F_der(x, y); 
+	
+	EigenSolver es(F);
+	
+	Vector q = es.eigenvectors().col(0); 
+	if (q[0] < 0) q *= -1.0;
+	double l = es.eigenvalues()[0]; 
+	
+	Matrix mat = Matrix::Identity(4, 4) * l - F; 
+	Matrix pinv = pseudo_inverse(mat, 1e-6); 
+	
+	std::vector<Matrix> qder;
+	for (int u = 0; u < natoms; u++) {
+		Matrix temp1(3, 4);
+		for (int w = 0; w < 3; w++) {
+			Matrix temp2(4, 4);
+			for (int i = 0; i < 4)
+				for (int j = 0; j < 4) temp2(i, j) = dF(u, w, i, j); 
+			
+			temp1.row(w) = pinv * temp2 * q; 
+		}
+		qder.push_back(temp1);
+	}
+	
+	return qder; 
+}
+
+Vector get_exp_map(const Matrix& xyz, const Matrix& x0) {
+	Vector q = get_quat(xyz, x0); 
+	double q0 = q[0] - 1.0;
+	Vector v(3) = { q[1], q[2], q[3] }; 
+	if (fabs(q0) < 1e-8) v*=(2.0 - 2.0 * q0/3.0); 
+	else {
+		q0 += 1.0;
+		double f = 2 * acos(q0) / sqrt(1.0 - q0 * q0); 
+		v *= f; 
+	} 
+	return v;
+}
+
+std::vector<Matrix> get_exp_map_der(const Matrix& xyz, const Matrix& x0) {
+	int natoms = xyz.rows(); 
+	
+	Vector q1 = get_quat(xyz, x0); 
+	Vector q(3) = { q1[1], q1[2], q1[3] }; 
+	double q0 = q1[0] - 1.0; 
+	
+	Vector v; 
+	double f, df; 
+	if (fabs(q0) < 1e-8) {
+		f = 2.0 - 2.0 * q0/3.0;
+		df = -2.0/3.0; 
+	} else {
+		q0 += 1.0;
+		double aq = acos(q0);
+		double oq2 = sqrt(1.0 - q0 * q0);
+		f = 2 * aq / oq2; 
+		df = -2.0 / (oq2 * oq2); 
+		df += 2.0 * q0 * aq / (oq2 * oq2 * oq2); 
+	} 
+	v = q * f; 
+	
+	Matrix dvdq = Matrix::Zero(4, 3); 
+	dvdq.row(0) = df * q; 
+	for (int i = 0; i < 3; i++) dvdq(i+1, i) = f; 
+	
+	std::vector<Matrix> dqdx = get_q_der(xyz, x0); 
+	std::vector<Matrix> dvdx; 
+	for (int i = 0; i < natoms; i++) {
+		Matrix temp = Matrix::Zero(3, 3); 
+		for (int w = 0; w < 3; w++) {
+			Vector dqdx_iw = dqdx[i].row(w); 
+			for (int j = 0; j < 4; j++) temp.row(w) += dvdq.row(j) * dqdx[i](w, j); 
+		}
+		dvdx.push_back(temp); 
+	}  
+	
+	return dvdx; 
+}
+*/

@@ -19,6 +19,7 @@ REFERENCES:
 #include "ecp.hpp"
 #include "bessel.hpp"
 #include "eigen_wrapper.hpp"
+#include <chrono>
 
 //namespace psi {
 
@@ -33,7 +34,7 @@ class GaussianShell;
 * @param dfac - a vector of double factorials up to 2*lmax
 * @return a matrix S(l, l+m) of the spherical harmonic values
 */
-static TwoIndex<double> realSphericalHarmonics(int lmax, double x, double phi, std::vector<double> &fac, std::vector<double> &dfac);  
+TwoIndex<double> realSphericalHarmonics(int lmax, double x, double phi, std::vector<double> &fac, std::vector<double> &dfac);  
 
 /**
 * \ingroup MINTS
@@ -46,6 +47,11 @@ struct ShellPairData {
 	double A[3], B[3];
 	double A2, Am, B2, Bm, RAB2, RABm;
 };
+
+void G000(ECP& U, GaussianShell& shellA, GaussianShell& shellB, ShellPairData& data, ThreeIndex<double>& values);
+void G001(ECP& U, GaussianShell& shellA, GaussianShell& shellB, ShellPairData& data, ThreeIndex<double>& values);
+void G002(ECP& U, GaussianShell& shellA, GaussianShell& shellB, ShellPairData& data, ThreeIndex<double>& values);
+void G003(ECP& U, GaussianShell& shellA, GaussianShell& shellB, ShellPairData& data, ThreeIndex<double>& values);
 
 /** 
 * \ingroup MINTS
@@ -239,11 +245,11 @@ public:
 	/**
 	* Initialises the object, in turn intialising the quadrature grids and BesselFunction
 	* @param maxL - the maximum angular momentum of integral needed
-	* @param tol - the tolerance for convergence of integrals (defaults to 1e-12)
-	* @param small - the maximum number of quadrature points for the small integration grid (default 128, minimum recommended)
+	* @param tol - the tolerance for convergence of integrals (defaults to 1e-15)
+	* @param small - the maximum number of quadrature points for the small integration grid (default 256, minimum recommended)
 	* @param large - the maximum number of quadrature points for the large integration grid (default 1024, minimum recommended)
 	*/
-	void init(int maxL, double tol = 1e-12, int small = 128, int large = 1024);
+	void init(int maxL, double tol = 1e-15, int small = 256, int large = 1024);
 	
 	/**
 	* Given two GaussianShells, builds the parameters needed by both kind of integral. 
@@ -281,6 +287,7 @@ public:
 	* @param values - the matrix to return the integrals in
 	*/
 	void type2(int lam, int l1start, int l1end, int l2start, int l2end, int N, ECP &U, GaussianShell &shellA, GaussianShell &shellB, ShellPairData &data, TwoIndex<double> &values);	
+
 };
 
 /** 
@@ -305,6 +312,8 @@ private:
 	double calcC(int a, int m, double A, std::vector<double> &fac) const;
 
 public:
+	double time_total, time_sub; 
+	int ntotal, nsub; 
 	void makeC(FiveIndex<double> &C, int L, double *A, std::vector<double> &fac);
 	/// Constructor declares reference to the ECP basis
 	ECPIntegral(ECPBasis &basis, int maxLB, int maxLU, int deriv=0);
@@ -316,6 +325,7 @@ public:
 	void type1(ECP& U, GaussianShell &shellA, GaussianShell &shellB, ShellPairData &data, FiveIndex<double> &CA, FiveIndex<double> &CB, TwoIndex<double> &values);
 	/// Calculates the type 2 integrals for the given ECP center over the given shell pair
 	void type2(int l, ECP& U, GaussianShell &shellA, GaussianShell &shellB, ShellPairData &data, FiveIndex<double> &CA, FiveIndex<double> &CB, ThreeIndex<double> &values);
+	
 	/// Computes the overall ECP integrals over the given ECP center and shell pair
 	void compute_shell_pair(ECP &U, GaussianShell &shellA, GaussianShell &shellB, TwoIndex<double> &values, int shiftA = 0, int shiftB = 0);
 };

@@ -8,6 +8,7 @@
 #include <iostream>
 #include <cmath>
 #include <algorithm>
+#include <cstdio>
 
 Tensor4::Tensor4(int a, int b, int c, int d) : w(a), x(b), y(c), z(d)
 {
@@ -36,6 +37,39 @@ Tensor4::Tensor4(const Tensor4& other)
     }
   }
 }  
+
+int Tensor4::writeToFile(std::string filename) {
+	int success = 1; 
+	
+	FILE* pFile = std::fopen(filename.c_str(), "wb"); 
+    if (pFile == NULL) success = -1;
+	else {
+		std::fwrite(&data[0], sizeof(double), data.size(), pFile); 
+		std::fclose(pFile);
+		file_name = filename; 
+		data_size = data.size();
+		data.clear();
+	}
+	
+	return success; 
+}
+
+int Tensor4::readFromFile() {
+	int success = 1;
+
+	FILE* pFile = std::fopen(file_name.c_str(), "rb"); 
+	if (pFile == NULL) success = -1;
+	else {
+		double* buffer = (double*) malloc (sizeof(double)*data_size);
+		size_t result = std::fread(buffer, sizeof(double), data_size, pFile);
+		if (result != data_size) success = -2;
+		else
+			for (int i = 0; i < data_size; i++) data.push_back(buffer[i]); 
+		free(buffer);
+	}
+	
+	return success;
+}
 
 void Tensor4::resize(int a, int b, int c, int d)
 {
@@ -194,7 +228,9 @@ S8EvenTensor4::S8EvenTensor4(int _w, double val)
 S8EvenTensor4::S8EvenTensor4(const S8EvenTensor4& other)
 {
   w = other.w;
-  int size = w*(w+1)*(w+2)*(3*w+1) / 24;
+	long long size = w*(w+1)*(w+2);
+	size *= (3*w+1);
+	size /= 24; 
   data.resize(size);
   updateMults();
   for (int i = 0; i < w; i++){
@@ -211,7 +247,9 @@ S8EvenTensor4::S8EvenTensor4(const S8EvenTensor4& other)
 void S8EvenTensor4::resize(int _w)
 {
 	w = _w;
- 	int size = w*(w+1)*(w+2)*(3*w+1) / 24;
+  	long long size = w*(w+1)*(w+2);
+	size *= (3*w+1);
+	size /= 24; 
   	data.resize(size);
 	updateMults();
 }
@@ -219,7 +257,9 @@ void S8EvenTensor4::resize(int _w)
 void S8EvenTensor4::assign(int _w, double val)
 {
 	w = _w;
-  	int size = w*(w+1)*(w+2)*(3*w+1) / 24;
+  	long long size = w*(w+1)*(w+2);
+	size *= (3*w+1);
+	size /= 24; 
   	data.resize(size);
   	std::fill(data.begin(), data.end(), val);
 	updateMults();

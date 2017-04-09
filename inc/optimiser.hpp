@@ -5,8 +5,9 @@
 #include "molecule.hpp"
 #include "fock.hpp"
 #include "eigen_wrapper.hpp"
+#include "ProgramController.hpp"
+#include <vector>
 
-void quadratic_scf(Molecule& mol, Fock& f);
-Vector quadratic(Matrix& hessian, Vector& gradient);
+void optimise(Command& cmd, SharedMolecule m); 
 
 #endif

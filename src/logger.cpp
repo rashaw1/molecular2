@@ -15,12 +15,12 @@
 #include <ctime>
 #include <map>
 #include "logger.hpp"
+#include "ProgramController.hpp"
 #include "molecule.hpp"
 #include "bf.hpp"
 #include "pbf.hpp"
 #include "error.hpp"
 #include "ioutil.hpp"
-#include "filereader.hpp"
 
 // Define static constants
 const double Logger::RTOCM = 60.19969093279;
@@ -32,150 +32,40 @@ const double Logger::TOANG = 0.52917721092;
 const double Logger::TOBOHR = 1.889726124565;
 
 // Constructor
-Logger::Logger(std::ifstream& in, std::ofstream& out, std::ostream& e) : infile(in), outfile(out), errstream(e), ncmd(0)
+Logger::Logger(ProgramController& _control, std::ofstream& out, std::ostream& e) : control(_control), outfile(out), errstream(e)
 {
 	// Timer is started on initialisation of logger.
-	last_time = 0;
+	first_time = std::chrono::steady_clock::now(); 
+	last_time = first_time;
 
 	// Initialise error array - fixed maximum of 20 errors, because any more than that and the 
 	// whole idea is pointless really! Dynamic memory seems an unecessary overhead for just storing
 	// errors.
 	errs = new Error[20];
 	nerr = 0; // No errors as of yet (hopefully)!
-  
-	FileReader input(infile); // Declare a file reader object
-	try {
-		input.readParameters(); 
-	} catch (Error e) {
-		error(e);
-	}
-	// Do a whole heap of input file reading
-	// The single variables are pretty easy
-	charge = input.getCharge();
-	nthreads = input.getNThreads();
-	multiplicity = input.getMultiplicity();
-	PRECISION = input.getPrecision();
-	MAXITER = input.getMaxIter();
-	THRINT = input.getThrint();
-	CONVERGE = input.getConverge();
-	memory = input.getMemory();
-	twoprinting = input.getTwoPrint();
-	basisprint = input.getBPrint();
-	directing = input.getDirect();
-	diising = input.getDIIS();
-	fragmented = input.getFragments();
-	cmds = input.getCmds();
+}
 
-	if ((twoprinting)) { 
-		std::string intfilename = input.getIntFile();
+void Logger::init_intfile() {
+	if (control.get_option<bool>("printeris")) { 
+		std::string intfilename = control.get_option<std::string>("intfile"); 
 		intfile.open(intfilename);
 		if (!intfile.is_open()){
 			Error e1("FILEIO", "Unable to open integral file.");
 			error(e1);
 		}
 	}
+}
 
-	// Now we deal with the arrays
-	natoms = input.getNAtoms(); // Get how many atoms there are
-	if (natoms > 0){
-		// Now loop to get all the atoms 
-		std::string temp, token;
-
-		try {
-			input.readGeometry();
-		} catch (Error e) {
-			error(e);
-		}
-
-		std::string delimiter = ","; // Define the separation delimiter
-		std::size_t position; int q; Vector coords(3); double m;
-		iVector qs(natoms); // Hold the qs of all the atoms, for finding unique qs laterv
-		double multiplier = (input.getAngstrom() ? TOBOHR : 1.0); // Convert to bohr from angstrom?
-		for (int i = 0; i < natoms; i++){
-			temp = input.getGeomLine(i); // Get a line from the geometry
-			position = temp.find(delimiter); // Find first delimiter
-			token = temp.substr(0, position); // Tokenise
-
-			// Get rid of whitespace, if any
-			token.erase(std::remove(token.begin(), token.end(), ' '), token.end());
-
-			// Get the atom type and mass
-			q = getAtomCharge(token);
-			m = getAtomMass(q);
-			qs[i] = q;
-
-			// Move on to next token
-			temp.erase(0, position+delimiter.length());
-			position = temp.find(delimiter);
-
-			if (position != std::string::npos){
-				token = temp.substr(0, position); 
-
-				// This should now be the x coord
-				token.erase(std::remove(token.begin(), token.end(), ' '), token.end());
-				coords[0] = multiplier*std::stod(token);  // Convert it to double
-
-				// Repeat for y and z
-				temp.erase(0, position+delimiter.length());
-				position = temp.find(delimiter);
-				if (position != std::string::npos) {
-					token = temp.substr(0, position);
-					token.erase(std::remove(token.begin(), token.end(), ' '), token.end());
-					coords[1] = multiplier*std::stod(token);
-					temp.erase(0, position+delimiter.length());
-					if (temp.length() > 0){
-						temp.erase(std::remove(temp.begin(), temp.end(), ' '), temp.end());
-						coords[2] = multiplier*std::stod(temp);
-	
-						// We can now initialise the atom and add to array
-						Atom a(coords, q, m);
-						atoms.push_back(a);
-					} else {
-						Error e2("INPUT", "Missing coordinate.");
-						error(e2);
-					}
-				} else { 
-					Error e3("INPUT", "Missing coordinate.");
-					error(e3);
-				} 
-			} else {
-				Error e4("INPUT", "Missing coordinate.");
-				error(e4);
-			}					
-		}
-		
-		// Deal with fragments
-		if (fragmented) {
-			std::vector<std::vector <int>>& frags = input.getFrags();
-			for (auto f : frags)
-				if(f.size() > 3)
-					fragments.push_back(Fragment(*this, &atoms[f[0]], f[1] - f[0], f[2], f[3]));
-		}
-    
-		// Next, the basis set
-		// First find all the unique qs
-		iVector tempqs = qs;
-		std::sort(qs.data(), qs.data()+qs.size(), [](int lhs, int rhs){ return rhs > lhs; });
-		qs[0] = tempqs(0);
-		int k = 1;
-		for (int i = 1; i < natoms; i++){
-			if (tempqs(i) != qs(k-1)){
-				qs[k] = tempqs[i];
-				k++;
-			}
-		}
-		// k is now the number of unique qs, and all these unique qs are stored in qs
-		// resize to get rid of extra weight
-		qs.conservativeResize(k);
-		// Find the basis name and initialise the basis set
-		bnames = input.getBasis();
-		Basis b(bnames, qs, input.getECP());
-		basisset = b;
-
-	} else { // Our first error :(
-		Error e("NOATOMS", "Nothing to see here.");
-		error(e);
+Logger& Logger::operator=(const Logger& other) {
+	control = other.control;
+	nerr = other.nerr; 
+	if (nerr > 0) {
+		errs = new Error[nerr];
+		for (int i = 0; i < nerr; i++) errs[i] = other.errs[i]; 
 	}
+	first_time = other.first_time;
+	last_time = other.last_time;
+	return *this;
 }
 
 // Destructor - get rid of the atoms and errors arrays
@@ -187,66 +77,6 @@ Logger::~Logger()
 		intfile.close();
 	}
 }
-
-int Logger::nextCmd()
-{
-	int rval = 0;
-	if (ncmd < cmds.size()){
-		std::string token = cmds[ncmd];
-		if (token == "HF") { 
-			rval = 1;
-		} else if (token == "RHF"){
-			rval = 2;
-		} else if (token == "UHF"){
-			rval = 3;
-		} else if (token == "MP2"){
-			rval = 4;
-			std::vector<std::string>::iterator p = std::find(cmds.begin(), cmds.end(), "CCSD(T)");
-			std::vector<std::string>::iterator q = std::find(cmds.begin(), cmds.end(), "CCSD");
-			if (p != cmds.end()) {
-				rval = 6; 
-				cmds.erase(p);
-				if (q != cmds.end()) cmds.erase(q);
-			} else if (q != cmds.end()) {
-				rval = 5;
-				cmds.erase(q);
-			}
-		} else if (token == "CCSD") {
-			rval = 7;
-			std::vector<std::string>::iterator p = std::find(cmds.begin(), cmds.end(), "CCSD(T)");
-			std::vector<std::string>::iterator q = std::find(cmds.begin(), cmds.end(), "MP2");
-			if (q != cmds.end() && p != cmds.end()) {
-				rval = 6; 
-				cmds.erase(q);
-				cmds.erase(p);
-			} else if (p != cmds.end()) {
-				rval = 8;
-				cmds.erase(p);
-			} else if (q != cmds.end()) {
-				rval = 5;
-				cmds.erase(q);
-			}
-		} else if (token == "CCSD(T)") {
-			rval = 8;
-			std::vector<std::string>::iterator p = std::find(cmds.begin(), cmds.end(), "CCSD");
-			std::vector<std::string>::iterator q = std::find(cmds.begin(), cmds.end(), "MP2");
-			if (q != cmds.end()) {
-				rval = 6;
-				cmds.erase(q);
-			} 
-			if (p != cmds.end()) cmds.erase(p);
-		} else if (token == "ALMO") {
-			if (!fragmented) {
-				Error e("ALMO", "ALMO requested but no fragments given");
-				error(e);
-			} else {
-				rval = 9; 
-			}
-		}
-		ncmd++;
-	}
-	return rval;
-}					
 
 // Overloaded print functions
 
@@ -699,7 +529,7 @@ void Logger::iterationCC(int iter, double energy, double delta_e, double delta_s
 	outfile << std::setw(15) << t_iter;
 	outfile << "\n";
   
-	if (iter % 5 == 0) flush();
+	flush();
 }
 
 // Print out the orbitals from an SCF calculation
@@ -740,8 +570,8 @@ void Logger::orbitals(const Vector& eps, int nel, bool one)
 // Print time elapsed since last call
 void Logger::localTime()
 {
-	boost::timer::nanosecond_type temp = timer.elapsed().wall;
-	outfile << "Time taken: " <<  ((double)(temp - last_time))/(1e9)
+	auto temp = std::chrono::steady_clock::now(); 
+	outfile << "Time taken: " <<  std::chrono::duration<double, std::deci>(temp - last_time).count()/10.0
 		<< " seconds\n";
 	last_time = temp;
 }
@@ -749,29 +579,32 @@ void Logger::localTime()
 // Print total time taken
 void Logger::globalTime()
 {
-	outfile << "Total time: " << ((double)(timer.elapsed().wall))/(1e9) 
+	auto temp = std::chrono::steady_clock::now() - first_time; 
+	outfile << "Total time: " << std::chrono::duration<double, std::deci>(temp).count()/10.0
 		<< " seconds\n";
 }
 
 // Print time at which error occured
 void Logger::errTime()
 {
-	errstream << "Error after " << ((double)(timer.elapsed().wall))/(1e9) 
+	auto temp = std::chrono::steady_clock::now() - first_time; 
+	errstream << "Error after " << std::chrono::duration<double, std::deci>(temp).count()/10.0
 		<< " seconds\n";
 }
 
 // Return the localTime/globalTime, instead of printing
 double Logger::getLocalTime() 
 {
-	boost::timer::nanosecond_type temp = timer.elapsed().wall;
-	boost::timer::nanosecond_type rval = temp - last_time;
+	auto temp = std::chrono::steady_clock::now(); 
+	auto rval = temp - last_time;
 	last_time = temp;
-	return ((double)(rval))/(1e9);
+	return std::chrono::duration<double, std::deci>(rval).count()/10.0; 
 }
 
 double Logger::getGlobalTime()
 {
-	return ((double)(timer.elapsed().wall))/(1e9);
+	auto temp = std::chrono::steady_clock::now() - first_time;
+	return std::chrono::duration<double, std::deci>(temp).count()/10.0; 
 }
 
 // Flush the output streams

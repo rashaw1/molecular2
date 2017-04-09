@@ -50,31 +50,45 @@
 #include "basis.hpp"
 #include "atom.hpp"
 #include <string>
+#include <map>
+#include <vector>
 #include "bf.hpp"
 #include "ecp.hpp"
 #include "eigen_wrapper.hpp"
 
 // Declare forward dependcies
-class Logger;
+class Fragment;
+class Molecule;
+class ProgramController;
+struct Construct;
+
+using SharedMolecule = std::shared_ptr<Molecule>; 
+using SharedFragment = std::shared_ptr<Fragment>;  
 
 // Begin class definition
-class Molecule
+class Molecule : public std::enable_shared_from_this<Molecule> 
 {
-private:
-  ECPBasis ecpset;
 protected:
+  ECPBasis ecpset;
   Basis bfset;
   Atom* atoms;
-  Logger& log;
   int charge, nel, multiplicity, natoms;
-  bool parent;
+  bool parent, angstrom, fragmented, has_ecps;
+  std::vector<SharedFragment> fragments;
+  std::map<int, std::string> bnames;
   double enuc;
 public:
+	
+  std::shared_ptr<ProgramController> control;
+  
   // Constructors and destructor
-  void init(); // An initialisation function
-  Molecule(Logger& logger, int q = 0, bool doInit = true); // Need the log for input, q is charge
+  void init(Construct& c); // An initialisation function
+  Molecule(std::shared_ptr<ProgramController> control, Construct& c, int q = 0); // Need the log for input, q is charge
+  Molecule(std::shared_ptr<ProgramController> control, int q); 
   Molecule(const Molecule& other); // Copy constructor
   ~Molecule(); // Deletes the atom array
+  
+  Atom parseGeomLine(std::string line);
   
   void buildShellBasis();
   void buildECPBasis();
@@ -85,13 +99,15 @@ public:
   int getCharge() const { return charge; }
   int getNel() const { return nel; }
   int getMultiplicity() const { return multiplicity; }
-  Logger& getLog() { return log; }
   double getEnuc() const { return enuc; }
   Atom& getAtom(int i) { return atoms[i]; } // Return atom i
   BF& getBF(int q, int i) { return bfset.getBF(q, i); } // Return basis func. i of atom q
   Basis& getBasis() { return bfset; }
   ECPBasis& getECPBasis() { return ecpset; }
   ECP& getECP(int i) { return ecpset.getECP(i); }
+  bool hasECPS() { return has_ecps; }
+  std::vector<SharedFragment>& getFragments() { return fragments; }
+  
   // Routines
   void rotate(const Matrix& U);
   void translate(double x, double y, double z);
@@ -107,6 +123,8 @@ public:
   double torsionAngle(int i, int j, int k, int l) const;
   std::string rType();
   Vector rConsts(int units);
+  
+  Molecule& operator=(const Molecule& other); 
 };
 
 class Fragment : public Molecule 
@@ -114,10 +132,12 @@ class Fragment : public Molecule
 private:
 	std::vector<Atom> frag_atoms; 
 public:
-	Fragment(Logger& logger, Atom* as, int nat, int q = 0, int mult = 1); 
+	Fragment(std::shared_ptr<ProgramController> control, Atom* as, int nat, const Basis& _bfset, std::map<int, std::string> _bnames, bool _has_ecps = false, int q = 0, int mult = 1); 
 	Fragment(const Fragment& other);
 	~Fragment();
-	void init(Atom* as, int nat, int q, int mult);
+	void init(Atom* as, int nat, int q, int mult, bool _has_ecps, const Basis& _bfset);
+	
+	Fragment& operator=(const Fragment& other); 
 };
 
 #endif

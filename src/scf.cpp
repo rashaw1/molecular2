@@ -13,11 +13,14 @@
 #include "integrals.hpp"
 #include <cmath>
 #include "error.hpp"
+#include "ProgramController.hpp"
 
 // Constructor
-SCF::SCF(Molecule& m, Fock& f) : molecule(m), focker(f), energy(0.0), last_energy(0.0), one_E(0.0), two_E(0.0), error(0.0), last_err(0.0)
+SCF::SCF(Command& c, SharedMolecule m, Fock& f) : cmd(c), molecule(m), focker(f), energy(0.0), last_energy(0.0), one_E(0.0), two_E(0.0), error(0.0), last_err(0.0)
 {
-	diis.init(8, m.getLog().diis());
+	int maxdiis = cmd.get_option<int>("maxdiis");
+	bool dodiis = cmd.get_option<bool>("diis");
+	diis.init(maxdiis, dodiis); 
 }
 
 // Routines
@@ -32,7 +35,7 @@ void SCF::calcE()
   
 	// Calculate the energy
 	last_energy = energy;
-	energy = calcE(hcore, dens, fock) + molecule.getEnuc();
+	energy = calcE(hcore, dens, fock) + molecule->getEnuc();
 }
 
 // Do the same but as an external function, where matrices are given as arguments
@@ -69,7 +72,7 @@ Vector SCF::calcErr()
 // matrices for convergence testing
 bool SCF::testConvergence(double val)
 {
-	bool result = (val < molecule.getLog().converge() ? true : false);
+	bool result = (val < cmd.get_option<double>("converge") ? true : false);
 	last_err = error;
 	return result;
 }
@@ -87,25 +90,25 @@ bool SCF::testConvergence(double val)
 void SCF::rhf(bool print)
 {
 	// Check the multiplicity and number of electrons
-	int nel = molecule.getNel();
-	int mult = molecule.getMultiplicity();
+	int nel = molecule->getNel();
+	int mult = molecule->getMultiplicity();
   
 	if ( (nel%2 != 0) ) {
 		Error e1("RHF", "Molecule has an odd number of electrons.");
-		molecule.getLog().error(e1);
+		molecule->control->log.error(e1);
 	} else if (mult != 1) {
 		Error e2("RHF", "Molecule is not a singlet state.");
-		molecule.getLog().error(e2);
+		molecule->control->log.error(e2);
 	} else { // All is fine
 		if (print) {
-			molecule.getLog().title("RHF SCF Calculation");
-			molecule.getLog().initIteration();
+			molecule->control->log.title("RHF SCF Calculation");
+			molecule->control->log.initIteration();
 		}
 		bool converged = false;
 		// Get initial guess
 		focker.transform(true); // Get guess of fock from hcore
 		focker.diagonalise();
-		focker.makeDens(nel/2);
+		focker.makeDens();
 		Matrix old_dens = focker.getDens();
 		focker.makeJK();
 		focker.makeFock();
@@ -116,16 +119,19 @@ void SCF::rhf(bool print)
 		errs.clear();
 
 		calcE();
-		if(print) molecule.getLog().iteration(0, energy, 0.0, 0.0);
+		if(print) molecule->control->log.iteration(0, energy, 0.0, 0.0);
 		focker.average(weights);
 		focker.transform(false);
 		int iter = 1;
 		double delta, dd;
+		
+		int MAXITER = cmd.get_option<int>("maxiter"); 
+		double CONVERGE = cmd.get_option<double>("converge");
     
-		while (!converged && iter < molecule.getLog().maxiter()) {
+		while (!converged && iter < MAXITER) {
 			// Recalculate
 			focker.diagonalise();
-			focker.makeDens(nel/2);
+			focker.makeDens();
 			dd = (focker.getDens() - old_dens).norm();
 			old_dens = focker.getDens();
 			focker.makeJK();
@@ -137,111 +143,111 @@ void SCF::rhf(bool print)
       
 			calcE();
 			delta = fabs(energy-last_energy);
-			if(print) molecule.getLog().iteration(iter, energy, delta, dd);
+			if(print) molecule->control->log.iteration(iter, energy, delta, dd);
 			focker.average(weights);
 			focker.transform(false);
 			converged = testConvergence(dd);
-			if ( delta > molecule.getLog().converge()/100.0 ) { converged = false; }
+			if ( delta > CONVERGE/100.0 ) { converged = false; }
 			iter++;
 		}
 		focker.diagonalise();
 	
 		if (!converged) { 
-			molecule.getLog().result("SCF failed to converge.");
+			molecule->control->log.result("SCF failed to converge.");
 		} else if (print) {
-			molecule.getLog().print("\nOne electron energy (Hartree) = " + std::to_string(one_E));
-			molecule.getLog().print("\nTwo electron energy (Hartree) = " + std::to_string(two_E));
-			molecule.getLog().print("\n");
-			molecule.getLog().orbitals(focker.getEps(), nel, false);
-			molecule.getLog().result("RHF Energy", energy, "Hartree");
+			molecule->control->log.print("\nOne electron energy (Hartree) = " + std::to_string(one_E));
+			molecule->control->log.print("\nTwo electron energy (Hartree) = " + std::to_string(two_E));
+			molecule->control->log.print("\n");
+			molecule->control->log.orbitals(focker.getEps(), nel, false);
+			molecule->control->log.result("RHF Energy", energy, "Hartree");
 		}
 	}
 }
 
+void SCF::uhf(bool print) {
+		UnrestrictedFock& ufocker = dynamic_cast<UnrestrictedFock&>(focker);
+		uhf_internal(print, ufocker);  
+}
+
 // UHF
-void SCF::uhf(bool print)
-{
-	// Make a second focker instance
-	Fock focker2(focker.getIntegrals(), molecule);
-  
+void SCF::uhf_internal(bool print, UnrestrictedFock& ufocker)
+{ 
 	// Get number of alpha/beta electrons
-	int nalpha = molecule.nalpha();
-	int nbeta = molecule.nbeta();
+	int nalpha = molecule->nalpha();
+	int nbeta = molecule->nbeta();
 
 	// Start logging
 	if (print) {
-		molecule.getLog().title("UHF SCF Calculation");
-		molecule.getLog().print("# alpha = " + std::to_string(nalpha));
-		molecule.getLog().print("# beta = " + std::to_string(nbeta));
-		molecule.getLog().print("\n");
-		molecule.getLog().initIteration();
+		molecule->control->log.title("UHF SCF Calculation");
+		molecule->control->log.print("# alpha = " + std::to_string(nalpha));
+		molecule->control->log.print("# beta = " + std::to_string(nbeta));
+		molecule->control->log.print("\n");
+		molecule->control->log.initIteration();
 	}
 	bool converged = false;
   
 	// Get initial guess                                                                                                                                                                      
-	focker.transform(true); focker2.transform(true);
-	focker.diagonalise(); focker2.diagonalise();
+	ufocker.transform(true);
+	ufocker.diagonalise();
 	int iter = 1;
 	double delta, ea, eb, dist;
-	Matrix DA = Matrix::Zero(focker.getFockMO().rows(), focker.getFockMO().rows());
-	Matrix DB = Matrix::Zero(focker2.getFockMO().rows(), focker2.getFockMO().rows());
-	//bool average = molecule.getLog().diis();
+	//bool average = molecule->control->log.diis();
 	double err1 = 0.0, err2 = 0.0, err1_last = 0.0, err2_last = 0.0;
 	std::vector<Vector> errs;
-	while (!converged && iter < molecule.getLog().maxiter()) {
-		if (iter!= 1) {
-			DA = focker.getDens(); DB = focker2.getDens();
-		}
-		focker.makeDens(nalpha); focker2.makeDens(nbeta);
-		/*if (iter != 1 && average ) { 
-		focker.simpleAverage(DA, 0.5); 
-		focker2.simpleAverage(DB, 0.5);
-		}*/
-		focker.makeJK(); focker2.makeJK();
-		focker.makeFock(focker2.getJ()); focker2.makeFock(focker.getJ());    
+	int nbfs = ufocker.getHCore().rows();
+	Matrix old_dens_alpha = Matrix::Zero(nbfs, nbfs);
+	Matrix old_dens_beta = Matrix::Zero(nbfs, nbfs);
+	int MAXITER = cmd.get_option<int>("maxiter"); 
+	double CONVERGE = cmd.get_option<double>("converge");
+	
+	while (!converged && iter < MAXITER) {
+		
+		ufocker.makeDens();
+		ufocker.makeJK(); 
+		ufocker.makeFock();  
 
-		errs.push_back(calcErr(focker.getFockAO(), focker.getDens(), focker.getIntegrals().getOverlap(), focker.getOrthog()));
+		errs.push_back(calcErr(ufocker.getFockAlphaAO(), ufocker.getDensAlpha(), ufocker.getS(), ufocker.getOrthog()));
 		err1_last = err1;
 		err1 = error;
 
-		errs.push_back(calcErr(focker2.getFockAO(), focker2.getDens(), focker2.getIntegrals().getOverlap(), focker.getOrthog()));
+		errs.push_back(calcErr(ufocker.getFockBetaAO(), ufocker.getDensBeta(), ufocker.getS(), ufocker.getOrthog()));
 		err2_last = err2;
 		err2 = error;
 	
 		Vector weights = diis.compute(errs);
 		errs.clear();
-		focker.average(weights);
-		focker2.average(weights);
+		ufocker.average(weights);
 
-		ea = calcE(focker.getHCore(), focker.getDens(), focker.getFockAO());
-		eb = calcE(focker2.getHCore(), focker2.getDens(), focker2.getFockAO());
+		ea = calcE(ufocker.getHCore(), ufocker.getDensAlpha(), ufocker.getFockAlphaAO());
+		eb = calcE(ufocker.getHCore(), ufocker.getDensBeta(), ufocker.getFockBetaAO());
 
-		focker.transform(); focker2.transform();
-		focker.diagonalise(); focker2.diagonalise();
+		ufocker.transform(); 
+		ufocker.diagonalise();
     
 		last_energy = energy;
-		energy = (ea + eb)/2.0 + molecule.getEnuc();
+		energy = (ea + eb)/2.0 + molecule->getEnuc();
 		delta = fabs(energy - last_energy);
     
-		dist = (focker.getDens() + focker2.getDens() - DA - DB).norm();
+		dist = (ufocker.getDensAlpha() + ufocker.getDensBeta() - old_dens_alpha - old_dens_beta).norm();
+		old_dens_alpha = ufocker.getDensAlpha();
+		old_dens_beta = ufocker.getDensBeta(); 
 		//dist = 0.5*(err1+err2-err1_last-err2_last);
     
-		if(print) molecule.getLog().iteration(iter, energy, delta, dist);
+		if(print) molecule->control->log.iteration(iter, energy, delta, dist);
 
-		if (delta < molecule.getLog().converge()/100.0 && dist < molecule.getLog().converge()) { converged = true; }
+		if (delta < CONVERGE/100.0 && dist < CONVERGE) { converged = true; }
 		iter++;
 	}
 
-	focker.diagonalise();
-	focker2.diagonalise();
+	ufocker.diagonalise();
 	if (converged && print) {
 		// Construct the orbital energies
-		molecule.getLog().print("\nALPHA ORBITALS");
-		molecule.getLog().orbitals(focker.getEps(), nalpha, true);
-		molecule.getLog().print("\nBETA ORBITALS");
-		molecule.getLog().orbitals(focker2.getEps(), nbeta, true);
-		molecule.getLog().result("UHF Energy", energy, "Hartree");
-	} else {
-		molecule.getLog().result("UHF failed to converge");
+		molecule->control->log.print("\nALPHA ORBITALS");
+		molecule->control->log.orbitals(ufocker.getEpsAlpha(), nalpha, true);
+		molecule->control->log.print("\nBETA ORBITALS");
+		molecule->control->log.orbitals(ufocker.getEpsBeta(), nbeta, true);
+		molecule->control->log.result("UHF Energy", energy, "Hartree");
+	} else if (!converged){
+		molecule->control->log.result("UHF failed to converge");
 	}
 }

@@ -1,10 +1,15 @@
-basis, default, cc-pvqz
 memory, 4000
-rhf,
-!uhf,
-mp2,
-geom,
-h, 0.0, 0.0, 0.0
-h, 0.0, 0.0, 1.4
-geomend
 nthreads, 2
+direct, true
+molecule = {
+	 geometry = {
+	 	  h, 0.0, 0.0, 0.0
+		  h, 1.4, 0.0, 0.0
+	 }
+	 basis = {
+	       default, avqz
+	 }
+}	 
+!rhf()
+uhf()
+!mp2()

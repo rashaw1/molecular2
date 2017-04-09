@@ -1,6 +1,13 @@
-basis, default, cc-pvdz-pp
-ecp, br, ecp10mdf
-hf,
-geom,
-br, 0, 0, 0
-geomend
+molecule = {
+	 geometry = {
+	 	  br, 0, 0, 0
+	 }
+	 basis = {
+	       default, cc-pvdz-pp
+	 }
+	 ecp = {
+	     br, ecp10mdf
+	 }
+	 multiplicity, 2
+}
+hf()

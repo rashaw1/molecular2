@@ -1118,9 +1118,12 @@ iVector BasisReader::readShells(int q)
 				else if (temp == "l") { lmult = 45; }
 
 				std::getline(input, line);
-				while (line.at(0) == 'c'){
+				bool section = true; 
+				while (section){
 					nbfs += lmult;
 					std::getline(input, line);
+					section = line.length() > 0;
+					if (section) section = line.at(0) == 'c'; 
 				}
 				shells[counter] = nbfs;
 				counter++;

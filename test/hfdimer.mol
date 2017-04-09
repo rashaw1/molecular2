@@ -1,13 +1,17 @@
-basis, default, cc-pvdz
-geom,
-H, 0, 0, 0
-F, 2.0, 0, 0
-H, 4.5, 0, 0
-F, 6.5, 0, 0
-geomend
-fragments,
-1, 2, 0, 1
-3, 4, 0, 1
-fragmentsend
 nthreads, 2
-rhf,
+molecule = {
+	 geometry = {
+	 	  H, 0.0, 0.0, 0.0
+		  F, 2.0, 0.0, 0.0
+		  H, 4.5, 0.0, 0.0
+		  F, 6.5, 0.0, 0.0
+	 }
+	 basis = {
+	       default, cc-pvdz
+	 }
+	 fragments = {
+	 	   1, 2, 0, 1
+		   3, 4, 0, 1
+	 }
+}
+rhf()

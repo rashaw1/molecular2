@@ -7,12 +7,13 @@
 #include "error.hpp"
 #include <iostream>
 #include <thread>
+#include "ProgramController.hpp"
 
 // Constructor
 MP2::MP2(Fock& _focker) : spinBasis(false), focker(_focker)
 {
 	N = focker.getDens().rows();
-	nocc = focker.getMolecule().getNel()/2;
+	nocc = focker.getMolecule()->getNel()/2;
 	energy = 0.0;
 	moInts.assign(N, 0.0);
 }
@@ -20,14 +21,14 @@ MP2::MP2(Fock& _focker) : spinBasis(false), focker(_focker)
 // Integral transformation
 void MP2::transformIntegrals()
 {
-	if (focker.getMolecule().getLog().direct()) {
+	if (focker.getMolecule()->control->get_option<bool>("direct")) {
 		Error e("MP2TRANS", "Integral direct MP2 not implemented yet.");
-		focker.getMolecule().getLog().error(e);
+		focker.getMolecule()->control->log.error(e);
 		nocc = 0;
 	} else {
 	
 		// Multithread
-		int nthreads = focker.getMolecule().getLog().getNThreads();
+		int nthreads = focker.getMolecule()->control->get_option<int>("nthreads");
 
 		std::vector<Tensor4> moTemps(nthreads);
 		std::vector<std::thread> thrds(nthreads);
@@ -68,13 +69,13 @@ void MP2::transformIntegrals()
 
 void MP2::spatialToSpin() {
 	if (!spinBasis) {
-		if (focker.getMolecule().getLog().direct()) {
+		if (focker.getMolecule()->control->get_option<bool>("direct")) {
 			Error e("MP2TRANS", "Integral direct CC not implemented yet.");
-			focker.getMolecule().getLog().error(e);
+			focker.getMolecule()->control->log.error(e);
 			nocc = 0;
 		} else if (moInts.getW() == 0) {
 			Error e("SPINTRANS", "Integrals have not yet been transformed to the MO basis");
-			focker.getMolecule().getLog().error(e);
+			focker.getMolecule()->control->log.error(e);
 			nocc = 0;
 		} else {
 			spinInts.assign(2*N, 0.0);
@@ -158,8 +159,12 @@ void MP2::calculateEnergy()
 
 	double ediff, etemp;
 	energy = 0.0;
-	for (int i = 0; i < nocc; i++){
-		for (int j = 0; j < nocc; j++){
+	int occ_min = 0; 
+	for (int i = 0; i < nocc; i++)
+		if (eps[i] >= -1.0) { occ_min = i; break; } 
+	
+	for (int i = occ_min; i < nocc; i++){
+		for (int j = occ_min; j < nocc; j++){
 			
 			for (int a = nocc; a < N; a++){	
 				for (int b = nocc; b < N; b++){
