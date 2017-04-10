@@ -360,11 +360,14 @@ void CCSD::compute()
 	double time_tot; 
 	double new_en; 
 	double nt1 = T.ai->norm2();
+	T["abij"] = 0.5*T["abij"]; 
 	double nt2 = T.abij->norm2();
 	double newnt1, newnt2; 
 	while (!converged && iter < MAXITER) {
 		ccsd_iteration(V, T, 0); 
-		new_en = V["ai"]*T["ai"] + 0.25*V["abij"]*(T["abij"] + 0.5*T["ai"]*T["bj"]); 
+		new_en = V["ai"]*T["ai"] + 0.25*V["abij"]*(T["abij"] + 0.5*T["ai"]*T["bj"]);
+		double singles_en = V["ai"]*T["ai"];
+		std::cout << singles_en << std::endl;
 		delta_e = new_en - energy;
 		energy = new_en; 
 		newnt1 = T.ai->norm2();
@@ -472,10 +475,11 @@ int sched_nparts){
 	Dabij["abij"] -= V["a"];
 	Dabij["abij"] -= V["b"];
 
+
 	CTF::Function<> fctr(&divide);
 
 	T.ai->contract(1.0, Zai, "ai", Dai, "ai", 0.0, "ai", fctr);
-	T.abij->contract(1.0, Zabij, "abij", Dabij, "abij", 0.0, "abij", fctr);
+	T.abij->contract(0.5, Zabij, "abij", Dabij, "abij", 0.0, "abij", fctr);
 } 
 
 					
