@@ -72,6 +72,7 @@ protected:
   ECPBasis ecpset;
   Basis bfset;
   Atom* atoms;
+  std::vector<int> frozen_atoms; 
   int charge, nel, multiplicity, natoms;
   bool parent, angstrom, fragmented, has_ecps;
   std::vector<SharedFragment> fragments;
@@ -96,6 +97,8 @@ public:
   
   // Accessors
   int getNAtoms() const { return natoms; }
+  int getNFrozenAtoms() const { return frozen_atoms.size(); }
+  int getNActiveAtoms() const { return natoms - frozen_atoms.size(); }
   int getCharge() const { return charge; }
   int getNel() const { return nel; }
   int getMultiplicity() const { return multiplicity; }
@@ -103,6 +106,7 @@ public:
   int getNValence() const;
   double getEnuc() const { return enuc; }
   Atom& getAtom(int i) { return atoms[i]; } // Return atom i
+  std::vector<int> getActiveList() const; 
   BF& getBF(int q, int i) { return bfset.getBF(q, i); } // Return basis func. i of atom q
   Basis& getBasis() { return bfset; }
   ECPBasis& getECPBasis() { return ecpset; }

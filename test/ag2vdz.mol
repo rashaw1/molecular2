@@ -1,4 +1,4 @@
-withcore, true
+!withcore, true
 molecule = {
 	 angstrom,true
 	 geometry = {

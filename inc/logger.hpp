@@ -93,6 +93,7 @@ public:
   static const double TOEV;
   static const double TOBOHR;
   static const double TOANG;
+  static const double TOWAVENUMBERS; 
   
   // Constructor/destructor
   Logger(ProgramController &control, std::ofstream& out, std::ostream& e);
@@ -121,6 +122,8 @@ public:
   void initIteration();
   void initIterationCC();
   void orbitals(const Vector& eps, int nel, bool one = false);
+  void frequencies(const Vector& freqs, const Matrix& modes, bool printmodes); 
+  
   // Specific logging formats
   void title(const std::string& msg) const;
   void result(const std::string& msg) const;

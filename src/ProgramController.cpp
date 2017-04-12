@@ -374,10 +374,14 @@ void ProgramController::call_optg(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true); 
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 8);
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
-	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
+	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-3); 
 	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12);
+	if(!c.is_option_set("trust")) c.set_option<double>("trust", 0.1); 
+	if(!c.is_option_set("freq")) c.set_option<bool>("freq", false); 
+	if(!c.is_option_set("modes")) c.set_option<bool>("modes", false); 
 	
-	//conjugate_scf(c, m); 
+	RHFOptimiser optim(c, m);
+	optim.optimise();  
 }
 
 void ProgramController::call_nuctest(Command& c, SharedMolecule m) {

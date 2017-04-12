@@ -30,6 +30,7 @@ const double Logger::TOEV = 27.21138505;
 const double Logger::TOKJ = 2625.49962;
 const double Logger::TOANG = 0.52917721092;
 const double Logger::TOBOHR = 1.889726124565;
+const double Logger::TOWAVENUMBERS = 32298.63331; 
 
 // Constructor
 Logger::Logger(ProgramController& _control, std::ofstream& out, std::ostream& e) : control(_control), outfile(out), errstream(e)
@@ -565,6 +566,58 @@ void Logger::orbitals(const Vector& eps, int nel, bool one)
 		outfile << std::setw(15) << eps(i)*TOEV << " eV\n";
 	}	
 }
+
+void Logger::frequencies(const Vector& freqs, const Matrix& modes, bool printmodes) {
+	int nrows = modes.rows(); 
+	
+	outfile << "\nFREQUENCIES (in wavenumbers)\n\n"; 
+	outfile << std::setw(10) << "Mode" << std::setw(20) << "Frequency" << std::endl; 
+	for (int i = 0; i < nrows; i++) {
+		outfile << std::setw(10) << i+1;
+		outfile << std::setw(20) << std::setprecision(6) << freqs[i] << std::endl; 
+	}
+		
+	if (printmodes) {
+		outfile << "\nNORMAL MODES\n\n"; 
+		
+		int ntrips = nrows / 3; 
+		int i = 0; 
+		for (int row = 0; row < ntrips; row++) {
+			outfile << std::setw(20) << "Coordinate"; 
+			outfile << std::setw(20) << i+1; 
+			outfile << std::setw(20) << i+2;
+			outfile << std::setw(20) << i+3 << std::endl;
+			
+			int j = 0; 
+			for (int atom = 0; atom < ntrips; atom++) {
+				outfile << std::setw(20) << "X" + std::to_string(atom+1); 
+				outfile << std::setw(20) << std::setprecision(8) << modes(j, i); 
+				outfile << std::setw(20) << modes(j, i+1); 
+				outfile << std::setw(20) << modes(j, i+2); 
+				outfile << std::endl; 
+				
+				outfile << std::setw(20) << "Y" + std::to_string(atom+1); 
+				outfile << std::setw(20) << std::setprecision(8) << modes(j+1, i); 
+				outfile << std::setw(20) << modes(j+1, i+1); 
+				outfile << std::setw(20) << modes(j+1, i+2); 
+				outfile << std::endl; 
+				
+				outfile << std::setw(20) << "Z" + std::to_string(atom+1); 
+				outfile << std::setw(20) << std::setprecision(8) << modes(j+2, i); 
+				outfile << std::setw(20) << modes(j+2, i+1); 
+				outfile << std::setw(20) << modes(j+2, i+2); 
+				outfile << std::endl; 
+					
+				j+=3;
+			}
+			
+			i += 3;  
+			outfile << std::endl << std::endl;  
+		}
+		
+	}
+}
+
 // Timing functions
 
 // Print time elapsed since last call

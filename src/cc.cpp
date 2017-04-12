@@ -360,14 +360,16 @@ void CCSD::compute()
 	double time_tot; 
 	double new_en; 
 	double nt1 = T.ai->norm2();
-	T["abij"] = 0.5*T["abij"]; 
+	T["abij"] = T["abij"]; 
 	double nt2 = T.abij->norm2();
 	double newnt1, newnt2; 
 	while (!converged && iter < MAXITER) {
 		ccsd_iteration(V, T, 0); 
-		new_en = V["ai"]*T["ai"] + 0.25*V["abij"]*(T["abij"] + 0.5*T["ai"]*T["bj"]);
 		double singles_en = V["ai"]*T["ai"];
-		std::cout << singles_en << std::endl;
+		double disconn_en = 0.5*V["abij"]*T["ai"]*T["bj"]; 
+		double doubles_en = 0.25*V["abij"]*T["abij"]; 
+		new_en = singles_en + disconn_en + doubles_en; 
+		std::cout << singles_en << " " << disconn_en << " " << doubles_en << std::endl;
 		delta_e = new_en - energy;
 		energy = new_en; 
 		newnt1 = T.ai->norm2();
@@ -400,69 +402,95 @@ Amplitudes  &T,
 int sched_nparts){
 	int rank;   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-	CTF::Tensor<> Tau = CTF::Tensor<>(V.abij); 
-	CTF::Tensor<> FAE = CTF::Tensor<>(V.ab); 
-	CTF::Tensor<> FMI = CTF::Tensor<>(V.ij); 
+	int ns[2] = {NS, NS}; 
+	int nsns[4] = {NS, NS, NS, NS}; 
+	int asns[4] = {AS, NS, NS, NS}; 
+	int nsas[4] = {NS, NS, AS, NS}; 
+	 
+	CTF::Tensor<> Tau = CTF::Tensor<>(T.abij); 
+	CTF::Tensor<> TauTilde = CTF::Tensor<>(T.abij); 
+	CTF::Tensor<> FAE(2, V.ab->lens, ns, *V.dw); 
+	CTF::Tensor<> FMI(2, V.ij->lens, ns, *V.dw);  
 	CTF::Tensor<> FME = CTF::Tensor<>(V.ia);
-	CTF::Tensor<> WMNIJ = CTF::Tensor<>(V.ijkl);
-	CTF::Tensor<> WMNEJ = CTF::Tensor<>(V.ijak);
-	CTF::Tensor<> WAMIJ = CTF::Tensor<>(V.aijk);
-	CTF::Tensor<> WAMEI = CTF::Tensor<>(V.aibj);
+	CTF::Tensor<> WMNIJ(4, V.ijkl->lens, asns, *V.dw);
+	CTF::Tensor<> WABEF(4, V.abcd->lens, nsas, *V.dw);
+	CTF::Tensor<> WBMEJ = CTF::Tensor<>(V.aibj);
 	
-	Tau["abij"] = T["abij"];
-	Tau["abij"] += 0.5*T["ai"]*T["bj"]; 
+	Tau["abij"] = T["ai"]*T["bj"]; 
+	Tau["abij"] -= T["bi"]*T["aj"]; 
+	TauTilde["abij"] = T["abij"];
+	TauTilde["abij"] += 0.5*Tau["abij"];
+	Tau["abij"] += T["abij"]; 
 	
 	// Intermediates
 	FME["me"] = V["me"]; 
 	FME["me"] += V["mnef"]*T["fn"]; 
 	
 	FMI["mi"] = V["mi"]; 
-	FMI["mi"] += 0.5*V["mnef"]*T["efin"]; 
-	FMI["mi"] += FME["me"]*T["ei"]; 
-	FMI["mi"] += V["nmfi"]*T["fn"]; 
-	
+	FMI["mi"] += 0.5*V["me"]*T["ei"]; 
+	FMI["mi"] -= V["mnei"]*T["en"]; 
+	FMI["mi"] += 0.5*V["mnef"]*TauTilde["efin"]; 
+ 	
 	FAE["ae"] = V["ae"]; 
-	FAE["ae"] -= 0.5*V["mnef"]*T["afmn"];
-	FAE["ae"] -= FME["me"]*T["am"]; 
+	FAE["ae"] -= 0.5*V["me"]*T["am"];
 	FAE["ae"] += V["amef"]*T["fm"]; 
+	FAE["ae"] -= 0.5*V["mnef"]*TauTilde["afmn"]; 
 	
 	WMNIJ["mnij"] = V["mnij"]; 
-	WMNIJ["mnij"] += 0.5*V["mnef"]*Tau["efij"]; 
-	WMNIJ["mnij"] += V["mnej"]*T["ei"]; 
+	WMNIJ["mnij"] -= V["mnei"]*T["ej"]; 
+	WMNIJ["mnij"] += V["mnej"]*T["ei"];
+	WMNIJ["mnij"] += 0.25*V["mnef"]*Tau["efij"]; 
 	
-	WMNEJ["mnej"] = V["mnej"]; 
-	WMNEJ["mnej"] += V["mnef"]*T["fj"];
+	WABEF["abef"] = V["abef"];
+	WABEF["abef"] -= V["amef"]*T["bm"];
+	WABEF["abef"] += V["bmef"]*T["am"]; 
+	WABEF["abef"] += 0.25*V["mnef"]*Tau["abmn"]; 
 	
-	WAMIJ["amij"] = V["amij"];
-	WAMIJ["amij"] += 0.5*V["amef"]*Tau["efij"];
-	WAMIJ["amij"] += V["amej"]*T["ei"]; 
-	
-	WAMEI["amei"] = V["amei"];
-	WAMEI["amei"] += 0.5*V["mnef"]*T["afni"];
-	WAMEI["amei"] += V["amef"]*T["fi"];
-	WAMEI["amei"] -= WMNEJ["nmei"]*T["an"]; 
-	
+	WBMEJ["bmej"] = V["bmej"]; 
+	WBMEJ["bmej"] += V["bmef"]*T["fj"];
+	WBMEJ["bmej"] += V["mnej"]*T["bn"];
+	WBMEJ["bmej"] -= 0.5*V["mnef"]*T["bfjn"]; 
+	WBMEJ["bmej"] += V["mnef"]*T["fj"]*T["bn"]; 
+		
 	// Iteration
 	
 	CTF::Tensor<> Zai = CTF::Tensor<>(V.ai);
 	CTF::Tensor<> Zabij = CTF::Tensor<>(V.abij); 
 	
 	Zai["ai"] = V["ai"];
-	Zai["ai"] += V["ae"]*T["ei"]; 
+	Zai["ai"] += FAE["ae"]*T["ei"]; 
 	Zai["ai"] -= FMI["mi"]*T["am"];
-	Zai["ai"] -= V["amei"]*T["em"]; 
 	Zai["ai"] += FME["me"]*T["aeim"];
-	Zai["ai"] += 0.5*V["amef"]*Tau["efim"]; 
-	Zai["ai"] -= 0.5*WMNEJ["mnei"]*T["eamn"]; 
+	Zai["ai"] -= V["anfi"]*T["fn"];
+	Zai["ai"] += 0.5*V["amef"]*T["efim"]; 
+	Zai["ai"] -= 0.5*V["nmei"]*T["aemn"]; 
 	
-	Zabij["abij"] = V["abij"];
-	Zabij["abij"] += V["abej"]*T["ei"];
-	Zabij["abij"] -= WAMIJ["amij"]*T["bm"];
-	Zabij["abij"] += FAE["ae"]*T["ebij"];
-	Zabij["abij"] -= FMI["mi"]*T["abmj"];
-	Zabij["abij"] += 0.5*V["abef"]*Tau["efij"];
-	Zabij["abij"] += 0.5*WMNIJ["mnij"]*Tau["abmn"];
-	Zabij["abij"] += WAMEI["amei"]*T["ebjm"]; 
+	
+	CTF::Tensor<> tempAE(2, V.ab->lens, ns, *V.dw);
+	CTF::Tensor<> tempMJ(2, V.ij->lens, ns, *V.dw);
+	Zabij["abij"] = 4.0 * V["abij"];
+	tempAE["be"] = FAE["be"] - 0.5*FME["me"]*T["bm"]; 
+	Zabij["abij"] += 2.0 * tempAE["be"] * T["aeij"]; 
+	tempAE["ae"] = FAE["ae"] - 0.5*FME["me"]*T["am"];
+	Zabij["abij"] -= 2.0* tempAE["ae"] * T["beij"];
+	tempMJ["mj"] = FMI["mj"] + 0.5*FME["me"]*T["ej"]; 
+	Zabij["abij"] -= 2.0 * tempMJ["mj"] * T["abim"]; 
+	tempMJ["mi"] = FMI["mi"] + 0.5*FME["me"]*T["ei"];
+	Zabij["abij"] += 2.0 * tempMJ["mi"] * T["abjm"]; 
+	Zabij["abij"] += WMNIJ["mnij"]*Tau["abmn"]; 
+	Zabij["abij"] += WABEF["abef"]*Tau["efij"]; 
+	Zabij["abij"] += 2.0 * V["abej"] * T["ei"];
+	Zabij["abij"] -= 2.0 * V["abei"] * T["ej"]; 
+	Zabij["abij"] += 2.0 * V["bmij"] * T["am"];
+	Zabij["abij"] -= 2.0 * V["amij"] * T["bm"]; 
+	Zabij["abij"] -= WBMEJ["bmej"] * T["aeim"]; 
+	Zabij["abij"] += V["bmej"]*T["ei"]*T["am"]; 
+	Zabij["abij"] += WBMEJ["bmei"] * T["aejm"];
+	Zabij["abij"] -= V["bmei"]*T["ej"]*T["am"]; 
+	Zabij["abij"] += WBMEJ["amej"]*T["beim"]; 
+	Zabij["abij"] -= V["amej"]*T["bm"];
+	Zabij["abij"] -= WBMEJ["amei"]*T["bejm"]; 
+	Zabij["abij"] += V["amei"]*T["ej"]*T["bm"];
 	
 	CTF::Tensor<> Dai(2, V.ai->lens, V.ai->sym, *V.dw);
 	int sh_sym[4] = {SH, NS, SH, NS};
@@ -479,7 +507,7 @@ int sched_nparts){
 	CTF::Function<> fctr(&divide);
 
 	T.ai->contract(1.0, Zai, "ai", Dai, "ai", 0.0, "ai", fctr);
-	T.abij->contract(0.5, Zabij, "abij", Dabij, "abij", 0.0, "abij", fctr);
+	T.abij->contract(0.125, Zabij, "abij", Dabij, "abij", 0.0, "abij", fctr);
 } 
 
 					

@@ -161,7 +161,7 @@ public:
 	CTF::World dw; 
 	
 	MP2(Fock& _focker);
-	void transformIntegrals();
+	void transformIntegrals(bool withSpin = true);
 	void transformThread(int start, int end, Tensor4& moTemp);
 	void calculateEnergy();
 	double getEnergy() const { return energy; }
