@@ -106,6 +106,8 @@ public:
   virtual void compute_hessian(const std::vector<Atom> &atoms, int nocc);
   virtual void compute_hessian_numeric(const std::vector<Atom> &atoms, int nocc, Command &cmd);
   
+  virtual Vector compute_xgrad(double fx, Matrix& xhessian, std::vector<int>& activex, Command& cmd); 
+  
   template <unsigned deriv_order>
   std::vector<EMatrix> compute_2body_fock_deriv(const std::vector<Atom> &atoms, const EMatrix& D);
 };

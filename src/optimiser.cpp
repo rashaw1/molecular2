@@ -5,6 +5,7 @@
 #include "integrals.hpp"
 #include <vector>
 #include <Eigen/Core>
+#include <iomanip>
 
 double rfo(Vector& dx, Vector& grad, Matrix& hessian, double alpha, double stepsize) {
 	
@@ -98,10 +99,12 @@ double trust_newton(Vector& dx, Vector& grad, Matrix& hessian, double stepsize) 
 				delta = new_delta;
 			}
 		}
-		
+
 		for (int i = 0; i < hessian.rows(); i++) {
 			double eival = hsolve.eigenvalues()[i]; 
-			step[i] = - gtilde[i] / (eival - mu); 
+			if (fabs(eival - mu) > 1e-12)
+				step[i] = - gtilde[i] / (eival - mu); 
+			else step[i] = 0.0; 
 		}
 		
 	}
@@ -163,8 +166,9 @@ std::pair<double, double> rfo_prime(Vector& dy, Vector &grad, Matrix& hessian, d
 void RHFOptimiser::optimise() {
 	Logger& log = mol->control->log;
 	log.title("GEOMETRY OPTIMIZATION"); 
+	log.initIterationOpt();
 	int MAXITER = cmd.get_option<int>("maxiter");
-	double CONVERGE = cmd.get_option<double>("converge");  
+	double CONVERGE = cmd.get_option<double>("gradconverge");  
 	
 	Vector dx = Vector::Zero(3*mol->getNActiveAtoms()); 
 	
@@ -173,7 +177,9 @@ void RHFOptimiser::optimise() {
 	Matrix hessian; 
 	calc.iter = 0;
 	double trust = cmd.get_option<double>("trust"); 
-	double expect, trust_ratio; 
+	double trust_ratio;
+	double expect = 0.0;
+	double step_norm = 0.0;
 	while (!converged && calc.iter < MAXITER) {
 		calc(dx, grad, hessian); 
 		if (calc.iter > 1) {
@@ -185,9 +191,15 @@ void RHFOptimiser::optimise() {
 			else if (trust_ratio < 0.25) trust = 0.25*stepnorm; 
 		}
 		
-		converged = calc.grad_norm < CONVERGE; 
-		if (!converged)
+		mol->control->log.optg_dump(calc.iter, grad, dx, mol, 
+								hessian, trust, calc.delta_e, calc.grad_norm,
+								step_norm, calc.energy, expect); 
+		
+		converged = (calc.grad_norm < CONVERGE) || (fabs(calc.delta_e) < CONVERGE / 1000.0); 
+		if (!converged) {
 			expect = trust_newton(dx, grad, hessian, trust); 
+			step_norm = dx.norm();
+		}
 	}
 	
 	if (calc.iter < MAXITER) {
@@ -199,6 +211,8 @@ void RHFOptimiser::optimise() {
 		
 	} else {
 		log.result("Geometry optimisation failed to converge.");
+		log.print("Last trial geometry\n"); 
+		for (int i = 0; i <mol->getNAtoms(); i++) log.print(mol->getAtom(i));
 	}
 }
 
@@ -251,6 +265,113 @@ void RHFOptimiser::frequencies(Matrix& hessian) {
 	
 	mol->control->log.frequencies(freqs, modes, cmd.get_option<bool>("modes"));  
 	
+}
+
+void RHFOptimiser::exponents() { 
+	
+	int nexp = mol->getBasis().getNExps(); 
+	
+	Logger& log = mol->control->log;
+	log.title("EXPONENT OPTIMIZATION"); 
+	log.initIterationOpt();
+	int MAXITER = cmd.get_option<int>("maxiter");
+	double CONVERGE = cmd.get_option<double>("gradconverge");  
+	
+	std::string active = cmd.get_option<std::string>("active"); 
+	std::vector<int> activex;
+	if (active == "all") {
+		for (int i = 0; i < nexp; i++) activex.push_back(i); 
+	} else {
+		size_t pos = active.find(',');
+		std::string token; 
+		while (pos != std::string::npos) {
+			token = active.substr(0, pos);
+			activex.push_back(std::stoi(token)-1);
+			active.erase(0, pos+1);
+			pos = active.find(',');
+		}
+		activex.push_back(std::stoi(active) - 1);
+		
+		nexp = activex.size(); 
+	}
+	
+	int orbital = cmd.get_option<int>("orbital"); 
+	bool momap = cmd.get_option<bool>("momap"); 
+	Vector mocoeffs; 
+	
+	bool converged = false;
+	Matrix xhessian;
+	Vector xgrad; 
+	Vector dxx = Vector::Zero(nexp); 
+	int iter = 0;
+	double trust = cmd.get_option<double>("trust"); 
+	double trust_ratio, delta_e, grad_norm;
+	double energy = 0.0;
+	double expect = 0.0; 
+	double step_norm = 0.0;  
+	while (!converged && iter < MAXITER) {
+		
+		IntegralEngine ints(mol, false);
+		Fock f(cmd, ints, mol);
+		SCF hf(cmd, mol, f); 
+		hf.rhf(false); 
+		delta_e = hf.getEnergy() - energy;
+		energy = hf.getEnergy(); 
+		xgrad = f.compute_xgrad(energy, xhessian, activex, cmd); 
+		grad_norm = xgrad.norm();
+		if (momap) 
+			mocoeffs = f.getCP().col(orbital); 
+		
+		if (iter > 1) {
+		
+			trust_ratio = delta_e / expect; 
+			
+			step_norm = dxx.norm();
+			if (trust_ratio > 0.75 && 1.25*step_norm > trust) trust *= 2.0;
+			else if (trust_ratio < 0.25) trust = 0.25*step_norm; 
+		}
+		
+		mol->control->log.optx_dump(iter++, xgrad, dxx, mol, 
+								xhessian, trust, delta_e, grad_norm,
+								step_norm, energy, expect, activex); 
+		
+		converged = (grad_norm < CONVERGE) || (fabs(delta_e) < CONVERGE / 1000.0);  
+		if (!converged) {
+			expect = trust_newton(dxx, xgrad, xhessian, trust); 
+			
+			double currexp, newexp;
+			int ctr = 0;
+			for (int i : activex) {
+				currexp = mol->getBasis().getExp(i); 
+				newexp = currexp + dxx[ctr++]; 
+				newexp = newexp <= 0.0 ? currexp / 10.0 : newexp; 
+				mol->getBasis().setExp(i, newexp);  
+			}
+		}
+			
+	}
+	
+	if (calc.iter < MAXITER) {
+		log.print("Converged exponents:\n");
+		
+		for (int i : activex)
+			log.print(std::to_string(i) + ": " + std::to_string(mol->getBasis().getExp(i))); 
+		
+		log.result("HF Energy", energy, "Hartree");
+		
+		if (momap) {
+			std::string mapfile = cmd.get_option<std::string>("mapfile");
+			log.mo_map(mocoeffs, mol, cmd.get_option<int>("fineness"), mapfile);
+		} 
+		
+	} else {
+		log.result("Exponent optimisation failed to converge.");
+		log.print("Last trial exponents\n"); 
+		
+		for (int i : activex)
+			log.print(std::to_string(i) + ": " + std::to_string(mol->getBasis().getExp(i)));
+	}
+
 }
 
 double RHFCalculator::operator()(const Vector& dx, Vector& grad, Matrix& hessian) {
@@ -309,10 +430,9 @@ double RHFCalculator::operator()(const Vector& dx, Vector& grad, Matrix& hessian
 	
 	delta_e = energy - old_e; 
 	grad_norm = grad.norm(); 
-	mol->control->log.iteration(iter++, energy, delta_e, grad_norm);
 	old_e = energy; 
+	iter++;
 	
 	return energy; 
 	
 }
-

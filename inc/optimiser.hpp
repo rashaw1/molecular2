@@ -33,6 +33,7 @@ struct RHFOptimiser {
 	
 	void optimise(); 
 	void frequencies(Matrix& hessian); 
+	void exponents(); 
 	
 }; 
 #endif

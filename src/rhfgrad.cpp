@@ -1,6 +1,7 @@
 #include "fock.hpp"
 #include "error.hpp"
 #include "atom.hpp"
+#include "basis.hpp"
 #include "tensor4.hpp"
 #include <iostream>
 #include <iomanip>
@@ -607,4 +608,65 @@ std::vector<EMatrix> Fock::compute_2body_fock_deriv(const std::vector<Atom> &ato
 	}
 
 	return GG;
+}
+
+Vector Fock::compute_xgrad(double fx, Matrix& xhessian, std::vector<int>& activex, Command& cmd) {
+	
+	Basis& b = molecule->getBasis(); 
+	const auto nexp = activex.size();
+	const double h = 0.01; 
+	
+	Vector xgrad = Vector::Zero(nexp);
+	xhessian = Matrix::Zero(nexp, nexp); 
+	
+	double currex, currey, fxp, fyp; 
+	int xctr = 0;  
+	for (int x : activex) {
+		currex = b.getExp(x); 
+	
+		b.setExp(x, currex+h); 
+			
+		IntegralEngine ints1(molecule, false);
+		Fock f1(cmd, ints1, molecule);
+		SCF hf1(cmd, molecule, f1); 
+		hf1.rhf(false);   
+		fxp = hf1.getEnergy(); 
+		
+		xgrad[xctr] = fxp; 	
+		
+		int yctr = xctr;
+		for (int y : activex) {
+			if (y >= x) {
+				currey = b.getExp(y); 
+			
+				b.setExp(y, currey+h); 
+			
+				IntegralEngine ints2(molecule, false);
+				Fock f2(cmd, ints2, molecule);
+				SCF hf2(cmd, molecule, f2); 
+				hf2.rhf(false); 
+				fyp = hf2.getEnergy(); 
+			
+				xhessian(xctr, yctr++) = fyp; 
+			
+				b.setExp(y, currey); 
+			}
+		}
+		
+		b.setExp(x, currex); 
+		xctr++; 
+	}
+
+	double h2 = h*h; 
+	for (int x = 0; x < nexp; x++) {
+		for (int y = x; y < nexp; y++) {
+			xhessian(x, y) += fx - xgrad[x] - xgrad[y]; 
+			xhessian(x, y) /= h2; 
+			xhessian(y, x) = xhessian(x, y); 
+		}
+		xgrad[x] -= fx;
+		xgrad[x] /= h; 
+	}
+
+	return xgrad; 
 }

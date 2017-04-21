@@ -269,7 +269,7 @@ void MP2::transformIntegrals(bool withSpin)
 		ctr = 0;  
 		for (int a = 0; a < nvirt; a++) { 
 			for (int i = 0; i < nocc; i++) {
-				values[ctr] = F(i, a+nocc); 
+				values[ctr] = F(i, a+nocc);
 				ctr++; 
 			}
 		}

@@ -1,5 +1,6 @@
 memory, 500
 direct, false
+!printorbs, true
 molecule = {
 	 angstrom, true
 	 geometry = {

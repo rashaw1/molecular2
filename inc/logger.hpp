@@ -78,7 +78,8 @@ class Logger
 {
 private:
   ProgramController& control; 
-  std::ofstream& outfile, intfile;
+  std::ofstream& outfile;
+  std::ofstream intfile, optfile;
   std::ostream& errstream;
   Error* errs;
   int nerr;
@@ -102,8 +103,10 @@ public:
   Logger& operator=(const Logger& other);
   
   void init_intfile();
+  void init_optfile(); 
   
   std::ofstream& getIntFile() { return intfile; }
+  std::ofstream& getOptFile() { return optfile; }
   
   // Overloaded print functions
   void print(const std::string& msg) const; // Print a string message
@@ -122,7 +125,18 @@ public:
   void initIteration();
   void initIterationCC();
   void orbitals(const Vector& eps, int nel, bool one = false);
+  void coefficient_matrix(const Vector& eps, int nel, const Matrix& coeffs, bool one = false); 
   void frequencies(const Vector& freqs, const Matrix& modes, bool printmodes); 
+  
+  void initIterationOpt(); 
+  void optg_dump(int iter, Vector& grad, Vector& step, SharedMolecule m, Matrix& hessian,
+  				double trust, double delta_e, double grad_norm, double step_norm, 
+				double energy, double expect);
+  void optx_dump(int iter, Vector& grad, Vector& step, SharedMolecule m, Matrix& hessian,
+			    double trust, double delta_e, double grad_norm, double step_norm, 
+			  	double energy, double expect, std::vector<int>& activex);
+				
+  void mo_map(Vector& coeffs, SharedMolecule m, int fineness, std::string& filename);  
   
   // Specific logging formats
   void title(const std::string& msg) const;

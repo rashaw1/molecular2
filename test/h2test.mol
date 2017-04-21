@@ -8,10 +8,21 @@ molecule = {
 		  h, 0.71815, 0.0, 0.0
 	 }
 	 basis = {
-	       default, avdz
+	       default, onefunc
 	 }
 }	 
-!rhf()
+rhf(
+	momap, true
+	mapfile, h2before.map
+	fineness, 75
+)
 !uhf()
 !mp2()
 optg()
+optx()
+optg()
+optx(
+	momap, true
+	mapfile, h2after.map
+	fineness, 75
+)

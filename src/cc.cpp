@@ -430,6 +430,8 @@ int sched_nparts){
 	FMI["mi"] += 0.5*V["me"]*T["ei"]; 
 	FMI["mi"] -= V["mnei"]*T["en"]; 
 	FMI["mi"] += 0.5*V["mnef"]*TauTilde["efin"]; 
+	
+	FMI.print();
  	
 	FAE["ae"] = V["ae"]; 
 	FAE["ae"] -= 0.5*V["me"]*T["am"];

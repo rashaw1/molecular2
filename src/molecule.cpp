@@ -197,7 +197,6 @@ void Molecule::init(Construct& c)
 			if (sc.content.size() > 0) {
 				for (auto& line : sc.content) {
 					size_t pos = line.find(',');
-					std::vector<int> f;
 					while (pos != std::string::npos) {
 						token = line.substr(0, pos);
 						frozen_atoms.push_back(std::stoi(token)-1);
