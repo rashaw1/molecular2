@@ -397,17 +397,18 @@ double RHFCalculator::operator()(const Vector& dx, Vector& grad, Matrix& hessian
 	std::vector<Atom> atomlist; 
 	for (int i = 0; i < natoms; i++) atomlist.push_back(mol->getAtom(i));
 	
-	f.compute_forces(atomlist, mol->getNel()/2);
+	//f.compute_forces(atomlist, mol->getNel()/2);
+	f.compute_hessian(atomlist, mol->getNel()/2); 
 	Matrix g = f.getForces().transpose(); 
 	Vector full_grad = Eigen::Map<Vector>(g.data(), g.cols()*g.rows());
 	
-	f.compute_hessian_numeric(atomlist, mol->getNel()/2, cmd); 
+	//f.compute_hessian_numeric(atomlist, mol->getNel()/2, cmd); 
 	if (natoms == activeAtoms.size()) {
 		hessian = f.getHessian(); 
 		grad = full_grad; 
 	} else {
 		Matrix& full_hessian = f.getHessian(); 
-	
+
 		// Restrict to only active atoms
 		int nactive = activeAtoms.size(); 
 		grad = Vector::Zero(3*nactive);

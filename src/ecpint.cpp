@@ -23,7 +23,7 @@ TwoIndex<double> realSphericalHarmonics(int lmax, double x, double phi, std::vec
 		double Plm[lmax+1][lmax+1]; 
 		// First get all Pmm terms
 		Plm[0][0] = 1.0;
-		double sox2 = sqrt(1.0 - x2);
+		double sox2 = sqrt(std::max(0.0, 1.0 - x2));
 		double ox2m = 1.0;
 		for (int m = 1; m <= lmax; m++) {
 			ox2m *= -sox2;
@@ -830,15 +830,16 @@ void ECPIntegral::type2(int lam, ECP& U, GaussianShell &shellA, GaussianShell &s
 		}
 		nsub++;
 	} else {
-		radInts.buildParameters(shellA, shellB, data);
 		auto start_inner = std::chrono::steady_clock::now();
 		ThreeIndex<double> radials(L+1, lam + LA + 1, lam + LB + 1); 
 		TwoIndex<double> temp;
+
 		for (int N = 0; N < L+1; N++) {
 			radInts.type2(lam, 0, lam + LA, 0, lam + LB, N, U, shellA, shellB, data, temp); 
 			for (int l1 = 0; l1 < lam + LA + 1; l1++)
-				for (int l2 = 0; l2 < lam + LB + 1; l2++)
+			for (int l2 = 0; l2 < lam + LB + 1; l2++) {
 					radials(N, l1, l2) = temp(l1, l2);
+				}
 		}
 		
 				
@@ -851,7 +852,6 @@ void ECPIntegral::type2(int lam, ECP& U, GaussianShell &shellA, GaussianShell &s
 		TwoIndex<double> SA = realSphericalHarmonics(lam+LA, xA, phiA, fac, dfac);
 		TwoIndex<double> SB = realSphericalHarmonics(lam+LB, xB, phiB, fac, dfac);
 			
-	
 		for (int x1 = LA; x1 >= 0; x1--) {
 			for (int r1 = LA-x1; r1 >= 0; r1--) {
 				z1 = LA - x1 - r1; 
@@ -882,7 +882,7 @@ void ECPIntegral::type2(int lam, ECP& U, GaussianShell &shellA, GaussianShell &s
 																for (int mu2 = -lam2; mu2 <= lam2; mu2++) {
 															
 																	val2 = val1 * SA(lam1, lam1+mu1) * SB(lam2, lam2+mu2);
-															
+																																
 																	for (int mu = -lam; mu <= lam; mu++)
 																		values(na, nb, lam+mu) += val2 * angInts.getIntegral(alpha_x, alpha_y, alpha_z, lam, mu, lam1, mu1) * angInts.getIntegral(beta_x, beta_y, beta_z, lam, mu, lam2, mu2);
 																	
@@ -943,6 +943,7 @@ void ECPIntegral::compute_shell_pair(ECP &U, GaussianShell &shellA, GaussianShel
 	data.RABm = sqrt(data.RAB2);
 	
 	std::vector<double> fac = facArray(data.maxLBasis);
+	radInts.buildParameters(shellA, shellB, data);
 	
 	// Construct coefficients 
 	FiveIndex<double> CA(1, data.ncartA, data.LA+1, data.LA+1, data.LA+1);
@@ -951,17 +952,19 @@ void ECPIntegral::compute_shell_pair(ECP &U, GaussianShell &shellA, GaussianShel
 	makeC(CB, data.LB, data.B, fac);
 	
 	// Calculate type1 integrals
-	//type1(U, shellA, shellB, data, CA, CB, values);
-	values.assign(data.ncartA, data.ncartB, 0.0);
+	type1(U, shellA, shellB, data, CA, CB, values);
+	
 	// Now all the type2 integrals
 	ThreeIndex<double> t2vals(data.ncartA, data.ncartB, 2*U.getL() + 1);
 	for (int l = 0; l < U.getL(); l++) {
 		t2vals.fill(0.0);
 		type2(l, U, shellA, shellB, data, CA, CB, t2vals);
+		
 		for (int m = -l; m <= l; m++) {
 			for(int na = 0; na < data.ncartA; na++) {
-				for (int nb = 0; nb < data.ncartB; nb++)
+				for (int nb = 0; nb < data.ncartB; nb++) {
 					values(na, nb) += t2vals(na, nb, l+m);
+				}
 			}
 		}
 	}

@@ -320,10 +320,17 @@ void ProgramController::call_uhf(Command& c, SharedMolecule m) {
 }
 
 void ProgramController::call_mp2(Command& c, SharedMolecule m) {
-	if(done_hf && !done_transform) { 
+	if(done_hf) { 
 		mp2obj = std::make_shared<MP2>(*focker); 
-		runmp2(*mp2obj, *hf, true); 
-		done_transform = true;
+		
+		log.title("MP2 CALCULATION"); 
+		mp2obj->tensormp2(); 
+		log.print("Integral transformation complete.\n");
+		log.localTime();
+
+		log.result("MP2 Energy Correction", mp2obj->getEnergy(), "Hartree");
+		log.result("Total Energy = ", hf->getEnergy() + mp2obj->getEnergy(), "Hartree");
+		
 	} else {
 		Error e("MP2", "HF is required before MP2 can be done.");
 		log.error(e);
@@ -340,7 +347,7 @@ void ProgramController::call_ccsd(Command& c, SharedMolecule m) {
 	if (done_hf) {
 		if(!done_transform) {
 			mp2obj = std::make_shared<MP2>(*focker); 
-			runmp2(*mp2obj, *hf, false);
+			mp2obj->cctrans(); 
 			done_transform = true;
 		}
 		

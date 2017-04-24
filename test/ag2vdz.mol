@@ -15,5 +15,5 @@ molecule = {
 rhf()
 !mp2()
 ccsd (
-     triples, false
+     triples, true
 )

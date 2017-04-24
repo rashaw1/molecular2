@@ -254,8 +254,8 @@ void Fock::compute_hessian(const std::vector<Atom> &atoms, int nocc) {
 			
 			for (int b = 0; b < nvirt; b++) {
 				for (int j = 0; j < nocc; j++) {
-					Vaibj(row, col) = -moInts(a+nocc, b+nocc, j, i) - moInts(a+nocc, j, b+nocc, i); 
-					Vaibj(row, col) += 4.0 * moInts(a+nocc, i, j, b+nocc); 
+					Vaibj(row, col) = -moInts(a+nocc, b+nocc, i, j) - moInts(a+nocc, j, i, b+nocc); 
+					Vaibj(row, col) += 4.0 * moInts(a+nocc, i, b+nocc, j); 
 					Vaibj(row, col) /= dia; 
 					col++; 
 				}
@@ -289,7 +289,7 @@ void Fock::compute_hessian(const std::vector<Atom> &atoms, int nocc) {
 	}
 	
 	// Call CPHF solver
-	std::vector<Vector> uai = cphf_group_solver(Q1, Vaibj); 
+	std::vector<Vector> uai = cphf_group_solver(Q1, Vaibj, 1e-4, 30); 
 	
 	// Calculate perturbed Fock, density, and weighted density matrices, and transform to AO basis
 	std::vector<Matrix> P1, W1;
@@ -303,7 +303,7 @@ void Fock::compute_hessian(const std::vector<Atom> &atoms, int nocc) {
 				for (int i = 0; i < nocc; i++) {
 					
 					for (int j = 0; j < nocc; j++) 
-						ftilde(q, p) -= S1_mo[nc](j, i) * ( 2.0 * moInts(q, p, i, j) - moInts(q, j, i, p)); 
+						ftilde(q, p) -= S1_mo[nc](j, i) * ( 2.0 * moInts(q, p, j, i) - moInts(q, i, j, p)); 
 					
 					for (int a = nocc; a < nmos; a++)
 						ftilde(q, p) += uai[nc][(a-nocc)*nocc+i] * ( 4.0 * moInts(q, p, i, a) - moInts(q, i, a, p) - moInts(q, a, p, i) );
@@ -322,7 +322,7 @@ void Fock::compute_hessian(const std::vector<Atom> &atoms, int nocc) {
 			}
 			
 			for (int a = nocc; a < nmos; a++) {
-				ptilde(i, a) = uai[nc]((a-nocc)*nocc+i); 
+				ptilde(i, a) = 2.0*uai[nc]((a-nocc)*nocc+i); 
 				wtilde(i, a) = eps[i] * ptilde(i, a); 
 			}
 		} 
@@ -338,36 +338,23 @@ void Fock::compute_hessian(const std::vector<Atom> &atoms, int nocc) {
 	for (auto i = 0; i < ncoords; i++) {
 		for (auto j = i; j < ncoords; j++) {
 					
-			auto h_force = (T1[i] + V1[i]).cwiseProduct(P1[j]).sum();
-			auto w_force = S1[i].cwiseProduct(W1[j]).sum();	
-			auto g_force = G1[i].cwiseProduct(P1[j]).sum();
-			H_r(i, j) += h_force - w_force + g_force; 
+			for (int mu = 0; mu < nmos; mu++) {
+				for (int nu = 0; nu < nmos; nu++) {
+					
+					H_r(i, j) += P1[j](mu, nu) * (T1[i](mu, nu) + V1[i](mu, nu)); 
+					H_r(i, j) += P1[j](mu, nu) * G1[i](mu, nu); 
+					H_r(i, j) -= W1[j](mu, nu) * S1[i](mu, nu); 
+ 					
+				}
+			}
 			
 		}
 	}
 	
-	hessian = H_nr + H_r; 
-	std::cout << hessian << std::endl;
+	hessian = H_nr + 2.0 * H_r; 
 	for (auto i = 0; i < ncoords; i++)
 		for (auto j = 0; j < i; j++)
 			hessian(i, j) = hessian(j, i);
-	
-	std::cout << hessian << std::endl; 
-	
-	double sm1, sm2; 
-	for (int i = 0; i < N; i++) {
-		sm1 = sqrt(molecule->getAtom(i).getMass());
-		for (int xyz = 0; xyz < 3; xyz++) {
-			for (int j = 0; j < N; j++) {
-				sm2 = sqrt(molecule->getAtom(j).getMass());
-				for (int abc = 0; abc < 3; abc++) 
-					hessian(3*i+xyz, 3*j+abc) /= sm1*sm2; 
-			}
-		}
-	}
-	
-	EigenSolver solver(hessian); 
-	std::cout << solver.eigenvalues() << std::endl << std::endl;
 	
 }
 

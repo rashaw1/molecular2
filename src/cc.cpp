@@ -303,37 +303,258 @@ void CCSD::calculateError(Matrix& newSingles, S4OddTensor4& newDoubles) {
 	*/
 }
 
-void CCSD::calculateTriples(Integrals &V, Amplitudes &T) {
+void slow_iteration(Vector& eps, S8EvenTensor4& moInts, Matrix& Tai, Tensor4& Tabij, int nocc, int nvirt) {
 	
-	int nvirt = N-nocc;
-	int shapeASAS[6] = {AS,NS,NS,AS,NS,NS};
+	Tensor4 Tau(nvirt, nvirt, nocc, nocc, 0.0); 
+	for (int a = 0; a < nvirt; a++)
+		for (int b = 0; b < nvirt; b++)
+			for (int i = 0; i < nocc; i++)
+				for (int j = 0; j < nocc; j++)
+					Tau(a, b, i, j) = Tabij(a, b, i, j) + Tai(a, i)*Tai(b, j); 
 	
-	int vvvooo[6] = {nvirt, nvirt, nvirt, nocc, nocc, nocc}; 
-	CTF::Tensor<> T3(6, vvvooo, shapeASAS, mp2.dw, "Tabcijk", 1); 
-	CTF::Tensor<> Z3(6, vvvooo, shapeASAS, mp2.dw, "Tabcijk", 1); 
+	Matrix Fia = Matrix::Zero(nocc, nvirt);
+	Matrix Fab = Matrix::Zero(nvirt, nvirt);
+	Matrix Fij = Matrix::Zero(nocc, nocc);
+	Matrix Fpij = Matrix::Zero(nocc, nocc); 
 	
-	Z3["abcijk"]  = V["bcek"]*T["aeij"];
-	Z3["abcijk"] -= V["amij"]*T["bcmk"];
+	for (int i = 0; i < nocc; i++) {
+		for (int a = 0; a < nvirt; a++) {
+			for (int m = 0; m < nocc; m++) {
+				for (int e = 0; e < nvirt; e++) {
+					Fia(i, a) += (2.0*moInts(i, a+nocc, m, e+nocc) - moInts(i, e+nocc, m, a+nocc)) * Tai(e, m); 
+				}
+			}
+		}
+	}
+	
+	
+	for (int a = 0; a < nvirt; a++) {
+		for (int b = 0; b < nvirt; b++) {
+			for (int m = 0; m < nocc; m++) {
+				for (int e = 0; e < nvirt; e++) {
+					Fab(a, b) += (2.0 * moInts(a+nocc, b+nocc, m, e+nocc) - moInts(m, b+nocc, a+nocc, e+nocc))*Tai(e, m);
+					
+					for (int n = 0; n < nocc; n++)
+						Fab(a, b) -= (2.0*moInts(m, e+nocc, n, b+nocc) - moInts(m, b+nocc, n, e+nocc)) * Tau(e, a, m, n); 
+				}
+			}
+		}
+	}
+	
+	for (int i = 0; i < nocc; i++) {
+		for (int j = 0; j < nocc; j++) {
+			for (int m = 0; m < nocc; m++) {
+				for (int e = 0; e < nvirt; e++) {
+					Fpij(i, j) += (2.0*moInts(i, j, m, e+nocc) - moInts(i, e+nocc, m, j))*Tai(e, m); 
+					
+					for (int f = 0; f < nvirt; f++)
+						Fpij(i, j) += (2.0*moInts(m, e+nocc, i, f+nocc) - moInts(i, e+nocc, m, f+nocc))*Tabij(e, f, m, j); 
+				}
+			}
+			
+			Fij(i, j) = Fpij(i, j);
+			for (int e = 0; e < nvirt; e++)
+				Fij(i, j) += Fia(i, e) * Tai(e, j); 
+		
+		}
+	}
+	
+	Tensor4 Wijkl(nocc, nocc, nocc, nocc, 0.0);
+	Tensor4 Wiajb(nocc, nvirt, nocc, nvirt, 0.0);
+	Tensor4 Wiabj(nocc, nvirt, nvirt, nocc, 0.0); 
+	Tensor4 Wabci(nvirt, nvirt, nvirt, nocc, 0.0);
+	Tensor4 Wiajk(nocc, nvirt, nocc, nocc, 0.0); 
+	
+	for (int i = 0; i < nocc; i++) {
+		for (int j = 0; j < nocc; j++) {
+			for (int k = 0; k < nocc; k++) {
+				for (int l = 0; l < nocc; l++) {
+					
+					Wijkl(i, j, k, l) = moInts(i, k, j, l); 
+					
+					for (int e = 0; e < nvirt; e++) {
+						for (int f = 0; f < nvirt; f++)
+							Wijkl(i, j, k, l) += moInts(i, e+nocc, j, f+nocc) * Tau(e, f, k, l); 
+						
+						Wijkl(i, j, k, l) += Tai(e, k) * moInts(i, e+nocc, j, l); 
+						Wijkl(i, j, k, l) += Tai(e, l) * moInts(j, e+nocc, i, k); 
+					}
+					
+				}
+			}
+		}
+	}
+	
+	for (int i = 0; i < nocc; i++) {
+		for (int a = 0; a < nvirt; a++) {
+			for (int j = 0; j < nocc; j++) {
+				for (int b = 0; b < nvirt; b++) {
+					Wiajb(i, a, j, b) = moInts(i, j, a+nocc, b+nocc); 
+					Wiabj(i, a, b, j) = moInts(i, b+nocc, a+nocc, j); 
+					
+					
+					for (int m = 0; m < nocc; m++) {
+						for (int e = 0; e < nvirt; e++) {
+							Wiajb(i, a, j, b) -= 0.5*moInts(i, e+nocc, m, b+nocc)*(Tau(e, a, j, m) + Tai(e, j)*Tai(a, m)); 
+							Wiabj(i, a, b, j) -= 0.5*moInts(i, b+nocc, m, e+nocc)*(Tau(a, e, m, j) + Tai(a, m)*Tai(e, j)); 
+							Wiabj(i, a, b, j) += 0.5*(2.0*moInts(i, b+nocc, m, e+nocc) - moInts(i, e+nocc, m, b+nocc))*Tabij(e, a, m, j); 
+						}
+						
+						Wiajb(i, a, j, b) -= moInts(i, j, m, b+nocc) * Tai(a, m); 
+						Wiabj(i, a, b, j) -= moInts(i, b+nocc, m, j) * Tai(a, m); 
+					}
+					
+					for (int e = 0; e < nvirt; e++){
+						Wiajb(i, a, j, b) += moInts(i, e+nocc, a+nocc, b+nocc)*Tai(e, j); 
+						Wiabj(i, a, b, j) += moInts(i, b+nocc, a+nocc, e+nocc)*Tai(e, j); 
+					}
+					
+				}
+			}
+		}
+	}
+	
+	for (int a = 0; a < nvirt; a++) {
+		for (int b = 0; b < nvirt; b++) {
+			for (int c = 0; c < nvirt; c++) {
+				for (int i = 0; i < nocc; i++) {
+					Wabci(a, b, c, i) = moInts(a+nocc, c+nocc, b+nocc, i); 
+					
+					for (int m = 0; m < nocc; m++) {
+						Wabci(a, b, c, i) -= moInts(a+nocc, c+nocc, m, i) * Tai(b, m); 
+						Wabci(a, b, c, i) -= Tai(a, m) * moInts(m, c+nocc, b+nocc, i); 
+					}
+					
+				}
+			}
+		}
+	}
+	
+	for (int i = 0; i < nocc; i++) {
+		for (int a = 0; a < nvirt; a++) {
+			for (int j = 0; j < nocc; j++) {
+				for (int k = 0; k < nocc; k++) {
+					Wiajk(i, a, j, k) = moInts(i, j, a+nocc, k); 
+					
+					for (int e = 0; e < nvirt; e++) {
+						for (int f = 0; f < nvirt; f++) {
+							Wiajk(i, a, j, k) += moInts(i, e+nocc, a+nocc, f+nocc)*Tau(e, f, j, k); 
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	Matrix Zai = Matrix::Zero(nvirt, nocc); 
+	Tensor4 Zabij(nvirt, nvirt, nocc, nocc, 0.0); 
+	
+	for (int a = 0; a < nvirt; a++) {
+		for (int i = 0; i < nocc; i++) {
+			
+			for (int e = 0; e < nvirt; e++) {
+				Zai(a, i) += Fab(a, e)*Tai(e, i); 
+				
+				for (int m = 0; m < nocc; m++) {
+					Zai(a, i) += Fia(m, e) * (2.0*Tabij(e, a, m, i) - Tabij(e, a, i, m)); 
+					Zai(a, i) += Tai(e, m) * (2.0*moInts(m, e+nocc, a+nocc, i) - moInts(a+nocc, e+nocc, m, i)); 
+					
+					for (int n = 0; n < nocc; n++) 
+						Zai(a, i) -= moInts(m, e+nocc, n, i) * (2.0 * Tabij(e, a, m, n) - Tabij(a, e, m, n)); 
+					
+					for (int f = 0; f < nvirt; f++) 
+						Zai(a, i) += moInts(m, e+nocc, a+nocc, f+nocc) * (2.0 * Tabij(e, f, m, i) - Tabij(e, f, i, m));
+					
+				}
+			}
+			
+			for (int m = 0; m < nocc; m++)
+				Zai(a, i) -= Fpij(m, i) * Tai(a, m); 
+			
+		}
+	}
+	
+	for (int a = 0; a < nvirt; a++) {
+		for (int b = 0; b < nvirt; b++) {
+			for (int i = 0; i < nocc; i++) {
+				for (int j = 0; j < nocc; j++) {
+					
+					Zabij(a, b, i, j) = moInts(a+nocc, i, b+nocc, j); 
+					
+					for (int e = 0; e < nvirt; e++) {
+						Zabij(a, b, i, j) += Tabij(a, e, i, j) * Fab(b, e); 
+						Zabij(b, a, j, i) += Tabij(b, e, j, i) * Fab(a, e); 
+						
+						for (int f = 0; f < nvirt; f++) {
+							Zabij(a, b, i, j) += 0.5*moInts(a+nocc, e+nocc, b+nocc, f+nocc) * Tau(e, f, i, j); 
+							Zabij(a, b, i, j) += 0.5*moInts(b+nocc, e+nocc, a+nocc, f+nocc) * Tau(e, f, j, i);
+						}
+						
+						for (int m = 0; m < nocc; m++) {
+							Zabij(a, b, i, j) -= Tabij(a, e, m, j) * Wiajb(m, b, i, e); 
+							Zabij(a, b, i, j) -= Tabij(b, e, m, i) * Wiajb(m, a, j, e); 
+							
+							Zabij(a, b, i, j) -= Wiajb(m, a, i, e) * Tabij(e, b, m, j); 
+							Zabij(a, b, i, j) -= Wiajb(m, b, j, e) * Tabij(e, a, m, i); 
+							
+							Zabij(a, b, i, j) += (2.0*Tabij(e, a, m, i) - Tabij(e, a, i, m))*Wiabj(m, b, e, j); 
+							Zabij(a, b, i, j) += (2.0*Tabij(e, b, m, j) - Tabij(e, b, j, m))*Wiabj(m, a, e, i); 
+						}
+						
+						Zabij(a, b, i, j) += Tai(e, i)*Wabci(a, b, e, j); 
+						Zabij(a, b, i, j) += Tai(e, j)*Wabci(b, a, e, i); 
+					} 
+					
+					for (int m = 0; m < nocc; m++) {
+						Zabij(a, b, i, j) -= Tabij(a, b, i, m) * Fij(m, j); 
+						Zabij(a, b, i, j) -= Tabij(b, a, j, m) * Fij(m, i); 
+						
+						for (int n = 0; n < nocc; n++) {
+							Zabij(a, b, i, j) += 0.5*Tau(a, b, m, n) * Wijkl(m, n, i, j); 
+							Zabij(a, b, i, j) += 0.5*Tau(b, a, m, n) * Wijkl(m, n, j, i); 
+						}
+						
+						Zabij(a, b, i, j) -= Tai(a, m) * Wiajk(m, b, i, j); 
+						Zabij(a, b, i, j) -= Tai(b, m) * Wiajk(m, a, j, i); 			
+					}
 
-	T3 = Z3;
+				}
+			}
+		}
+	}
 	
-	int sh_sym[6] = {SH, NS, NS, SH, NS, NS};
-	CTF::Tensor<> Dabcijk(6, T3.lens, sh_sym, *V.dw);
- 
-	Dabcijk["abcijk"] += V["i"];
-	Dabcijk["abcijk"] += V["j"];
-	Dabcijk["abcijk"] += V["k"];
-	Dabcijk["abcijk"] -= V["a"];
-	Dabcijk["abcijk"] -= V["b"];
-	Dabcijk["abcijk"] -= V["c"];
+	double sres, dres; 
+	for (int a = 0; a < nvirt; a++) {
+		for (int i = 0; i < nocc; i++) {
+			sres = eps[i] - eps[a+nocc]; 
+			Tai(a, i) = Zai(a, i) / sres; 
+			
+			for (int b = 0; b < nvirt; b++) {
+				for (int j = 0; j < nocc; j++) {
+					dres = sres + eps[j] - eps[b+nocc]; 
+					
+					Tabij(a, b, i, j) = Zabij(a, b, i, j) / dres;  
+				}
+			}
+		}
+	}
+	
+	for (int a = 0; a < nvirt; a++)
+		for (int b = 0; b < nvirt; b++)
+			for (int i = 0; i < nocc; i++)
+				for (int j = 0; j < nocc; j++)
+					Tau(a, b, i, j) = Tabij(a, b, i, j) + Tai(a, i)*Tai(b, j); 
+	
+	double en = 0.0; 
+	for (int a = 0; a < nvirt; a++)
+		for (int b = 0; b < nvirt; b++)
+			for (int i = 0; i < nocc; i++)
+	for (int j = 0; j < nocc; j++) {
+					en += Tau(a, b, i, j) * (2.0*moInts(i, a+nocc, j, b+nocc) - moInts(i, b+nocc, j, a+nocc)); 
+					if (fabs(Tabij(a, b, i, j)) > 0.05) std::cout << a << " " << b << " " << i << " " << j << " " << Tabij(a, b, i, j) << std::endl;
+				}
+	std::cout << en << std::endl; 
 
-	CTF::Function<> fctr(&divide);
-
-	T3.contract(1.0, Z3, "abcijk", Dabcijk, "abcijk", 0.0, "abcijk", fctr);
-	
-	Z3["abcijk"] += V["abij"]*T["ck"]; 
-	
-	triples_energy = (1.0/36.0) * T3["efgmno"] * Z3["efgmno"]; 
 }
 
 void CCSD::compute()
@@ -342,7 +563,6 @@ void CCSD::compute()
 	
 	log.title("CCSD CALCULATION");
 	
-	mp2.calculateEnergy();
 	log.print("MP2 Energy = " + std::to_string(mp2.getEnergy()) + "\n");
 	log.localTime();
 			
@@ -363,13 +583,47 @@ void CCSD::compute()
 	T["abij"] = T["abij"]; 
 	double nt2 = T.abij->norm2();
 	double newnt1, newnt2; 
+	
+	int oovv[4] = {nocc, nocc, N-nocc, N-nocc};
+	int vvoo[4] = {N-nocc, N-nocc, nocc, nocc};
+	int nsns[4] = {NS, NS, NS, NS}; 
+	CTF::Tensor<> Aijab(4, oovv, nsns, mp2.dw);
+	Aijab["ijab"] = 2.0 * V["iajb"] - V["ibja"]; 
+	CTF::Tensor<> Tau(4, vvoo, nsns, mp2.dw);
+	
+	/*mp2.transformIntegrals(); 
+	S8EvenTensor4& moInts = mp2.getMOInts(); 
+	Vector& eps = mp2.getFock().getEps(); 
+	Matrix Tai = Matrix::Zero(N-nocc, nocc); 
+	Tensor4 Tabij(N-nocc, N-nocc, nocc, nocc, 0.0); 
+	for (int a = 0; a < N-nocc; a++) {
+		for (int b = 0; b < N-nocc; b++) {
+			for (int i = 0; i < nocc; i++) {
+				for (int j = 0; j < nocc; j++) {
+					Tabij(a, b, i, j) = moInts(i, a+nocc, j, b+nocc) / (eps[i] + eps[j] - eps[a+nocc] - eps[b+nocc]); 
+				}
+			}
+		}
+	}
+	
+	double mp2en = 0.0;
+	for (int a = 0; a < N-nocc; a++) {
+		for (int b = 0; b < N-nocc; b++) {
+			for (int i = 0; i < nocc; i++) {
+				for (int j = 0; j < nocc; j++) {
+					mp2en += Tabij(a, b, i, j) * (2.0*moInts(i, a+nocc, j, b+nocc) - moInts(i, b+nocc, j, a+nocc)); 
+				}
+			}
+		}
+	}
+	std::cout << mp2en << std::endl;  */
+	
 	while (!converged && iter < MAXITER) {
 		ccsd_iteration(V, T, 0); 
-		double singles_en = V["ai"]*T["ai"];
-		double disconn_en = 0.5*V["abij"]*T["ai"]*T["bj"]; 
-		double doubles_en = 0.25*V["abij"]*T["abij"]; 
-		new_en = singles_en + disconn_en + doubles_en; 
-		std::cout << singles_en << " " << disconn_en << " " << doubles_en << std::endl;
+		//slow_iteration(eps, moInts, Tai, Tabij, nocc, N-nocc);  
+		Tau["abij"] = T["abij"] + T["ai"]*T["bj"];
+		new_en = Aijab["ijab"]*Tau["abij"]; 
+
 		delta_e = new_en - energy;
 		energy = new_en; 
 		newnt1 = T.ai->norm2();
@@ -401,115 +655,195 @@ void CCSD::ccsd_iteration(Integrals   &V,
 Amplitudes  &T,
 int sched_nparts){
 	int rank;   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-	int ns[2] = {NS, NS}; 
-	int nsns[4] = {NS, NS, NS, NS}; 
-	int asns[4] = {AS, NS, NS, NS}; 
-	int nsas[4] = {NS, NS, AS, NS}; 
-	 
-	CTF::Tensor<> Tau = CTF::Tensor<>(T.abij); 
-	CTF::Tensor<> TauTilde = CTF::Tensor<>(T.abij); 
-	CTF::Tensor<> FAE(2, V.ab->lens, ns, *V.dw); 
-	CTF::Tensor<> FMI(2, V.ij->lens, ns, *V.dw);  
-	CTF::Tensor<> FME = CTF::Tensor<>(V.ia);
-	CTF::Tensor<> WMNIJ(4, V.ijkl->lens, asns, *V.dw);
-	CTF::Tensor<> WABEF(4, V.abcd->lens, nsas, *V.dw);
-	CTF::Tensor<> WBMEJ = CTF::Tensor<>(V.aibj);
 	
-	Tau["abij"] = T["ai"]*T["bj"]; 
-	Tau["abij"] -= T["bi"]*T["aj"]; 
-	TauTilde["abij"] = T["abij"];
-	TauTilde["abij"] += 0.5*Tau["abij"];
-	Tau["abij"] += T["abij"]; 
+	int nvirt = N - nocc; 
 	
 	// Intermediates
-	FME["me"] = V["me"]; 
-	FME["me"] += V["mnef"]*T["fn"]; 
 	
-	FMI["mi"] = V["mi"]; 
-	FMI["mi"] += 0.5*V["me"]*T["ei"]; 
-	FMI["mi"] -= V["mnei"]*T["en"]; 
-	FMI["mi"] += 0.5*V["mnef"]*TauTilde["efin"]; 
+	CTF::Matrix<> FIA(nocc, nvirt, NS, mp2.dw); 
+	CTF::Matrix<> FAB(nvirt, nvirt, NS, mp2.dw);
+	CTF::Matrix<> FIJ(nocc, nocc, NS, mp2.dw); 
+	CTF::Matrix<> FPIJ(nocc, nocc, NS, mp2.dw);
 	
-	FMI.print();
- 	
-	FAE["ae"] = V["ae"]; 
-	FAE["ae"] -= 0.5*V["me"]*T["am"];
-	FAE["ae"] += V["amef"]*T["fm"]; 
-	FAE["ae"] -= 0.5*V["mnef"]*TauTilde["afmn"]; 
+	int oooo[4] = {nocc, nocc, nocc, nocc}; 
+	int ovov[4] = {nocc, nvirt, nocc, nvirt};
+	int vvvo[4] = {nvirt, nvirt, nvirt, nocc};
+	int ovoo[4] = {nocc, nvirt, nocc, nocc};
+	int vvoo[4] = {nvirt, nvirt, nocc, nocc}; 
+	int ovvo[4] = {nocc, nvirt, nvirt, nocc}; 
 	
-	WMNIJ["mnij"] = V["mnij"]; 
-	WMNIJ["mnij"] -= V["mnei"]*T["ej"]; 
-	WMNIJ["mnij"] += V["mnej"]*T["ei"];
-	WMNIJ["mnij"] += 0.25*V["mnef"]*Tau["efij"]; 
+	int sysy[4] = {SY, NS, SY, NS};
+	int nssy[4] = {NS, NS, SY, NS};
+	int syns[4] = {SY, NS, NS, NS};
+	int nsns[4] = {NS, NS, NS, NS};
 	
-	WABEF["abef"] = V["abef"];
-	WABEF["abef"] -= V["amef"]*T["bm"];
-	WABEF["abef"] += V["bmef"]*T["am"]; 
-	WABEF["abef"] += 0.25*V["mnef"]*Tau["abmn"]; 
+	CTF::Tensor<> Tau(4, vvoo, nsns, mp2.dw);
+	Tau["abij"] = T["abij"];
+	Tau["abij"] += T["ai"]*T["bj"]; 
 	
-	WBMEJ["bmej"] = V["bmej"]; 
-	WBMEJ["bmej"] += V["bmef"]*T["fj"];
-	WBMEJ["bmej"] += V["mnej"]*T["bn"];
-	WBMEJ["bmej"] -= 0.5*V["mnef"]*T["bfjn"]; 
-	WBMEJ["bmej"] += V["mnef"]*T["fj"]*T["bn"]; 
-		
-	// Iteration
+	CTF::Tensor<> WIJKL(4, oooo, nsns, mp2.dw);
+	CTF::Tensor<> WIAJB(4, ovov, nsns, mp2.dw);
+	CTF::Tensor<> WIABJ(4, ovvo, nsns, mp2.dw);
+	CTF::Tensor<> WABCI(4, vvvo, nsns, mp2.dw);
+	CTF::Tensor<> WIAJK(4, ovoo, nsns, mp2.dw); 
 	
-	CTF::Tensor<> Zai = CTF::Tensor<>(V.ai);
-	CTF::Tensor<> Zabij = CTF::Tensor<>(V.abij); 
+	FIA["ia"] = 2.0*V["iame"]*T["em"];
+	FIA["ia"] -= V["iema"]*T["em"];
 	
-	Zai["ai"] = V["ai"];
-	Zai["ai"] += FAE["ae"]*T["ei"]; 
-	Zai["ai"] -= FMI["mi"]*T["am"];
-	Zai["ai"] += FME["me"]*T["aeim"];
-	Zai["ai"] -= V["anfi"]*T["fn"];
-	Zai["ai"] += 0.5*V["amef"]*T["efim"]; 
-	Zai["ai"] -= 0.5*V["nmei"]*T["aemn"]; 
+	FAB["ab"] = 2.0*V["abme"]*T["em"]; 
+	FAB["ab"] -= V["mbae"]*T["em"]; 
+	FAB["ab"] -= 2.0*V["menb"]*Tau["eamn"]; 
+	FAB["ab"] += V["mbne"]*Tau["eamn"]; 
 	
+	FPIJ["ij"] = 2.0*V["ijme"]*T["em"];
+	FPIJ["ij"] -= V["iemj"]*T["em"];
+	FPIJ["ij"] += 2.0*V["meif"]*T["efmj"]; 
+	FPIJ["ij"] -= V["iemf"]*T["efmj"];
 	
-	CTF::Tensor<> tempAE(2, V.ab->lens, ns, *V.dw);
-	CTF::Tensor<> tempMJ(2, V.ij->lens, ns, *V.dw);
-	Zabij["abij"] = 4.0 * V["abij"];
-	tempAE["be"] = FAE["be"] - 0.5*FME["me"]*T["bm"]; 
-	Zabij["abij"] += 2.0 * tempAE["be"] * T["aeij"]; 
-	tempAE["ae"] = FAE["ae"] - 0.5*FME["me"]*T["am"];
-	Zabij["abij"] -= 2.0* tempAE["ae"] * T["beij"];
-	tempMJ["mj"] = FMI["mj"] + 0.5*FME["me"]*T["ej"]; 
-	Zabij["abij"] -= 2.0 * tempMJ["mj"] * T["abim"]; 
-	tempMJ["mi"] = FMI["mi"] + 0.5*FME["me"]*T["ei"];
-	Zabij["abij"] += 2.0 * tempMJ["mi"] * T["abjm"]; 
-	Zabij["abij"] += WMNIJ["mnij"]*Tau["abmn"]; 
-	Zabij["abij"] += WABEF["abef"]*Tau["efij"]; 
-	Zabij["abij"] += 2.0 * V["abej"] * T["ei"];
-	Zabij["abij"] -= 2.0 * V["abei"] * T["ej"]; 
-	Zabij["abij"] += 2.0 * V["bmij"] * T["am"];
-	Zabij["abij"] -= 2.0 * V["amij"] * T["bm"]; 
-	Zabij["abij"] -= WBMEJ["bmej"] * T["aeim"]; 
-	Zabij["abij"] += V["bmej"]*T["ei"]*T["am"]; 
-	Zabij["abij"] += WBMEJ["bmei"] * T["aejm"];
-	Zabij["abij"] -= V["bmei"]*T["ej"]*T["am"]; 
-	Zabij["abij"] += WBMEJ["amej"]*T["beim"]; 
-	Zabij["abij"] -= V["amej"]*T["bm"];
-	Zabij["abij"] -= WBMEJ["amei"]*T["bejm"]; 
-	Zabij["abij"] += V["amei"]*T["ej"]*T["bm"];
+	FIJ["ij"] = FPIJ["ij"];
+	FIJ["ij"] += FIA["ie"]*T["ej"]; 
 	
-	CTF::Tensor<> Dai(2, V.ai->lens, V.ai->sym, *V.dw);
-	int sh_sym[4] = {SH, NS, SH, NS};
-	CTF::Tensor<> Dabij(4, V.abij->lens, sh_sym, *V.dw);
-	Dai["ai"] += V["i"];
-	Dai["ai"] -= V["a"];
- 
-	Dabij["abij"] += V["i"];
-	Dabij["abij"] += V["j"];
-	Dabij["abij"] -= V["a"];
-	Dabij["abij"] -= V["b"];
-
-
+	WIJKL["ijkl"] = V["ikjl"];
+	WIJKL["ijkl"] += V["iejf"]*Tau["efkl"]; 
+	WIJKL["ijkl"] += T["ek"]*V["iejl"];
+	WIJKL["ijkl"] += T["el"]*V["jeik"];
+	
+	WIAJB["iajb"] = V["ijab"];
+	WIAJB["iajb"] -= 0.5*V["iemb"]*Tau["eajm"];
+	WIAJB["iajb"] -= 0.5*V["iemb"]*T["ej"]*T["am"]; 
+	WIAJB["iajb"] -= V["ijmb"]*T["am"]; 
+	WIAJB["iajb"] += V["ieab"]*T["ej"]; 
+	
+	WIABJ["iabj"] = V["ibaj"]; 
+	WIABJ["iabj"] -= 0.5*V["ibme"]*T["aemj"];
+	WIABJ["iabj"] -= V["ibme"]*T["am"]*T["ej"]; 
+	WIABJ["iabj"] += V["ibae"]*T["ej"]; 
+	WIABJ["iabj"] -= V["ibmj"]*T["am"]; 
+	WIABJ["iabj"] += V["ibme"]*T["eamj"]; 
+	WIABJ["iabj"] -= 0.5*V["iemb"]*T["eamj"]; 
+	
+	WABCI["abci"] = V["acbi"];
+	WABCI["abci"] -= V["acmi"]*T["bm"]; 
+	WABCI["abci"] -= T["am"]*V["mcbi"]; 
+	
+	WIAJK["iajk"] = V["ijak"]; 
+	WIAJK["iajk"] += V["ieaf"]*Tau["efjk"];
+	
+	// Amplitudes
+	
+	CTF::Matrix<> Zai(nvirt, nocc, NS, mp2.dw); 
+	CTF::Tensor<> Zabij(4, vvoo, nsns, mp2.dw); 
+	CTF::Tensor<> temp(4, vvoo, nsns, mp2.dw);
+	
+	temp["abij"] = 2.0*T["abij"]; 
+	temp["abij"] -= T["abji"]; 
+	
+	Zai["ai"] = FAB["ae"]*T["ei"]; 
+	Zai["ai"] -= FPIJ["mi"]*T["am"]; 
+	Zai["ai"] += 2.0*T["em"]*V["meai"];
+	Zai["ai"] -= T["em"]*V["aemi"];
+	Zai["ai"] += FIA["me"]*temp["eami"];
+	Zai["ai"] += V["meaf"]*temp["efmi"];  
+	
+	Zabij["abij"] = V["aibj"];
+	Zabij["abij"] += T["aeij"]*FAB["be"];
+	Zabij["abij"] -= T["abim"]*FIJ["mj"];
+	Zabij["abij"] += 0.5*V["aebf"]*Tau["efij"]; 
+	Zabij["abij"] += 0.5*Tau["abmn"]*WIJKL["mnij"];  
+	Zabij["abij"] -= T["aemj"]*WIAJB["mbie"]; 
+	Zabij["abij"] -= WIAJB["maie"]*T["ebmj"];
+	Zabij["abij"] += temp["eami"]*WIABJ["mbej"]; 
+	Zabij["abij"] += T["ei"]*WABCI["abej"];
+	Zabij["abij"] -= T["am"]*WIAJK["mbij"]; 
+	
+	Zabij["abij"] += T["beji"]*FAB["ae"];
+	Zabij["abij"] -= T["bajm"]*FIJ["mi"];
+	Zabij["abij"] += 0.5*V["beaf"]*Tau["efji"]; 
+	Zabij["abij"] += 0.5*Tau["bamn"]*WIJKL["mnji"];  
+	Zabij["abij"] -= T["bemi"]*WIAJB["maje"]; 
+	Zabij["abij"] -= WIAJB["mbje"]*T["eami"];
+	Zabij["abij"] += temp["ebmj"]*WIABJ["maei"]; 
+	Zabij["abij"] += T["ej"]*WABCI["baei"];
+	Zabij["abij"] -= T["bm"]*WIAJK["maji"]; 
+	
+	temp["abij"] = 2.0*T["abij"];
+	temp["abij"] -= T["baij"];
+	
+	Zai["ai"] -= V["meni"]*temp["eamn"];
+	
+	CTF::Matrix<> Dai(nvirt, nocc, NS, mp2.dw); 
+	CTF::Tensor<> Dabij(4, vvoo, nsns, mp2.dw);
+	
+	Dai["ai"]  = V["ii"]; 
+	Dai["ai"] -= V["aa"];
+	Dabij["abij"] = V["ii"];
+	Dabij["abij"] += V["jj"];
+	Dabij["abij"] -= V["aa"];
+	Dabij["abij"] -= V["bb"]; 
+	
 	CTF::Function<> fctr(&divide);
-
-	T.ai->contract(1.0, Zai, "ai", Dai, "ai", 0.0, "ai", fctr);
-	T.abij->contract(0.125, Zabij, "abij", Dabij, "abij", 0.0, "abij", fctr);
+	T.ai->contract(1.0, Zai, "ai", Dai, "ai", 0.0, "ai", fctr); 
+	T.abij->contract(1.0, Zabij, "abij", Dabij, "abij", 0.0, "abij", fctr);
+	  
 } 
 
+void CCSD::calculateTriples(Integrals &V, Amplitudes &T) {
+	
+	int nvirt = N-nocc;
+	int shapeNSNS[6] = {NS,NS,NS,NS,NS,NS}; 
+	int vvvooo[6] = {nvirt, nvirt, nvirt, nocc, nocc, nocc}; 
+
+	CTF::Tensor<> Dabcijk(6, vvvooo, shapeNSNS, *V.dw);
+ 
+	Dabcijk["abcijk"] += V["ii"];
+	Dabcijk["abcijk"] += V["jj"];
+	Dabcijk["abcijk"] += V["kk"];
+	Dabcijk["abcijk"] -= V["aa"];
+	Dabcijk["abcijk"] -= V["bb"];
+	Dabcijk["abcijk"] -= V["cc"];
+
+	CTF::Function<> fctr(&divide);
+	
+	CTF::Tensor<> T3(6, vvvooo, shapeNSNS, mp2.dw, "Tabcijk", 1); 
+	
+	T3["abcijk"]  = V["beck"]*T["aeij"];
+	T3["abcijk"] -= T["abim"]*V["mjck"]; 
+	T3["abcijk"] += V["cebj"]*T["aeik"];
+	T3["abcijk"] -= T["acim"]*V["mkbj"]; 
+	T3["abcijk"] += V["aeck"]*T["beji"];
+	T3["abcijk"] -= T["bajm"]*V["mick"]; 
+	T3["abcijk"] += V["ceai"]*T["bejk"];
+	T3["abcijk"] -= T["bcjm"]*V["mkai"]; 
+	T3["abcijk"] += V["beai"]*T["cekj"];
+	T3["abcijk"] -= T["cbkm"]*V["mjai"]; 
+	T3["abcijk"] += V["aebj"]*T["ceki"];
+	T3["abcijk"] -= T["cakm"]*V["mibj"]; 
+ 
+  	{
+		CTF::Tensor<> T3bar(6, vvvooo, shapeNSNS, mp2.dw, "Tbarabcijk", 1); 
+		T3bar["abcijk"] = (4.0/3.0) * T3["abcijk"];
+		T3bar["abcijk"] -= 2.0 * T3["acbijk"]; 
+		T3bar["abcijk"] += (2.0/3.0) * T3["bcaijk"];  
+		
+		T3bar.contract(1.0, T3bar, "abcijk", Dabcijk, "abcijk", 0.0, "abcijk", fctr);
+		
+		triples_energy = T3bar["abcijk"]*T3["abcijk"];
+	}
+	
+	CTF::Tensor<> Z3(6, vvvooo, shapeNSNS, mp2.dw, "Zabcijk", 1); 
+	
+	Z3["abcijk"] = 4.0*T["ai"]*V["jbkc"]; 
+	Z3["abcijk"] += 4.0*T["bj"]*V["iakc"];
+	Z3["abcijk"] += 4.0*T["ck"]*V["iajb"]; 
+	Z3["abcijk"] -= 6.0*T["ai"]*V["jckb"];
+	Z3["abcijk"] -= 6.0*T["cj"]*V["iakb"];
+	Z3["abcijk"] -= 6.0*T["bk"]*V["iajc"]; 
+	Z3["abcijk"] += 2.0*T["bi"]*V["jcka"];
+	Z3["abcijk"] += 2.0*T["cj"]*V["ibka"];
+	Z3["abcijk"] += 2.0*T["ak"]*V["ibjc"]; 
+	
+	Z3.contract(1.0, Z3, "abcijk", Dabcijk, "abcijk", 0.0, "abcijk", fctr); 
+
+	triples_energy += (1.0 / 3.0) * T3["abcijk"] * Z3["abcijk"]; 
+}
 					

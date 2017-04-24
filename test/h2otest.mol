@@ -1,27 +1,24 @@
-memory, 500
+memory, 2000
 direct, false
 !printorbs, true
+!withcore, true
+bprint, true
 molecule = {
-	 angstrom, true
 	 geometry = {
-	      O,  0.00000, -0.07579, 0.00000
-	      H,  0.86681,  0.60144, 0.00000
-    	      H, -0.86681,  0.60144, 0.00000
+	      O,  0.00000, -0.143226, 0.00000
+	      H,  1.63803684,  1.1365488, 0.00000
+    	      H, -1.63803684,  1.1365488, 0.00000
 	 }
 	 basis = {
 	       default, cc-pvdz
 	 }
 }
-!rhf (
-!diis,true
-!converge, 1e-6
-!)
+rhf ()
 !mp2()
-!ccsd (
-!     triples, true
-!     diis, false
-!)
-optg(
-	freq, true
-	modes, true
+ccsd(
+	triples, true
 )
+!optg(
+!	freq, true
+!	modes, true
+!)
