@@ -792,9 +792,173 @@ int sched_nparts){
 void CCSD::calculateTriples(Integrals &V, Amplitudes &T) {
 	
 	int nvirt = N-nocc;
-	int shapeNSNS[6] = {NS,NS,NS,NS,NS,NS}; 
-	int vvvooo[6] = {nvirt, nvirt, nvirt, nocc, nocc, nocc}; 
-
+	int offset = mp2.getFock().getMolecule()->getNel();
+	offset -= mp2.getFock().getMolecule()->getNValence(); 
+	offset /= 2; 
+	int offnocc = nocc + offset; 
+	int offN = N + offset; 
+	
+	int64_t dsz, ssz, v1sz, v2sz, v3sz;
+	int64_t *dix, *six, *v1ix, *v2ix, *v3ix;
+	double *dval, *sval, *vabci, *viajb, *vijak; 
+	
+	T.abij->read_local(&dsz, &dix, &dval);
+	T.ai->read_local(&ssz, &six, &sval); 
+	V.iajb->read_local(&v1sz, &v1ix, &viajb); 
+	V.abci->read_local(&v2sz, &v2ix, &vabci); 
+	V.ijak->read_local(&v3sz, &v3ix, &vijak); 
+	
+	Vector& eps = mp2.getFock().getEps(); 
+	
+	int ooo[3] = {nocc, nocc, nocc};
+	int oov[3] = {nocc, nocc, nvirt}; 
+	int shapeNS[3] = {NS, NS, NS}; 
+	
+	int nvnv = nvirt*nvirt;
+	int nvnvnv = nvnv*nvirt; 
+	int nvnvno = nvnv * nocc; 
+	int nono = nocc*nocc;
+	int nonv = nocc*nvirt; 
+	int nonono = nono*nocc;
+	int nononv = nono*nvirt; 
+	int nvsy = (nvirt * (nvirt + 1))/2;
+	int nvnvsy = nvirt * nvsy;
+	int nosy = (nocc * (nocc + 1))/2; 
+	int nosynv = nosy * nvirt;
+	
+	triples_energy = 0.0; 
+	double dtrip = 0.0;
+	double ctrip = 0.0; 
+	double resolveabc, resolveijk, symfac; 
+	int tempix, p, q; 
+	
+	int64_t  t3sz, tsz, zsz, s1sz, s2sz, s3sz;
+	int64_t *tix, *t3ix, *zix, *s1ix, *s2ix, *s3ix;
+	double *tvalues, *zvalues, *t3values, *sym1, *sym2, *sym3; 
+	
+	CTF::Tensor<> DTabc(3, ooo, shapeNS, mp2.dw);
+	CTF::Tensor<> Tabc(3, ooo, shapeNS, mp2.dw);  
+	CTF::Tensor<> Tbar(3, ooo, shapeNS, mp2.dw);
+	CTF::Tensor<> Zabc(3, ooo, shapeNS, mp2.dw);
+	CTF::Tensor<> Zbar(3, ooo, shapeNS, mp2.dw);
+	CTF::Tensor<> symijk(3, ooo, shapeNS, mp2.dw);
+	CTF::Tensor<> symikj(3, ooo, shapeNS, mp2.dw);
+	CTF::Tensor<> symkij(3, ooo, shapeNS, mp2.dw);  
+	CTF::Tensor<> temp(3, ooo,  shapeNS, mp2.dw); 
+	
+	DTabc.read_local(&tsz, &tix, &tvalues);
+	Tabc.read_local(&t3sz, &t3ix, &t3values); 
+	Zabc.read_local(&zsz, &zix, &zvalues); 
+	symijk.read_local(&s1sz, &s1ix, &sym1);
+	symikj.read_local(&s2sz, &s2ix, &sym2);
+	symkij.read_local(&s3sz, &s3ix, &sym3); 
+	
+	int ai, bj, ck; 
+	
+	for (int c = 0; c < nvirt; c++) {
+		for (int b = 0; b <= c; b++) {
+			for (int a = 0; a <= b; a++) {
+				
+				resolveabc = eps[a+offnocc] + eps[b+offnocc] + eps[c+offnocc];  
+				
+				int ctr = 0; 
+				for (int k = 0; k < nocc; k++) {
+					for (int j = 0; j <= k; j++){ 
+						for (int i = 0; i <= j; i++) {
+							
+							ai = a*nocc + i; 
+							bj = b*nocc + j; 
+							ck = c*nocc + k; 
+							sym1[ctr] = (ai == bj && bj == ck) ? 1.0 : ((ai == bj || bj == ck) ? 3.0 : 6.0); 
+							bj = b*nocc + k;
+							ck = c*nocc + j; 
+							sym2[ctr] = (ai == bj && bj == ck) ? 1.0 : ((ai == bj || bj == ck) ? 3.0 : 6.0);
+							ai = a*nocc + k;
+							bj = b*nocc + i; 
+							ck = c*nocc + j; 
+							sym3[ctr] = (ai == bj && bj == ck) ? 1.0 : ((ai == bj || bj == ck) ? 3.0 : 6.0);
+							
+							resolveijk = eps[i+offset] + eps[j+offset] + eps[k+offset]; 
+						
+							zvalues[ctr] =  sval[a+i*nvirt] * viajb[j+b*nocc+k*nonv+c*nononv]; 
+							zvalues[ctr] += sval[b+j*nvirt] * viajb[i+a*nocc+k*nonv+c*nononv]; 
+							zvalues[ctr] += sval[c+k*nvirt] * viajb[i+a*nocc+j*nonv+b*nononv]; 
+							zvalues[ctr] /= (resolveijk - resolveabc); 
+							
+							tvalues[ctr] = 0.0;
+							for (int e = 0; e < nvirt; e++) {
+								p = std::min(b, e);
+								q = std::max(b, e); 
+								q = q*(q+1); 
+								tvalues[ctr] += dval[a+e*nvirt+i*nvnv + j*nvnvno] * vabci[p+q/2+c*nvsy+k*nvnvsy];
+								tvalues[ctr] += dval[c+e*nvirt+k*nvnv + j*nvnvno] * vabci[p+q/2+a*nvsy+i*nvnvsy]; 
+								p = std::min(c, e);
+								q = std::max(c, e);
+								q = q*(q+1);  
+								tvalues[ctr] += dval[a+e*nvirt+i*nvnv + k*nvnvno] * vabci[p+q/2+b*nvsy+j*nvnvsy]; 
+								tvalues[ctr] += dval[b+e*nvirt+j*nvnv + k*nvnvno] * vabci[p+q/2+a*nvsy+i*nvnvsy]; 
+								p = std::min(a, e);
+								q = std::max(a, e); 
+								q = q*(q+1); 
+								tvalues[ctr] += dval[b+e*nvirt+j*nvnv + i*nvnvno] * vabci[p+q/2+c*nvsy+k*nvnvsy];  
+								tvalues[ctr] += dval[c+e*nvirt+k*nvnv + i*nvnvno] * vabci[p+q/2+b*nvsy+j*nvnvsy]; 
+							}
+							for (int m = 0; m < nocc; m++) {
+								p = std::min(m, j);
+								q = std::max(m, j);
+								q = q*(q+1); 
+								tvalues[ctr] -= dval[b*nvirt+a+i*nvnv+m*nvnvno] * vijak[p+q/2+c*nosy+k*nosynv]; 
+								tvalues[ctr] -= dval[b*nvirt+c+k*nvnv+m*nvnvno] * vijak[p+q/2+a*nosy+i*nosynv];
+								p = std::min(m, k);
+								q = std::max(m, k);
+								q = q*(q+1); 
+								tvalues[ctr] -= dval[c*nvirt+a+i*nvnv+m*nvnvno] * vijak[p+q/2+b*nosy+j*nosynv]; 
+								tvalues[ctr] -= dval[c*nvirt+b+j*nvnv+m*nvnvno] * vijak[p+q/2+a*nosy+i*nosynv];
+								p = std::min(m, i);
+								q = std::max(m, i); 
+								q = q*(q+1); 
+								tvalues[ctr] -= dval[a*nvirt+b+j*nvnv+m*nvnvno] * vijak[p+q/2+c*nosy+k*nosynv]; 
+								tvalues[ctr] -= dval[a*nvirt+c+k*nvnv+m*nvnvno] * vijak[p+q/2+b*nosy+j*nosynv]; 
+							}
+							
+							t3values[ctr] = tvalues[ctr] / (resolveijk - resolveabc); 
+							ctr++; 
+						}
+					}
+				}
+				DTabc.write(tsz, tix, tvalues);
+				Tabc.write(t3sz, t3ix, t3values); 
+				Zabc.write(zsz, zix, zvalues);
+				symijk.write(s1sz, s1ix, sym1);
+				symikj.write(s2sz, s2ix, sym2); 
+				symkij.write(s3sz, s3ix, sym3);
+				
+				temp.contract(1.0, Tabc, "ijk", symijk, "ijk", 0.0, "ijk"); 
+				Tbar["ijk"] = (4.0/3.0) * temp["ijk"];
+				temp.contract(1.0, Tabc, "ikj", symikj, "ikj", 0.0, "ikj"); 
+				Tbar["ijk"] -= 2.0 * temp["ikj"];
+				temp.contract(1.0, Tabc, "kij", symkij, "kij", 0.0, "kij"); 
+				Tbar["ijk"] += (2.0/3.0) * temp["kij"]; 
+				
+				temp.contract(1.0, Zabc, "ijk", symijk, "ijk", 0.0, "ijk"); 
+				Zbar["ijk"] = (4.0/3.0) * temp["ijk"];
+				temp.contract(1.0, Zabc, "ikj", symikj, "ikj", 0.0, "ikj");
+				Zbar["ijk"] -= 2.0 * temp["ikj"];
+				temp.contract(1.0, Zabc, "kij", symkij, "kij", 0.0, "kij");
+				Zbar["ijk"] += (2.0/3.0) * temp["kij"]; 
+				
+				temp.contract(1.0, DTabc, "ijk", symijk, "ijk", 0.0, "ijk");
+				dtrip += Tbar["ijk"]*temp["ijk"]; 
+				ctrip += temp["ijk"]*Zbar["ijk"];
+	
+			}
+		}
+	}
+	/*int shapeNSNS[6] = {NS,NS,NS,NS,NS,NS}; 
+		int vvvooo[6] = {nvirt, nvirt, nvirt, nocc, nocc, nocc}; 
+	
+	std::cout << dtrip << " " << ctrip << " " << std::endl; 
+	
 	CTF::Tensor<> Dabcijk(6, vvvooo, shapeNSNS, *V.dw);
  
 	Dabcijk["abcijk"] += V["ii"];
@@ -824,14 +988,14 @@ void CCSD::calculateTriples(Integrals &V, Amplitudes &T) {
   	{
 		CTF::Tensor<> T3bar(6, vvvooo, shapeNSNS, mp2.dw, "Tbarabcijk", 1); 
 		T3bar["abcijk"] = (4.0/3.0) * T3["abcijk"];
-		T3bar["abcijk"] -= 2.0 * T3["acbijk"]; 
-		T3bar["abcijk"] += (2.0/3.0) * T3["bcaijk"];  
+		T3bar["abcijk"] -= 2.0 * T3["abcikj"]; 
+		T3bar["abcijk"] += (2.0/3.0) * T3["abckij"];  
 		
 		T3bar.contract(1.0, T3bar, "abcijk", Dabcijk, "abcijk", 0.0, "abcijk", fctr);
 		
-		triples_energy = T3bar["abcijk"]*T3["abcijk"];
+		dtrip = T3bar["abcijk"]*T3["abcijk"];
 	}
-	
+
 	CTF::Tensor<> Z3(6, vvvooo, shapeNSNS, mp2.dw, "Zabcijk", 1); 
 	
 	Z3["abcijk"] = 4.0*T["ai"]*V["jbkc"]; 
@@ -846,6 +1010,8 @@ void CCSD::calculateTriples(Integrals &V, Amplitudes &T) {
 	
 	Z3.contract(1.0, Z3, "abcijk", Dabcijk, "abcijk", 0.0, "abcijk", fctr); 
 
-	triples_energy += (1.0 / 3.0) * T3["abcijk"] * Z3["abcijk"]; 
+	ctrip = (1.0 / 3.0) * T3["abcijk"] * Z3["abcijk"]; 
+	std::cout << dtrip << " " << ctrip << std::endl; */
+	triples_energy = ctrip + dtrip;  
 }
 					

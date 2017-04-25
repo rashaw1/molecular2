@@ -16,4 +16,6 @@ molecule = {
 	 }
 }
 rhf()
-ccsd()
+ccsd(
+	triples, true
+)
