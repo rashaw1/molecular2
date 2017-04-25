@@ -8,13 +8,14 @@ molecule = {
     	      H, -0.86681,  0.60144, 0.00000
 	 }
 	 basis = {
-	       default, cc-pvdz
+	       default, sto-3g
 	 }
 }
 hf (
 diis,true
 converge, 1e-6
 )
-!ccsd (
-!     triples, true
-!)
+ccsd (
+     diis, false
+     triples, true
+)

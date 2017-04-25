@@ -127,13 +127,15 @@ void CCSD::build_intermediates(Matrix& F, Tensor4& W, S4OddTensor4& tau, S4OddTe
 				for (int n = 0; n < nocc; n++) {
 					sum2 += singles(n, e-nocc) * spinInts(m, n, i, e);
 					
+ 					
 					for (int f = e; f < N; f++)
 						sum3 += (2 - (f==e)) * tautilde(i, n, e-nocc, f-nocc) * spinInts(m, n, e, f);
 				}
 			}
 			F(m, i) += 0.5*(sum1 + sum3) + sum2;
+			std::cout << m << " " << i << " " << F(m, i) << std::endl;
 		}
-	}	
+	}
 	
 	for (int m = 0; m < nocc; m++) {
 		for (int e = nocc; e < N; e++) {
@@ -148,7 +150,7 @@ void CCSD::build_intermediates(Matrix& F, Tensor4& W, S4OddTensor4& tau, S4OddTe
 			F(m, e) += sum;
 		}
 	}
-	
+ 	
 	// Build W
 	
 	for (int m = 0; m < nocc; m++) {
@@ -257,8 +259,8 @@ void CCSD::build_amplitudes(Matrix& F, Tensor4& W, S4OddTensor4& tau, S4OddTenso
 				for (int b = nocc; b <= a; b++) {
 					
 					auto value = spinInts(i, j, a, b);
+					double sum = 0.0;  
 					
-					double sum = 0.0;
 					for (int e = nocc; e < N; e++) {
 						double sum2 = 0.0, sum3 = 0.0;
 						for (int m = 0; m < nocc; m++) {
@@ -376,6 +378,7 @@ void CCSD::calculateEnergy() {
 			}
 		}
 	}
+	std::cout << newEnergy << " " << 0.5*sum2 << " " << 0.25*sum1 << std::endl;
 	newEnergy += 0.25*sum1 + 0.5*sum2; 
 	
 	delta_e = newEnergy - energy;
