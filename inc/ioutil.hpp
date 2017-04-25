@@ -26,12 +26,15 @@
 // General routines
 #include <string>
 
-// Get the atomic mass/name of an atom with atomic number q
+// Get the atomic mass/name/valency of an atom with atomic number q
 double getAtomMass(int q);
 std::string getAtomName(int q);
+int getAtomValence(int q); 
 
 // Get the atomic number of an atom with name n
 int getAtomCharge(const std::string& n);
+
+
 
 // Get the text name for a shell of angular momentum l
 std::string getShellName(int l);

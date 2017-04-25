@@ -59,10 +59,11 @@ private:
   BF* bfs;
   std::string name;
   std::map<int, std::string> names;
+  std::vector<std::vector <libint2::Shell::Contraction>> raw_contractions; 
   iVector charges;
   iVector shells;
   iVector lnums;
-  int maxl;
+  int maxl, nexps;
   bool ecps; 
   std::vector<libint2::Shell> intShells;
   std::vector<int> shellAtomList;
@@ -71,7 +72,7 @@ public:
   // Note - no copy constructor, as it doesn't really seem necessary
   // Need to specify the name of the basis, n, and a list of the 
   // distinct atoms that are needed (as a vector of atomic numbers)
-  Basis() : name("Undefined") { } // Default constructor
+  Basis() : name("Undefined"), nexps(-1) { } // Default constructor
   Basis(std::map<int, std::string> ns, iVector& atoms, bool _ecps = false);
   ~Basis(); // Destructor
   // Accessors
@@ -91,6 +92,10 @@ public:
   int getShellAtom(int i) const { return shellAtomList[i]; }
   std::vector<libint2::Shell>& getIntShells() { return intShells; }
   iVector getLnums(int q) const;
+  
+  int getNExps(); 
+  double getExp(int i) const; 
+  void setExp(int i, double value); 
   
   void addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std::vector <libint2::real_t>> &coeffs, double *pos, int atom);
   

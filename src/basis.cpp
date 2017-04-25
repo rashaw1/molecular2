@@ -16,7 +16,7 @@
 #include <array>
 
 // Constructors and destructors
-Basis::Basis(std::map<int, std::string> ns, iVector& atoms, bool _ecps) : names(ns), maxl(0), ecps(_ecps)
+Basis::Basis(std::map<int, std::string> ns, iVector& atoms, bool _ecps) : names(ns), maxl(0), nexps(-1), ecps(_ecps)
 {
   BasisReader input(ns); // Make a basis reading object
   auto it = ns.find(0);
@@ -188,6 +188,7 @@ void Basis::addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std:
 		for (auto c : contr) newC.coeff.push_back(c);
 		contr_arr.push_back(newC);
 	}
+	raw_contractions.push_back(contr_arr); 
 	
 	std::array<libint2::real_t, 3> O = { {pos[0], pos[1], pos[2]} };
 
@@ -222,6 +223,67 @@ Basis& Basis::operator=(const Basis& other)
     }
   }
   return *this;
+}
+
+int Basis::getNExps() {
+	
+	if (nexps == -1) {
+		nexps = 0; 
+		
+		for (auto& s : intShells)
+			nexps += s.alpha.size();
+			
+	}
+
+	return nexps; 
+	
+}
+
+double Basis::getExp(int i) const {
+	int ctr = 0; 
+	bool found = false; 
+	double ex = 0.0;
+	
+	for (auto& s : intShells) {
+		for (auto x : s.alpha) {
+			if (ctr == i) {
+				ex = x; 
+				found = true;
+				break;
+			}
+			ctr++; 
+		}
+		if (found) break;
+	}
+	
+	return ex; 
+}
+
+void Basis::setExp(int i, double value) {
+	if (value > 0) {
+		int ctr = 0;
+			bool found = false; 
+		for (int w = 0; w < intShells.size(); w++) {
+			libint2::Shell& s = intShells[w]; 
+			
+			for (int x = 0; x < s.alpha.size(); x++) {
+				if (ctr == i) {
+					s.alpha[x] = value; 
+					
+					libint2::Shell newShell(s.alpha,
+						raw_contractions[w],
+						s.O);
+					
+					intShells[w] = newShell; 
+					
+					found = true;
+					break;
+				}
+				ctr++; 
+			}
+			if (found) break; 
+		}
+	}	
 }
 
   

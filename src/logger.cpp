@@ -21,6 +21,8 @@
 #include "pbf.hpp"
 #include "error.hpp"
 #include "ioutil.hpp"
+#include <libint2.hpp>
+#include "ecpint.hpp"
 
 // Define static constants
 const double Logger::RTOCM = 60.19969093279;
@@ -30,6 +32,7 @@ const double Logger::TOEV = 27.21138505;
 const double Logger::TOKJ = 2625.49962;
 const double Logger::TOANG = 0.52917721092;
 const double Logger::TOBOHR = 1.889726124565;
+const double Logger::TOWAVENUMBERS = 32298.63331; 
 
 // Constructor
 Logger::Logger(ProgramController& _control, std::ofstream& out, std::ostream& e) : control(_control), outfile(out), errstream(e)
@@ -53,6 +56,17 @@ void Logger::init_intfile() {
 			Error e1("FILEIO", "Unable to open integral file.");
 			error(e1);
 		}
+	}
+}
+
+void Logger::init_optfile() {
+	if (!optfile.is_open()) {
+		std::string optfilename = control.getName() + ".info";
+		optfile.open(optfilename); 
+		if (!optfile.is_open()) { 
+			Error e1("FILEIO", "Unable to open optimisation file."); 
+			error(e1); 
+		} 
 	}
 }
 
@@ -513,7 +527,7 @@ void Logger::iteration(int iter, double energy, double delta, double dd)
 	outfile << std::setw(20) << std::setprecision(6) << getLocalTime();
 	outfile << "\n";
   
-	if (iter % 5 == 0) flush();
+	flush();
 }
 
 // Print a single iteration
@@ -559,12 +573,328 @@ void Logger::orbitals(const Vector& eps, int nel, bool one)
 		i = (one ? nel : nel/2);
 		outfile << std::setw(12) <<"HOMO:";
 		outfile << std::setw(12) <<  i;
-		outfile << std::setw(15) << eps(i-1)*TOEV << " eV\n";   	 
-		outfile << std::setw(12) << "LUMO:";
-		outfile << std::setw(12) << i+1;
-		outfile << std::setw(15) << eps(i)*TOEV << " eV\n";
+		outfile << std::setw(15) << eps(i-1)*TOEV << " eV\n";  
+		if (i < eps.size()) { 	 
+			outfile << std::setw(12) << "LUMO:";
+			outfile << std::setw(12) << i+1;
+			outfile << std::setw(15) << eps(i)*TOEV << " eV\n";
+		} else {
+			outfile << "MINIMAL BASIS USED, SO NO LUMO" << std::endl; 
+		}
 	}	
 }
+
+void Logger::coefficient_matrix(const Vector& eps, int nel, const Matrix& coeffs, bool one) 
+{
+	
+	int nlines = nel; 
+	if (!one) {
+		outfile << "ORBITALS (Energies in Hartree)\n\n";
+		nlines /= 2; 
+	}
+	
+	int nsublines = coeffs.rows(); 
+	nsublines = nsublines % 10 == 0 ? nsublines / 10 : nsublines / 10 + 1; 
+	
+	outfile << std::setw(12) << "Orbital";
+	outfile << std::setw(15) << "Energy";
+	outfile << std::setw(12) << "Occ."; 
+	outfile << std::setw(15) << "Coefficients" << std::endl; 
+	
+	for (int i = 0; i < nlines; i++) {
+		outfile << std::setw(12) <<  i+1;
+		outfile << std::setw(15) << std::setprecision(6) << eps(i);
+		outfile << std::setw(12) << (one ? 1 : 2); 
+		
+		int ctr = 0; 
+		for (int j = 0; j < nsublines; j++) {
+			int maxk = coeffs.rows() - ctr; 
+			maxk = maxk < 10 ? maxk : 10; 
+			for (int k = 0; k < maxk; k++)
+				outfile << std::setw(15) << coeffs(k+ctr, i); 
+			outfile << std::endl; 
+			outfile << std::setw(12) << " "; 
+			outfile << std::setw(15) << " ";
+			outfile << std::setw(12) << " ";
+			ctr+= 10; 
+		}
+		outfile << std::endl; 
+	}
+	
+	outfile << "\n\n";
+	if (nel > 0) {
+		int i = (one ? nel : nel/2);
+		outfile << std::setw(12) <<"HOMO:";
+		outfile << std::setw(12) <<  i;
+		outfile << std::setw(15) << eps(i-1)*TOEV << " eV\n";  
+		if (i < eps.size()) { 	 
+			outfile << std::setw(12) << "LUMO:";
+			outfile << std::setw(12) << i+1;
+			outfile << std::setw(15) << eps(i)*TOEV << " eV\n";
+		} else {
+			outfile << "MINIMAL BASIS USED, SO NO LUMO" << std::endl; 
+		}
+	}	
+} 
+
+void Logger::frequencies(const Vector& freqs, const Matrix& modes, bool printmodes) {
+	int nrows = modes.rows(); 
+	
+	outfile << "\nFREQUENCIES (in wavenumbers)\n\n"; 
+	outfile << std::setw(10) << "Mode" << std::setw(20) << "Frequency" << std::endl; 
+	for (int i = 0; i < nrows; i++) {
+		outfile << std::setw(10) << i+1;
+		outfile << std::setw(20) << std::setprecision(6) << freqs[i] << std::endl; 
+	}
+		
+	if (printmodes) {
+		outfile << "\nNORMAL MODES\n\n"; 
+		
+		int ntrips = nrows / 3; 
+		int i = 0; 
+		for (int row = 0; row < ntrips; row++) {
+			outfile << std::setw(20) << "Coordinate"; 
+			outfile << std::setw(20) << i+1; 
+			outfile << std::setw(20) << i+2;
+			outfile << std::setw(20) << i+3 << std::endl;
+			
+			int j = 0; 
+			for (int atom = 0; atom < ntrips; atom++) {
+				outfile << std::setw(20) << "X" + std::to_string(atom+1); 
+				outfile << std::setw(20) << std::setprecision(8) << modes(j, i); 
+				outfile << std::setw(20) << modes(j, i+1); 
+				outfile << std::setw(20) << modes(j, i+2); 
+				outfile << std::endl; 
+				
+				outfile << std::setw(20) << "Y" + std::to_string(atom+1); 
+				outfile << std::setw(20) << std::setprecision(8) << modes(j+1, i); 
+				outfile << std::setw(20) << modes(j+1, i+1); 
+				outfile << std::setw(20) << modes(j+1, i+2); 
+				outfile << std::endl; 
+				
+				outfile << std::setw(20) << "Z" + std::to_string(atom+1); 
+				outfile << std::setw(20) << std::setprecision(8) << modes(j+2, i); 
+				outfile << std::setw(20) << modes(j+2, i+1); 
+				outfile << std::setw(20) << modes(j+2, i+2); 
+				outfile << std::endl; 
+					
+				j+=3;
+			}
+			
+			i += 3;  
+			outfile << std::endl << std::endl;  
+		}
+		
+	}
+}
+
+// Optimisation printing routines
+
+void Logger::initIterationOpt() {
+	
+	outfile << "\n";
+	outfile << std::setw(12) << "Iteration";
+	outfile << std::setw(24) << "Energy";
+	outfile << std::setw(24) << "Delta E";
+	outfile << std::setw(24) << "Grad. Norm";
+	outfile << std::setw(24) << "Step. Norm"; 
+	outfile << std::setw(20) << "Time elapsed\n";
+	outfile << std::string(131, '-') << "\n";
+	
+	init_optfile(); 
+	
+	optfile << "\nSTARTING OPTIMIZATION\n";
+	
+}
+
+void Logger::optg_dump(int iter, Vector& grad, Vector& step, SharedMolecule m, Matrix& hessian,
+				double trust, double delta_e, double grad_norm, double step_norm, 
+			double energy, double expect) 
+{
+
+	outfile << std::setw(12) << iter-1;
+	outfile << std::setw(24) << std::setprecision(12) << energy;
+	outfile << std::setw(24) << delta_e;
+	outfile << std::setw(24) << grad_norm;
+	outfile << std::setw(24) << step_norm; 
+	outfile << std::setw(20) << std::setprecision(6) << getLocalTime();
+	outfile << "\n";	
+	
+	flush(); 
+	
+	optfile << "\nITERATION " << iter-1 << std::endl << std::endl; 
+	
+	optfile << std::setw(10) << "Coord."; 
+	optfile << std::setw(20) << "Current"; 
+	optfile << std::setw(20) << "Next"; 
+	optfile << std::setw(20) << "Gradient"; 
+	optfile << std::setw(20) << "HNorm" << std::endl; 
+	 
+	std::vector<int> activeAtoms = m->getActiveList();
+	int ctr = 0;
+	for (int i : activeAtoms) {
+		Atom& a = m->getAtom(i); 
+		
+		optfile << std::setw(10) << "X" << i; 
+		optfile << std::setw(20) << a.getX() - step[ctr];
+		optfile << std::setw(20) << a.getX(); 
+		optfile << std::setw(20) << grad[ctr]; 
+		optfile << std::setw(20) << hessian.row(ctr++).norm() << std::endl; 
+		
+		optfile << std::setw(10) << "Y" << i; 
+		optfile << std::setw(20) << a.getY() - step[ctr];
+		optfile << std::setw(20) << a.getY(); 
+		optfile << std::setw(20) << grad[ctr]; 
+		optfile << std::setw(20) << hessian.row(ctr++).norm() << std::endl;
+		
+		optfile << std::setw(10) << "Z" << i; 
+		optfile << std::setw(20) << a.getZ() - step[ctr];
+		optfile << std::setw(20) << a.getZ(); 
+		optfile << std::setw(20) << grad[ctr]; 
+		optfile << std::setw(20) << hessian.row(ctr++).norm() << std::endl;  
+	}
+	
+	optfile << std::endl << "Expected change in energy (Ha): " << -expect << std::endl;
+	optfile << std::endl << "Actual change in energy (Ha): " << delta_e << std::endl;
+	optfile << std::endl << "Gradient norm: " << grad_norm << std::endl;
+	optfile << std::endl << "Step norm: " << step_norm << std::endl;
+	optfile << std::endl << "Current trust radius: " << trust << std::endl; 
+ 				
+}
+void Logger::optx_dump(int iter, Vector& grad, Vector& step, SharedMolecule m, Matrix& hessian,
+		    double trust, double delta_e, double grad_norm, double step_norm, 
+		  	double energy, double expect, std::vector<int>& activex) 
+{
+	outfile << std::setw(12) << iter;
+	outfile << std::setw(24) << std::setprecision(12) << energy;
+	outfile << std::setw(24) << delta_e;
+	outfile << std::setw(24) << grad_norm;
+	outfile << std::setw(24) << step_norm; 
+	outfile << std::setw(20) << std::setprecision(6) << getLocalTime();
+	outfile << "\n";	
+	
+	flush(); 
+	
+	optfile << "\nITERATION " << iter << std::endl << std::endl; 
+	
+	optfile << std::setw(10) << "Exponent"; 
+	optfile << std::setw(20) << "Current"; 
+	optfile << std::setw(20) << "Next"; 
+	optfile << std::setw(20) << "Gradient"; 
+	optfile << std::setw(20) << "HNorm" << std::endl; 
+	 
+	int nexps = m->getBasis().getNExps(); 
+	double currexp; 
+	int ctr = 0; 
+	for (int i : activex) {
+		currexp = m->getBasis().getExp(i); 
+		
+		optfile << std::setw(10) << i;  
+		optfile << std::setw(20) << currexp - step[ctr];
+		optfile << std::setw(20) << currexp; 
+		optfile << std::setw(20) << grad[ctr]; 
+		optfile << std::setw(20) << hessian.row(ctr++).norm() << std::endl; 
+  
+	}
+	
+	optfile << std::endl << "Expected change in energy (Ha): " << -expect << std::endl;
+	optfile << std::endl << "Actual change in energy (Ha): " << delta_e << std::endl;
+	optfile << std::endl << "Gradient norm: " << grad_norm << std::endl;
+	optfile << std::endl << "Step norm: " << step_norm << std::endl;
+	optfile << std::endl << "Current trust radius: " << trust << std::endl; 				
+}
+
+void Logger::mo_map(Vector& coeffs, SharedMolecule m, int fineness, std::string& filename) {
+	
+	std::ofstream mofile;
+	mofile.open(filename); 
+	
+	if (mofile.is_open()) {
+		
+		double maxx = 0.0;
+		double maxy = 0.0;
+		double minx = 0.0;
+		double miny = 0.0;
+		
+		double currx, curry;
+		for (int i = 0; i < m->getNAtoms(); i++) {
+			currx = m->getAtom(i).getX();
+			curry = m->getAtom(i).getY();
+			maxx = currx > maxx ? currx : maxx;
+			maxy = curry > maxy ? curry : maxy;
+			minx = currx < minx ? currx : minx;
+			miny = curry < miny ? curry : miny; 
+		}
+		
+		miny -= 0.5;
+		minx -= 0.5;
+		maxx += 0.5;
+		maxy += 0.5; 
+		
+		double xgap = (maxx - minx) / ((double) fineness); 
+		double ygap = (maxy - miny) / ((double) fineness);
+		
+		std::vector<libint2::Shell>& shells = m->getBasis().getIntShells(); 
+		
+		currx = minx;
+		double x, y, z, r, r2; 
+		int l; 
+		for (int i = 0 ; i <= fineness; i++) {
+			
+			curry = miny;
+			for (int j = 0; j <= fineness; j++) {
+				
+				double value = 0.0; 
+				int ctr = 0; 
+				for (auto& s : shells) {
+					x = currx - s.O[0];
+					y = curry - s.O[1];
+					z = s.O[2]; 
+					
+					r2 = x*x + y*y + z*z;
+					r = std::sqrt(r2); 
+					
+					std::vector<libint2::real_t>& exps = s.alpha; 
+					std::vector<libint2::Shell::Contraction>& contr = s.contr;
+					for (auto& c : contr) {
+						l = c.l; 
+						double tempval = 0.0;
+						for (int k = 0; k < c.coeff.size(); k++)
+							tempval += c.coeff[k] * std::exp(-exps[k] * r2); 
+						tempval *= std::pow(r, l); 
+						
+						double cost = r > 0 ? z / r : 0.0; 
+						double phi = atan2(y, x); 
+						std::vector<double> fac = facArray(2*l + 1);
+						std::vector<double> dfac = dfacArray(2*l + 1);
+						TwoIndex<double> spherharms = realSphericalHarmonics(l, cost, phi, fac, dfac); 
+						
+						for (int m = -l; m <= l; m++)
+							value += coeffs[ctr++] * tempval * spherharms(l, m+l); 
+					}
+				}
+				
+				mofile << std::setw(15) << std::setprecision(7) << currx; 
+				mofile << std::setw(15) << curry; 
+				mofile << std::setw(15) << value << std::endl; 
+				
+				curry += ygap; 
+			}
+			
+			currx += xgap; 
+		}
+		
+		
+		
+		
+	} else {
+		Error e1("FILEIO", "Could not open MO mapping file.");
+		error(e1); 
+	}
+	
+}
+
+
 // Timing functions
 
 // Print time elapsed since last call

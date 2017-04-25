@@ -125,6 +125,10 @@ void SCF::rhf(bool print)
 		int iter = 1;
 		double delta, dd;
 		
+		int orbital = cmd.get_option<int>("orbital"); 
+		bool momap = cmd.get_option<bool>("momap"); 
+		Vector mocoeffs;
+		
 		int MAXITER = cmd.get_option<int>("maxiter"); 
 		double CONVERGE = cmd.get_option<double>("converge");
     
@@ -146,8 +150,11 @@ void SCF::rhf(bool print)
 			if(print) molecule->control->log.iteration(iter, energy, delta, dd);
 			focker.average(weights);
 			focker.transform(false);
-			converged = testConvergence(dd);
-			if ( delta > CONVERGE/100.0 ) { converged = false; }
+			converged = (testConvergence(dd) && delta < CONVERGE/100.0) || (delta < CONVERGE/1000.0);
+			
+			if (momap)
+				mocoeffs = focker.getCP().row(orbital); 
+			
 			iter++;
 		}
 		focker.diagonalise();
@@ -158,8 +165,18 @@ void SCF::rhf(bool print)
 			molecule->control->log.print("\nOne electron energy (Hartree) = " + std::to_string(one_E));
 			molecule->control->log.print("\nTwo electron energy (Hartree) = " + std::to_string(two_E));
 			molecule->control->log.print("\n");
-			molecule->control->log.orbitals(focker.getEps(), nel, false);
+			
+			if(molecule->control->get_option<bool>("printorbs"))
+				molecule->control->log.coefficient_matrix(focker.getEps(), nel, focker.getCP(), false); 
+			else 
+				molecule->control->log.orbitals(focker.getEps(), nel, false);
+				
 			molecule->control->log.result("RHF Energy", energy, "Hartree");
+			
+			if (momap) {
+				std::string mapfile = cmd.get_option<std::string>("mapfile");
+				molecule->control->log.mo_map(mocoeffs, molecule, cmd.get_option<int>("fineness"), mapfile);
+			} 
 		}
 	}
 }
@@ -242,10 +259,19 @@ void SCF::uhf_internal(bool print, UnrestrictedFock& ufocker)
 	ufocker.diagonalise();
 	if (converged && print) {
 		// Construct the orbital energies
-		molecule->control->log.print("\nALPHA ORBITALS");
-		molecule->control->log.orbitals(ufocker.getEpsAlpha(), nalpha, true);
-		molecule->control->log.print("\nBETA ORBITALS");
-		molecule->control->log.orbitals(ufocker.getEpsBeta(), nbeta, true);
+		
+		if (molecule->control->get_option<bool>("printorbs")) {
+			molecule->control->log.print("\nALPHA OCCUPATIONS");
+			molecule->control->log.coefficient_matrix(ufocker.getEpsAlpha(), nalpha, ufocker.getCPAlpha(), true); 
+			molecule->control->log.print("\nBETA OCCUPATIONS");
+			molecule->control->log.coefficient_matrix(ufocker.getEpsBeta(), nbeta, ufocker.getCPBeta(), true); 
+		} else {
+			molecule->control->log.print("\nALPHA ORBITALS");
+			molecule->control->log.orbitals(ufocker.getEpsAlpha(), nalpha, true);
+			molecule->control->log.print("\nBETA ORBITALS");
+			molecule->control->log.orbitals(ufocker.getEpsBeta(), nbeta, true);
+		}
+		
 		molecule->control->log.result("UHF Energy", energy, "Hartree");
 	} else if (!converged){
 		molecule->control->log.result("UHF failed to converge");

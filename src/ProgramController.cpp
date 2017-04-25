@@ -88,7 +88,7 @@ void Construct::parse(std::vector<std::string>& lines) {
 	}
 }
 
-ProgramController::ProgramController(std::ifstream& input, std::ofstream& output, std::ostream& err) : log(*this, output, err) {
+ProgramController::ProgramController(std::ifstream& input, std::ofstream& output, std::ostream& err, std::string& name) : jobname(name), log(*this, output, err) {
 	log.init();
 	log.flush();
 	
@@ -101,19 +101,22 @@ ProgramController::ProgramController(std::ifstream& input, std::ofstream& output
 	command_list["ralmo"] = std::bind(&ProgramController::call_ralmo, this, _1, _2); 
 	command_list["ualmo"] = std::bind(&ProgramController::call_ualmo, this, _1, _2); 
 	command_list["optg"] = std::bind(&ProgramController::call_optg, this, _1, _2); 
+	command_list["optx"] = std::bind(&ProgramController::call_optx, this, _1, _2);
 	command_list["nuctest"] = std::bind(&ProgramController::call_nuctest, this, _1, _2);
 	
 	parse(input); 
 	
-	log.init_intfile();
-	
 	if (!is_option_set("memory")) set_option<double>("memory", 100.0);
 	if (!is_option_set("nthreads")) set_option<int>("nthreads", 1);
 	if (!is_option_set("printeris")) set_option<bool>("printeris", false);
+	if (!is_option_set("printorbs")) set_option<bool>("printorbs", false); 
 	if (!is_option_set("direct")) set_option<bool>("direct", false);
 	if (!is_option_set("intfile")) set_option<std::string>("intfile", "eris.ints"); 
 	if (!is_option_set("thrint")) set_option<double>("thrint", 1e-12);
 	if (!is_option_set("bprint")) set_option<bool>("bprint", false); 
+	if (!is_option_set("withcore")) set_option<bool>("withcore", false); 
+	
+	log.init_intfile();
 	
 }
 
@@ -252,7 +255,7 @@ void ProgramController::run() {
 			log.print(m->getBasis(), get_option<bool>("bprint")); 
 			log.localTime(); 
 			log.flush(); 
-
+			
 			ints = std::make_shared<IntegralEngine>(m); 
 		
 			done_hf = false;
@@ -292,6 +295,10 @@ void ProgramController::call_rhf(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
 	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
 	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12); 
+	if(!c.is_option_set("momap")) c.set_option<bool>("momap", false);
+	if(!c.is_option_set("mapfile")) c.set_option<std::string>("mapfile", "mo.map");
+	if(!c.is_option_set("fineness")) c.set_option<int>("fineness", 50); 
+	if(!c.is_option_set("orbital")) c.set_option<int>("orbital", 0);
 	
 	focker = std::make_shared<Fock>(c, *ints, m);
 	hf = std::make_shared<SCF>(c, m, *focker); 
@@ -313,10 +320,17 @@ void ProgramController::call_uhf(Command& c, SharedMolecule m) {
 }
 
 void ProgramController::call_mp2(Command& c, SharedMolecule m) {
-	if(done_hf && !done_transform) { 
+	if(done_hf) { 
 		mp2obj = std::make_shared<MP2>(*focker); 
-		runmp2(*mp2obj, *hf, true); 
-		done_transform = true;
+		
+		log.title("MP2 CALCULATION"); 
+		mp2obj->tensormp2(); 
+		log.print("Integral transformation complete.\n");
+		log.localTime();
+
+		log.result("MP2 Energy Correction", mp2obj->getEnergy(), "Hartree");
+		log.result("Total Energy = ", hf->getEnergy() + mp2obj->getEnergy(), "Hartree");
+		
 	} else {
 		Error e("MP2", "HF is required before MP2 can be done.");
 		log.error(e);
@@ -333,11 +347,10 @@ void ProgramController::call_ccsd(Command& c, SharedMolecule m) {
 	if (done_hf) {
 		if(!done_transform) {
 			mp2obj = std::make_shared<MP2>(*focker); 
-			runmp2(*mp2obj, *hf, false);
+			mp2obj->cctrans(); 
 			done_transform = true;
 		}
 		
-		mp2obj->spatialToSpin();
 		CCSD ccobj(c, *mp2obj); 
 		ccobj.compute();
 		log.result("Total Energy = ", hf->getEnergy() + ccobj.getEnergy() + ccobj.getETriples(), "Hartree");
@@ -374,10 +387,33 @@ void ProgramController::call_optg(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true); 
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 8);
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
-	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
+	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5);
+	if(!c.is_option_set("gradconverge")) c.set_option<double>("gradconverge", 1e-3);  
 	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12);
+	if(!c.is_option_set("trust")) c.set_option<double>("trust", 0.1); 
+	if(!c.is_option_set("freq")) c.set_option<bool>("freq", false); 
+	if(!c.is_option_set("modes")) c.set_option<bool>("modes", false); 
 	
-	//conjugate_scf(c, m); 
+	RHFOptimiser optim(c, m);
+	optim.optimise();  
+}
+
+void ProgramController::call_optx(Command& c, SharedMolecule m) {
+	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true); 
+	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 8);
+	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
+	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
+	if(!c.is_option_set("gradconverge")) c.set_option<double>("gradconverge", 1e-5);  
+	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12);
+	if(!c.is_option_set("trust")) c.set_option<double>("trust", 5.0);
+	if(!c.is_option_set("active")) c.set_option<std::string>("active", "all"); 
+	if(!c.is_option_set("momap")) c.set_option<bool>("momap", false);
+	if(!c.is_option_set("mapfile")) c.set_option<std::string>("mapfile", "mo.map");
+	if(!c.is_option_set("fineness")) c.set_option<int>("fineness", 50); 
+	if(!c.is_option_set("orbital")) c.set_option<int>("orbital", 0);
+	 
+	RHFOptimiser optim(c, m); 
+	optim.exponents(); 
 }
 
 void ProgramController::call_nuctest(Command& c, SharedMolecule m) {
@@ -545,6 +581,7 @@ ProgramController& ProgramController::operator=(const ProgramController& other) 
 	ints = other.ints;
 	done_hf = other.done_hf;
 	done_transform = other.done_transform; 
+	jobname = other.jobname; 
 	log = other.log;
 	return *this;
 }

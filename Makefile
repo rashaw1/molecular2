@@ -1,21 +1,21 @@
 # Project name
 PROJECT = molecular.x
 # Compiler
-CXX = clang++
+CXX = mpicxx
 
 # Run Options
 COMMANDLINE_OPTIONS = 
 
 # Compiler options
-DEBUG = -g -Wall -O0 -Wno-unused-variable -Wno-sign-compare -std=c++11 -D_GLIBCXX_DEBUG -omp -DLIBINT2_MAX_DERIV_ORDER=2 
-OPTIM = -O3 -Wall -Wno-unused-variable -Wno-sign-compare -std=c++11 -omp -DLIBINT2_MAX_DERIV_ORDER=2
+DEBUG = -g -Wall -O0 -Wno-unused-variable -Wno-sign-compare -Wno-format -std=c++11 -D_GLIBCXX_DEBUG -omp -DLIBINT2_MAX_DERIV_ORDER=2 
+OPTIM = -O3 -Wall -Wno-unused-variable -Wno-sign-compare -Wno-format -std=c++11 -omp -DLIBINT2_MAX_DERIV_ORDER=2
 COMPILE_OPTIONS = $(OPTIM)
 
 # Header include directories
-HEADERS = -I./inc -I/usr/local/Cellar/eigen/3.3.1/include/eigen3 -I/usr/local/libint/2.3.0-beta.3/include -I/usr/local/libint/2.3.0-beta.3/include/libint2
+HEADERS = -I./inc -I./extern -I../ctf/include -I/usr/local/Cellar/eigen/3.3.1/include/eigen3 -I/usr/local/libint/2.3.0-beta.3/include -I/usr/local/libint/2.3.0-beta.3/include/libint2
 
 # Libraries for linking
-LIBS = -L/usr/local/libint/2.3.0-beta.3/lib -lint2 -std=c++11
+LIBS = -L/usr/local/libint/2.3.0-beta.3/lib -L../ctf/lib -lint2 -lctf -lblas -std=c++11 
 
 # Dependency options
 DEPENDENCY_OPTIONS = -MM

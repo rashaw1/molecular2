@@ -19,7 +19,8 @@
 
 Atom Molecule::parseGeomLine(std::string line) {
 	std::string delimiter = ","; // Define the separation delimiter
-	int q, m; 
+	int q;
+	double m;
 	Vector coords(3);
 	double multiplier = (angstrom ? Logger::TOBOHR : 1.0); // Convert to bohr from angstrom?
 		
@@ -192,7 +193,22 @@ void Molecule::init(Construct& c)
 					}
 				}
 			}	
-		} else {
+		} else if (sc.name == "frozen") { 
+			if (sc.content.size() > 0) {
+				for (auto& line : sc.content) {
+					size_t pos = line.find(',');
+					while (pos != std::string::npos) {
+						token = line.substr(0, pos);
+						frozen_atoms.push_back(std::stoi(token)-1);
+						line.erase(0, pos+1);
+						pos = line.find(',');
+					}
+					frozen_atoms.push_back(std::stoi(line) - 1);
+				}
+				
+				std::sort(frozen_atoms.begin(), frozen_atoms.end(), std::less<int>());
+			}
+		}else {
 			Error e("INIT", "Construct not recognised."); 
 			control->log.error(e);
 		}
@@ -332,6 +348,44 @@ Fragment& Fragment::operator=(const Fragment& other) {
 }
 
 // Routines
+
+
+//Get number of core/valence electrons in molecule
+
+int Molecule::getNCore() const 
+{
+	return nel - getNValence(); 
+}
+
+int Molecule::getNValence() const
+{
+	int nvalence = -charge; 
+	
+	for (int i = 0; i < natoms; i++)
+		nvalence += getAtomValence(atoms[i].getCharge());
+	
+	return nvalence; 
+}
+
+std::vector<int> Molecule::getActiveList() const {
+	
+	std::vector<int> list; 
+	
+	int ninactive = frozen_atoms.size(); 
+	int currix = ninactive > 0 ? 0 : -1; 
+	for (int i = 0; i < natoms; i++) {
+		int curr = currix > -1 ? frozen_atoms[currix] : -1; 
+		if (i == curr) {
+			currix++; 
+			currix = currix < ninactive ? currix : -1;  
+		} else {
+			list.push_back(i); 
+		}
+	}
+	
+	return list; 
+	
+}
 
 // rotate(Matrix U) rotates the coordinate system according
 // to the transformation specified by the unitary matrix U

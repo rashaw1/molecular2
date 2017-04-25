@@ -1,0 +1,62 @@
+
+STARTING OPTIMIZATION
+
+ITERATION 0
+
+    Coord.             Current                Next            Gradient               HNorm
+         X0           -0.678553           -0.678553           0.0247895            0.681983
+         Y0                   0                   0        -2.09872e-17           0.0258134
+         Z0                   0                   0          4.0417e-19           0.0258134
+         X1            0.678553            0.678553          -0.0247895            0.681983
+         Y1                   0                   0         2.09872e-17           0.0258134
+         Z1                   0                   0         -4.0417e-19           0.0258134
+
+Expected change in energy (Ha): -0
+
+Actual change in energy (Ha): -1.12807
+
+Gradient norm: 0.0350577
+
+Step norm: 0
+
+Current trust radius: 0.1
+
+ITERATION 1
+
+    Coord.             Current                Next            Gradient               HNorm
+         X0           -0.678553           -0.704256          0.00198608            0.575992
+         Y0         7.08701e-19        -5.74193e-16         2.99055e-17          0.00197955
+         Z0        -6.63073e-19         1.04083e-17        -5.91477e-18          0.00197955
+         X1            0.678553            0.704256         -0.00198608            0.575992
+         Y1        -7.08701e-19         5.74193e-16        -2.99055e-17          0.00197955
+         Z1         6.63073e-19        -1.04083e-17         5.91477e-18          0.00197955
+
+Expected change in energy (Ha): -0.00254864
+
+Actual change in energy (Ha): -0.000671716
+
+Gradient norm: 0.00280874
+
+Step norm: 0.0363492
+
+Current trust radius: 0.00908729
+
+ITERATION 2
+
+    Coord.             Current                Next            Gradient               HNorm
+         X0           -0.704256           -0.706694          1.6156e-05            0.566852
+         Y0        -5.74165e-16         1.01082e-14        -3.23483e-17         1.98113e-06
+         Z0         1.03017e-17        -2.10248e-15        -2.31599e-18         1.98113e-06
+         X1            0.704256            0.706694         -1.6156e-05            0.566852
+         Y1         5.74165e-16        -1.01082e-14         3.23483e-17         1.98113e-06
+         Z1        -1.03017e-17         2.10248e-15         2.31599e-18         1.98113e-06
+
+Expected change in energy (Ha): -1.93696e-05
+
+Actual change in energy (Ha): -4.869e-06
+
+Gradient norm: 2.28481e-05
+
+Step norm: 0.0034481
+
+Current trust radius: 0.000862025

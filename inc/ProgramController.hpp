@@ -120,6 +120,8 @@ private:
 	std::shared_ptr<MP2> mp2obj; 
 	std::shared_ptr<IntegralEngine> ints; 
 	
+	std::string jobname; 
+	
 	bool done_hf;
 	bool done_transform; 
 	
@@ -128,8 +130,10 @@ private:
 public:
 	
 	Logger log; 
-	ProgramController(std::ifstream& input, std::ofstream& output, std::ostream& err); 
+	ProgramController(std::ifstream& input, std::ofstream& output, std::ostream& err, std::string& name); 
 	ProgramController& operator=(const ProgramController& other);
+	
+	std::string& getName() { return jobname; }
 	
 	template <typename T>
 	T get_option(std::string name) {
@@ -183,6 +187,7 @@ public:
 	void call_ralmo(Command& c, SharedMolecule m);
 	void call_ualmo(Command& c, SharedMolecule m);
 	void call_optg(Command& c, SharedMolecule m);
+	void call_optx(Command& c, SharedMolecule m); 
 	void call_nuctest(Command& c, SharedMolecule m);
 	
 };
