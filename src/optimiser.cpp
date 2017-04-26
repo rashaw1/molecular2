@@ -275,7 +275,8 @@ void RHFOptimiser::exponents() {
 	log.title("EXPONENT OPTIMIZATION"); 
 	log.initIterationOpt();
 	int MAXITER = cmd.get_option<int>("maxiter");
-	double CONVERGE = cmd.get_option<double>("gradconverge");  
+	double CONVERGE = cmd.get_option<double>("gradconverge"); 
+	bool withmp2 = cmd.get_option<bool>("mp2");  
 	
 	std::string active = cmd.get_option<std::string>("active"); 
 	std::vector<int> activex;
@@ -316,7 +317,15 @@ void RHFOptimiser::exponents() {
 		SCF hf(cmd, mol, f); 
 		hf.rhf(false); 
 		delta_e = hf.getEnergy() - energy;
-		energy = hf.getEnergy(); 
+		energy = hf.getEnergy();
+		
+		if (withmp2) {
+			MP2 mp2obj(f);
+			mp2obj.tensormp2(false);
+			energy += mp2obj.getEnergy();
+			delta_e += mp2obj.getEnergy(); 
+		}
+		 
 		xgrad = f.compute_xgrad(energy, xhessian, activex, cmd); 
 		grad_norm = xgrad.norm();
 		if (momap) 

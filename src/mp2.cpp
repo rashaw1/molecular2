@@ -335,7 +335,7 @@ void MP2::cctrans() {
 	V.ij->write(sz, indices, values);
 }
 
-void MP2::tensormp2() {
+void MP2::tensormp2(bool print) {
 	
 	int nvirt = N-nocc; 
 	int offset = 0;
@@ -349,8 +349,10 @@ void MP2::tensormp2() {
 	int offnocc = nocc + offset; 
 	int offN = N + offset; 
 
-	focker.getMolecule()->control->log.print("No. of occ. orbitals: " + std::to_string(nocc));
-	focker.getMolecule()->control->log.print("No. of virt. orbitals: " + std::to_string(nvirt)); 
+	if (print) {
+		focker.getMolecule()->control->log.print("No. of occ. orbitals: " + std::to_string(nocc));
+		focker.getMolecule()->control->log.print("No. of virt. orbitals: " + std::to_string(nvirt)); 
+	}
 	
 	int ao_lens[4] = {offN, offN, offN, offN};
 	int mo_lens[4] = {nocc, nvirt, nocc, nvirt};
@@ -362,38 +364,47 @@ void MP2::tensormp2() {
 	int nsns[4] = {NS, NS, NS, NS};
 	int syns[4] = {SY, NS, NS, NS}; 
 	CTF::Tensor<> ao_integrals(4, ao_lens, sysy, dw); 
-	int64_t sz, *indices;
-	double *values;
+	int64_t sz, *i1, *i2, *i3, *i4;
+	double *v1, *v2, *v3, *v4;
 	int ctr;
 	
 	IntegralEngine& aoInts = focker.getIntegrals();
 	
-	ao_integrals.read_local(&sz, &indices, &values);
+	ao_integrals.read_local(&sz, &i1, &v1);
 	ctr = 0;
 	for (int a = 0; a < offN; a++) 
 		for (int b = 0; b <= a; b++)
 			for (int c = 0; c < offN; c++)
 				for (int d = 0; d <= c; d++)
-					values[ctr++] = aoInts.getERI(d, c, b, a); 
-	ao_integrals.write(sz, indices, values);
+					v1[ctr++] = aoInts.getERI(d, c, b, a); 
+	ao_integrals.write(sz, i1, v1);
+	
+	delete v1; 
+	delete i1; 
 	
 	CTF::Matrix<> cp_occ(offN, nocc, NS, dw); 
 	CTF::Matrix<> cp_virt(offN, nvirt, NS, dw); 
 	Matrix& CP = focker.getCP(); 
 	
 	ctr = 0; 
-	cp_occ.read_local(&sz, &indices, &values);
+	cp_occ.read_local(&sz, &i2, &v2);
 	for (int i = offset; i < offnocc; i++)
 		for (int mu = 0; mu < offN; mu++)
-			values[ctr++] = CP(mu, i); 
-	cp_occ.write(sz, indices, values); 
+			v2[ctr++] = CP(mu, i); 
+	cp_occ.write(sz, i2, v2); 
+	
+	delete i2;
+	delete v2; 
 	
 	ctr = 0; 
-	cp_virt.read_local(&sz, &indices, &values);
+	cp_virt.read_local(&sz, &i3, &v3);
 	for (int a = offnocc; a < offN; a++)
 		for (int mu = 0; mu < offN; mu++)
-			values[ctr++] = CP(mu, a); 
-	cp_virt.write(sz, indices, values); 
+			v3[ctr++] = CP(mu, a); 
+	cp_virt.write(sz, i3, v3); 
+	
+	delete i3; 
+	delete v3; 
 	
 	CTF::Tensor<> temp1(4, t1_lens, syns, dw);
 	CTF::Tensor<> temp2(4, t2_lens, syns, dw); 
@@ -410,13 +421,16 @@ void MP2::tensormp2() {
 	
 	ctr = 0;
 	Vector& eps = focker.getEps(); 
-	Dijab.read_local(&sz, &indices, &values); 
+	Dijab.read_local(&sz, &i4, &v4); 
 	for (int b = offnocc; b < offN; b++)
 		for (int a = offnocc; a <= b; a++)
 			for (int j = offset; j < offnocc; j++)
 				for (int i = offset; i <= j; i++) 
-					values[ctr++] = eps[i] + eps[j] - eps[a] - eps[b]; 
-	Dijab.write(sz, indices, values); 
+					v4[ctr++] = eps[i] + eps[j] - eps[a] - eps[b]; 
+	Dijab.write(sz, i4, v4); 
+	
+	delete i4;
+	delete v4; 
 	
 	CTF::Function<> fctr(&dividef);
 	CTF::Tensor<> Tijab(4, dlens, nsns, dw);
@@ -424,7 +438,7 @@ void MP2::tensormp2() {
 	CTF::Tensor<> Aijab(4, dlens, nsns, dw); 
 	Aijab["ijab"] = 2.0 * Viajb["iajb"] - Viajb["ibja"]; 
 	energy = Tijab["ijab"] * Aijab["ijab"];
-	
+	 
 }
 
 // Determine the MP2 energy

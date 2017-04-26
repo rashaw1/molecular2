@@ -3,12 +3,12 @@ direct, false
 molecule = {
 	 geometry = {
 	 	  he, 0.0, 0.0, 0.0
-		  he, 4.0, 0.0, 0.0
+		  he, 5.65, 0.0, 0.0
 	 }
 	 basis = {
-	       	  default, avdz
+	       he, avtz
 	 }
-}				      
+}	 
 rhf()
 ccsd(
 	triples, true

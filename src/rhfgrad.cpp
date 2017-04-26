@@ -599,6 +599,8 @@ std::vector<EMatrix> Fock::compute_2body_fock_deriv(const std::vector<Atom> &ato
 
 Vector Fock::compute_xgrad(double fx, Matrix& xhessian, std::vector<int>& activex, Command& cmd) {
 	
+	bool withmp2 = cmd.get_option<bool>("mp2"); 
+	
 	Basis& b = molecule->getBasis(); 
 	const auto nexp = activex.size();
 	const double h = 0.01; 
@@ -619,6 +621,12 @@ Vector Fock::compute_xgrad(double fx, Matrix& xhessian, std::vector<int>& active
 		hf1.rhf(false);   
 		fxp = hf1.getEnergy(); 
 		
+		if (withmp2) {
+			MP2 mp2(f1);
+			mp2.tensormp2(false);
+			fxp += mp2.getEnergy(); 
+		}
+		
 		xgrad[xctr] = fxp; 	
 		
 		int yctr = xctr;
@@ -633,6 +641,12 @@ Vector Fock::compute_xgrad(double fx, Matrix& xhessian, std::vector<int>& active
 				SCF hf2(cmd, molecule, f2); 
 				hf2.rhf(false); 
 				fyp = hf2.getEnergy(); 
+				
+				if (withmp2) {
+					MP2 mp2(f2);
+					mp2.tensormp2(false);
+					fyp += mp2.getEnergy(); 
+				}
 			
 				xhessian(xctr, yctr++) = fyp; 
 			

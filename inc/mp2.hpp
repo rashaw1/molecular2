@@ -196,7 +196,7 @@ public:
 	void transformThread(int start, int end, Tensor4& moTemp);
 	void calculateEnergy();
 	
-	void tensormp2(); 
+	void tensormp2(bool print = true); 
 	void cctrans(); 
 	
 	double getEnergy() const { return energy; }

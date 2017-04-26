@@ -411,6 +411,7 @@ void ProgramController::call_optx(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("mapfile")) c.set_option<std::string>("mapfile", "mo.map");
 	if(!c.is_option_set("fineness")) c.set_option<int>("fineness", 50); 
 	if(!c.is_option_set("orbital")) c.set_option<int>("orbital", 0);
+	if(!c.is_option_set("mp2")) c.set_option<bool>("mp2", false); 
 	 
 	RHFOptimiser optim(c, m); 
 	optim.exponents(); 
