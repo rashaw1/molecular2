@@ -810,10 +810,6 @@ void CCSD::calculateTriples(Integrals &V, Amplitudes &T) {
 	
 	Vector& eps = mp2.getFock().getEps(); 
 	
-	int ooo[3] = {nocc, nocc, nocc};
-	int oov[3] = {nocc, nocc, nvirt}; 
-	int shapeNS[3] = {NS, NS, NS}; 
-	
 	int nvnv = nvirt*nvirt;
 	int nvnvnv = nvnv*nvirt; 
 	int nvnvno = nvnv * nocc; 
@@ -826,34 +822,12 @@ void CCSD::calculateTriples(Integrals &V, Amplitudes &T) {
 	int nosy = (nocc * (nocc + 1))/2; 
 	int nosynv = nosy * nvirt;
 	
-	triples_energy = 0.0; 
 	double dtrip = 0.0;
 	double ctrip = 0.0; 
-	double resolveabc, resolveijk, symfac; 
-	int tempix, p, q; 
-	
-	int64_t  t3sz, tsz, zsz, s1sz, s2sz, s3sz;
-	int64_t *tix, *t3ix, *zix, *s1ix, *s2ix, *s3ix;
-	double *tvalues, *zvalues, *t3values, *sym1, *sym2, *sym3; 
-	
-	CTF::Tensor<> DTabc(3, ooo, shapeNS, mp2.dw);
-	CTF::Tensor<> Tabc(3, ooo, shapeNS, mp2.dw);  
-	CTF::Tensor<> Tbar(3, ooo, shapeNS, mp2.dw);
-	CTF::Tensor<> Zabc(3, ooo, shapeNS, mp2.dw);
-	CTF::Tensor<> Zbar(3, ooo, shapeNS, mp2.dw);
-	CTF::Tensor<> symijk(3, ooo, shapeNS, mp2.dw);
-	CTF::Tensor<> symikj(3, ooo, shapeNS, mp2.dw);
-	CTF::Tensor<> symkij(3, ooo, shapeNS, mp2.dw);  
-	CTF::Tensor<> temp(3, ooo,  shapeNS, mp2.dw); 
-	
-	DTabc.read_local(&tsz, &tix, &tvalues);
-	Tabc.read_local(&t3sz, &t3ix, &t3values); 
-	Zabc.read_local(&zsz, &zix, &zvalues); 
-	symijk.read_local(&s1sz, &s1ix, &sym1);
-	symikj.read_local(&s2sz, &s2ix, &sym2);
-	symkij.read_local(&s3sz, &s3ix, &sym3); 
-	
-	int ai, bj, ck; 
+	double resolveabc, resolve, temp, symabc, symijk;
+	int p, q; 
+	double tijk, tikj, tjik, tjki, tkij, tkji; 
+	double zijk, zikj, zjik, zjki, zkij, zkji;  
 	
 	for (int c = 0; c < nvirt; c++) {
 		for (int b = 0; b <= c; b++) {
@@ -861,157 +835,179 @@ void CCSD::calculateTriples(Integrals &V, Amplitudes &T) {
 				
 				resolveabc = eps[a+offnocc] + eps[b+offnocc] + eps[c+offnocc];  
 				
-				int ctr = 0; 
+				symabc = (a == b && b == c) ? 6.0 : ((a == b || b == c) ? 2.0 : 1.0);
+				
 				for (int k = 0; k < nocc; k++) {
 					for (int j = 0; j <= k; j++){ 
 						for (int i = 0; i <= j; i++) {
 							
-							ai = a*nocc + i; 
-							bj = b*nocc + j; 
-							ck = c*nocc + k; 
-							sym1[ctr] = (ai == bj && bj == ck) ? 1.0 : ((ai == bj || bj == ck) ? 3.0 : 6.0); 
-							bj = b*nocc + k;
-							ck = c*nocc + j; 
-							sym2[ctr] = (ai == bj && bj == ck) ? 1.0 : ((ai == bj || bj == ck) ? 3.0 : 6.0);
-							ai = a*nocc + k;
-							bj = b*nocc + i; 
-							ck = c*nocc + j; 
-							sym3[ctr] = (ai == bj && bj == ck) ? 1.0 : ((ai == bj || bj == ck) ? 3.0 : 6.0);
+							symijk = (i == j && j == k) ? 6.0 : ((i == j || j == k) ? 2.0 : 1.0); 
 							
-							resolveijk = eps[i+offset] + eps[j+offset] + eps[k+offset]; 
-						
-							zvalues[ctr] =  sval[a+i*nvirt] * viajb[j+b*nocc+k*nonv+c*nononv]; 
-							zvalues[ctr] += sval[b+j*nvirt] * viajb[i+a*nocc+k*nonv+c*nononv]; 
-							zvalues[ctr] += sval[c+k*nvirt] * viajb[i+a*nocc+j*nonv+b*nononv]; 
-							zvalues[ctr] /= (resolveijk - resolveabc); 
+							resolve = eps[i+offset] + eps[j+offset] + eps[k+offset] - resolveabc;  
+							resolve *= symijk*symabc; 
 							
-							tvalues[ctr] = 0.0;
+							tijk = tikj = tjik = tjki = tkij = tkji = 0.0; 
+							zijk = zikj = zjik = zjki = zkij = zkji = 0.0; 
+							
+							zijk =  sval[a+i*nvirt] * viajb[j+b*nocc+k*nonv+c*nononv]; 
+							zijk += sval[b+j*nvirt] * viajb[i+a*nocc+k*nonv+c*nononv]; 
+							zijk += sval[c+k*nvirt] * viajb[i+a*nocc+j*nonv+b*nononv]; 
+							
+							zikj =  sval[a+i*nvirt] * viajb[k+b*nocc+j*nonv+c*nononv]; 
+							zikj += sval[b+k*nvirt] * viajb[i+a*nocc+j*nonv+c*nononv]; 
+							zikj += sval[c+j*nvirt] * viajb[i+a*nocc+k*nonv+b*nononv]; 
+							
+							zjik =  sval[a+j*nvirt] * viajb[i+b*nocc+k*nonv+c*nononv]; 
+							zjik += sval[b+i*nvirt] * viajb[j+a*nocc+k*nonv+c*nononv]; 
+							zjik += sval[c+k*nvirt] * viajb[j+a*nocc+i*nonv+b*nononv]; 
+							
+							zjki =  sval[a+j*nvirt] * viajb[k+b*nocc+i*nonv+c*nononv]; 
+							zjki += sval[b+k*nvirt] * viajb[j+a*nocc+i*nonv+c*nononv]; 
+							zjki += sval[c+i*nvirt] * viajb[j+a*nocc+k*nonv+b*nononv]; 
+							
+							zkij =  sval[a+k*nvirt] * viajb[i+b*nocc+j*nonv+c*nononv]; 
+							zkij += sval[b+i*nvirt] * viajb[k+a*nocc+j*nonv+c*nononv]; 
+							zkij += sval[c+j*nvirt] * viajb[k+a*nocc+i*nonv+b*nononv];
+							
+							zkji =  sval[a+k*nvirt] * viajb[j+b*nocc+i*nonv+c*nononv]; 
+							zkji += sval[b+j*nvirt] * viajb[k+a*nocc+i*nonv+c*nononv]; 
+							zkji += sval[c+i*nvirt] * viajb[k+a*nocc+j*nonv+b*nononv]; 
+							
 							for (int e = 0; e < nvirt; e++) {
 								p = std::min(b, e);
 								q = std::max(b, e); 
 								q = q*(q+1); 
-								tvalues[ctr] += dval[a+e*nvirt+i*nvnv + j*nvnvno] * vabci[p+q/2+c*nvsy+k*nvnvsy];
-								tvalues[ctr] += dval[c+e*nvirt+k*nvnv + j*nvnvno] * vabci[p+q/2+a*nvsy+i*nvnvsy]; 
+								tijk += dval[a+e*nvirt+i*nvnv + j*nvnvno] * vabci[p+q/2+c*nvsy+k*nvnvsy];
+								tijk += dval[c+e*nvirt+k*nvnv + j*nvnvno] * vabci[p+q/2+a*nvsy+i*nvnvsy];
+								tikj += dval[a+e*nvirt+i*nvnv + k*nvnvno] * vabci[p+q/2+c*nvsy+j*nvnvsy];
+								tikj += dval[c+e*nvirt+j*nvnv + k*nvnvno] * vabci[p+q/2+a*nvsy+i*nvnvsy]; 
+								tjik += dval[a+e*nvirt+j*nvnv + i*nvnvno] * vabci[p+q/2+c*nvsy+k*nvnvsy];
+								tjik += dval[c+e*nvirt+k*nvnv + i*nvnvno] * vabci[p+q/2+a*nvsy+j*nvnvsy];
+								tjki += dval[a+e*nvirt+j*nvnv + k*nvnvno] * vabci[p+q/2+c*nvsy+i*nvnvsy];
+								tjki += dval[c+e*nvirt+i*nvnv + k*nvnvno] * vabci[p+q/2+a*nvsy+j*nvnvsy]; 
+								tkij += dval[a+e*nvirt+k*nvnv + i*nvnvno] * vabci[p+q/2+c*nvsy+j*nvnvsy];
+								tkij += dval[c+e*nvirt+j*nvnv + i*nvnvno] * vabci[p+q/2+a*nvsy+k*nvnvsy];
+								tkji += dval[a+e*nvirt+k*nvnv + j*nvnvno] * vabci[p+q/2+c*nvsy+i*nvnvsy];
+								tkji += dval[c+e*nvirt+i*nvnv + j*nvnvno] * vabci[p+q/2+a*nvsy+k*nvnvsy];   
+								
 								p = std::min(c, e);
 								q = std::max(c, e);
 								q = q*(q+1);  
-								tvalues[ctr] += dval[a+e*nvirt+i*nvnv + k*nvnvno] * vabci[p+q/2+b*nvsy+j*nvnvsy]; 
-								tvalues[ctr] += dval[b+e*nvirt+j*nvnv + k*nvnvno] * vabci[p+q/2+a*nvsy+i*nvnvsy]; 
+								tijk += dval[a+e*nvirt+i*nvnv + k*nvnvno] * vabci[p+q/2+b*nvsy+j*nvnvsy]; 
+								tijk += dval[b+e*nvirt+j*nvnv + k*nvnvno] * vabci[p+q/2+a*nvsy+i*nvnvsy]; 
+								tikj += dval[a+e*nvirt+i*nvnv + j*nvnvno] * vabci[p+q/2+b*nvsy+k*nvnvsy]; 
+								tikj += dval[b+e*nvirt+k*nvnv + j*nvnvno] * vabci[p+q/2+a*nvsy+i*nvnvsy]; 
+								tjik += dval[a+e*nvirt+j*nvnv + k*nvnvno] * vabci[p+q/2+b*nvsy+i*nvnvsy]; 
+								tjik += dval[b+e*nvirt+i*nvnv + k*nvnvno] * vabci[p+q/2+a*nvsy+j*nvnvsy]; 
+								tjki += dval[a+e*nvirt+j*nvnv + i*nvnvno] * vabci[p+q/2+b*nvsy+k*nvnvsy]; 
+								tjki += dval[b+e*nvirt+k*nvnv + i*nvnvno] * vabci[p+q/2+a*nvsy+j*nvnvsy];
+								tkij += dval[a+e*nvirt+k*nvnv + j*nvnvno] * vabci[p+q/2+b*nvsy+i*nvnvsy]; 
+								tkij += dval[b+e*nvirt+i*nvnv + j*nvnvno] * vabci[p+q/2+a*nvsy+k*nvnvsy]; 
+								tkji += dval[a+e*nvirt+k*nvnv + i*nvnvno] * vabci[p+q/2+b*nvsy+j*nvnvsy]; 
+								tkji += dval[b+e*nvirt+j*nvnv + i*nvnvno] * vabci[p+q/2+a*nvsy+k*nvnvsy];
+								
 								p = std::min(a, e);
-								q = std::max(a, e); 
+								q = std::max(a, e); 		
 								q = q*(q+1); 
-								tvalues[ctr] += dval[b+e*nvirt+j*nvnv + i*nvnvno] * vabci[p+q/2+c*nvsy+k*nvnvsy];  
-								tvalues[ctr] += dval[c+e*nvirt+k*nvnv + i*nvnvno] * vabci[p+q/2+b*nvsy+j*nvnvsy]; 
+								tijk += dval[b+e*nvirt+j*nvnv + i*nvnvno] * vabci[p+q/2+c*nvsy+k*nvnvsy];  
+								tijk += dval[c+e*nvirt+k*nvnv + i*nvnvno] * vabci[p+q/2+b*nvsy+j*nvnvsy]; 
+								tikj += dval[b+e*nvirt+k*nvnv + i*nvnvno] * vabci[p+q/2+c*nvsy+j*nvnvsy];  
+								tikj += dval[c+e*nvirt+j*nvnv + i*nvnvno] * vabci[p+q/2+b*nvsy+k*nvnvsy];
+								tjik += dval[b+e*nvirt+i*nvnv + j*nvnvno] * vabci[p+q/2+c*nvsy+k*nvnvsy];  
+								tjik += dval[c+e*nvirt+k*nvnv + j*nvnvno] * vabci[p+q/2+b*nvsy+i*nvnvsy]; 
+								tjki += dval[b+e*nvirt+k*nvnv + j*nvnvno] * vabci[p+q/2+c*nvsy+i*nvnvsy];  
+								tjki += dval[c+e*nvirt+i*nvnv + j*nvnvno] * vabci[p+q/2+b*nvsy+k*nvnvsy];
+								tkij += dval[b+e*nvirt+i*nvnv + k*nvnvno] * vabci[p+q/2+c*nvsy+j*nvnvsy];  
+								tkij += dval[c+e*nvirt+j*nvnv + k*nvnvno] * vabci[p+q/2+b*nvsy+i*nvnvsy];  
+								tkji += dval[b+e*nvirt+j*nvnv + k*nvnvno] * vabci[p+q/2+c*nvsy+i*nvnvsy];  
+								tkji += dval[c+e*nvirt+i*nvnv + k*nvnvno] * vabci[p+q/2+b*nvsy+j*nvnvsy];
+								
 							}
 							for (int m = 0; m < nocc; m++) {
 								p = std::min(m, j);
 								q = std::max(m, j);
 								q = q*(q+1); 
-								tvalues[ctr] -= dval[b*nvirt+a+i*nvnv+m*nvnvno] * vijak[p+q/2+c*nosy+k*nosynv]; 
-								tvalues[ctr] -= dval[b*nvirt+c+k*nvnv+m*nvnvno] * vijak[p+q/2+a*nosy+i*nosynv];
+								tijk -= dval[b*nvirt+a+i*nvnv+m*nvnvno] * vijak[p+q/2+c*nosy+k*nosynv]; 
+								tijk -= dval[b*nvirt+c+k*nvnv+m*nvnvno] * vijak[p+q/2+a*nosy+i*nosynv];
+								tikj -= dval[c*nvirt+a+i*nvnv+m*nvnvno] * vijak[p+q/2+b*nosy+k*nosynv]; 
+								tikj -= dval[c*nvirt+b+k*nvnv+m*nvnvno] * vijak[p+q/2+a*nosy+i*nosynv];
+								tjik -= dval[a*nvirt+b+i*nvnv+m*nvnvno] * vijak[p+q/2+c*nosy+k*nosynv]; 
+								tjik -= dval[a*nvirt+c+k*nvnv+m*nvnvno] * vijak[p+q/2+b*nosy+i*nosynv];
+								tjki -= dval[a*nvirt+b+k*nvnv+m*nvnvno] * vijak[p+q/2+c*nosy+i*nosynv]; 
+								tjki -= dval[a*nvirt+c+i*nvnv+m*nvnvno] * vijak[p+q/2+b*nosy+k*nosynv];
+								tkij -= dval[c*nvirt+a+k*nvnv+m*nvnvno] * vijak[p+q/2+b*nosy+i*nosynv]; 
+								tkij -= dval[c*nvirt+b+i*nvnv+m*nvnvno] * vijak[p+q/2+a*nosy+k*nosynv];
+								tkji -= dval[b*nvirt+a+k*nvnv+m*nvnvno] * vijak[p+q/2+c*nosy+i*nosynv]; 
+								tkji -= dval[b*nvirt+c+i*nvnv+m*nvnvno] * vijak[p+q/2+a*nosy+k*nosynv];
+								
 								p = std::min(m, k);
 								q = std::max(m, k);
 								q = q*(q+1); 
-								tvalues[ctr] -= dval[c*nvirt+a+i*nvnv+m*nvnvno] * vijak[p+q/2+b*nosy+j*nosynv]; 
-								tvalues[ctr] -= dval[c*nvirt+b+j*nvnv+m*nvnvno] * vijak[p+q/2+a*nosy+i*nosynv];
+								tijk -= dval[c*nvirt+a+i*nvnv+m*nvnvno] * vijak[p+q/2+b*nosy+j*nosynv]; 
+								tijk -= dval[c*nvirt+b+j*nvnv+m*nvnvno] * vijak[p+q/2+a*nosy+i*nosynv];
+								tikj -= dval[b*nvirt+a+i*nvnv+m*nvnvno] * vijak[p+q/2+c*nosy+j*nosynv]; 
+								tikj -= dval[b*nvirt+c+j*nvnv+m*nvnvno] * vijak[p+q/2+a*nosy+i*nosynv];
+								tjik -= dval[c*nvirt+a+j*nvnv+m*nvnvno] * vijak[p+q/2+b*nosy+i*nosynv]; 
+								tjik -= dval[c*nvirt+b+i*nvnv+m*nvnvno] * vijak[p+q/2+a*nosy+j*nosynv];
+								tjki -= dval[b*nvirt+a+j*nvnv+m*nvnvno] * vijak[p+q/2+c*nosy+i*nosynv]; 
+								tjki -= dval[b*nvirt+c+i*nvnv+m*nvnvno] * vijak[p+q/2+a*nosy+j*nosynv];
+								tkij -= dval[a*nvirt+b+i*nvnv+m*nvnvno] * vijak[p+q/2+c*nosy+j*nosynv]; 
+								tkij -= dval[a*nvirt+c+j*nvnv+m*nvnvno] * vijak[p+q/2+b*nosy+i*nosynv]; 
+								tkji -= dval[a*nvirt+b+j*nvnv+m*nvnvno] * vijak[p+q/2+c*nosy+i*nosynv]; 
+								tkji -= dval[a*nvirt+c+i*nvnv+m*nvnvno] * vijak[p+q/2+b*nosy+j*nosynv]; 
+								
 								p = std::min(m, i);
 								q = std::max(m, i); 
 								q = q*(q+1); 
-								tvalues[ctr] -= dval[a*nvirt+b+j*nvnv+m*nvnvno] * vijak[p+q/2+c*nosy+k*nosynv]; 
-								tvalues[ctr] -= dval[a*nvirt+c+k*nvnv+m*nvnvno] * vijak[p+q/2+b*nosy+j*nosynv]; 
+								tijk -= dval[a*nvirt+b+j*nvnv+m*nvnvno] * vijak[p+q/2+c*nosy+k*nosynv]; 
+								tijk -= dval[a*nvirt+c+k*nvnv+m*nvnvno] * vijak[p+q/2+b*nosy+j*nosynv];
+								tikj -= dval[a*nvirt+b+k*nvnv+m*nvnvno] * vijak[p+q/2+c*nosy+j*nosynv]; 
+								tikj -= dval[a*nvirt+c+j*nvnv+m*nvnvno] * vijak[p+q/2+b*nosy+k*nosynv]; 
+								tjik -= dval[b*nvirt+a+j*nvnv+m*nvnvno] * vijak[p+q/2+c*nosy+k*nosynv]; 
+								tjik -= dval[b*nvirt+c+k*nvnv+m*nvnvno] * vijak[p+q/2+a*nosy+j*nosynv];
+								tjki -= dval[c*nvirt+a+j*nvnv+m*nvnvno] * vijak[p+q/2+b*nosy+k*nosynv]; 
+								tjki -= dval[c*nvirt+b+k*nvnv+m*nvnvno] * vijak[p+q/2+a*nosy+j*nosynv];
+								tkij -= dval[b*nvirt+a+k*nvnv+m*nvnvno] * vijak[p+q/2+c*nosy+j*nosynv]; 
+								tkij -= dval[b*nvirt+c+j*nvnv+m*nvnvno] * vijak[p+q/2+a*nosy+k*nosynv];
+								tkji -= dval[c*nvirt+a+k*nvnv+m*nvnvno] * vijak[p+q/2+b*nosy+j*nosynv]; 
+								tkji -= dval[c*nvirt+b+j*nvnv+m*nvnvno] * vijak[p+q/2+a*nosy+k*nosynv];
 							}
 							
-							t3values[ctr] = tvalues[ctr] / (resolveijk - resolveabc); 
-							ctr++; 
+							temp = tijk*(tijk - tikj - tjik - tkji);
+							temp += tikj*(tikj - tjki - tkij);
+							temp += tjik*(tjik - tkij - tjki); 
+							temp += tjki*(tjki - tkji) + tkij*(tkij - tkji) + tkji*tkji; 
+							temp *= 8.0; 
+							temp += 4.0*tijk*(tkij + tjki) + 4.0*tikj*(tjik + tkji);
+							temp += 4.0*(tjik*tkji + tjki*tkij); 
+							dtrip += temp / resolve; 
+							
+							temp = 8.0 * (tijk*zijk + tikj*zikj + tjik*zjik + tjki*zjki + tkij*zkij + tkji*zkji); 
+							temp -= 4.0 * (tijk*zikj + tikj*zijk); 
+							temp -= 4.0 * (tijk*zjik + tjik*zijk); 
+							temp += 2.0 * (tijk*zjki + tjki*zijk); 
+							temp += 2.0 * (tijk*zkij + tkij*zijk); 
+							temp -= 4.0 * (tijk*zkji + tkji*zijk); 
+							temp += 2.0 * (tikj*zjik + tjik*zikj);
+							temp -= 4.0 * (tikj*zjki + tjki*zikj);
+							temp -= 4.0 * (tikj*zkij + tkij*zikj);
+							temp += 2.0 * (tikj*zkji + tkji*zikj); 
+							temp -= 4.0 * (tjik*zjki + tjki*zjik); 
+							temp -= 4.0 * (tjik*zkij + tkij*zjik);
+							temp += 2.0 * (tjik*zkji + tkji*zjik); 
+							temp += 2.0 * (tjki*zkij + tkij*zjki);
+							temp -= 4.0 * (tjki*zkji + tkji*zjki); 
+							temp -= 4.0 * (tkij*zkji + tkji*zkij); 
+							ctrip += temp / resolve; 
+							
 						}
 					}
 				}
-				DTabc.write(tsz, tix, tvalues);
-				Tabc.write(t3sz, t3ix, t3values); 
-				Zabc.write(zsz, zix, zvalues);
-				symijk.write(s1sz, s1ix, sym1);
-				symikj.write(s2sz, s2ix, sym2); 
-				symkij.write(s3sz, s3ix, sym3);
-				
-				temp.contract(1.0, Tabc, "ijk", symijk, "ijk", 0.0, "ijk"); 
-				Tbar["ijk"] = (4.0/3.0) * temp["ijk"];
-				temp.contract(1.0, Tabc, "ikj", symikj, "ikj", 0.0, "ikj"); 
-				Tbar["ijk"] -= 2.0 * temp["ikj"];
-				temp.contract(1.0, Tabc, "kij", symkij, "kij", 0.0, "kij"); 
-				Tbar["ijk"] += (2.0/3.0) * temp["kij"]; 
-				
-				temp.contract(1.0, Zabc, "ijk", symijk, "ijk", 0.0, "ijk"); 
-				Zbar["ijk"] = (4.0/3.0) * temp["ijk"];
-				temp.contract(1.0, Zabc, "ikj", symikj, "ikj", 0.0, "ikj");
-				Zbar["ijk"] -= 2.0 * temp["ikj"];
-				temp.contract(1.0, Zabc, "kij", symkij, "kij", 0.0, "kij");
-				Zbar["ijk"] += (2.0/3.0) * temp["kij"]; 
-				
-				temp.contract(1.0, DTabc, "ijk", symijk, "ijk", 0.0, "ijk");
-				dtrip += Tbar["ijk"]*temp["ijk"]; 
-				ctrip += temp["ijk"]*Zbar["ijk"];
 	
 			}
 		}
 	}
-	/*int shapeNSNS[6] = {NS,NS,NS,NS,NS,NS}; 
-		int vvvooo[6] = {nvirt, nvirt, nvirt, nocc, nocc, nocc}; 
-	
-	std::cout << dtrip << " " << ctrip << " " << std::endl; 
-	
-	CTF::Tensor<> Dabcijk(6, vvvooo, shapeNSNS, *V.dw);
- 
-	Dabcijk["abcijk"] += V["ii"];
-	Dabcijk["abcijk"] += V["jj"];
-	Dabcijk["abcijk"] += V["kk"];
-	Dabcijk["abcijk"] -= V["aa"];
-	Dabcijk["abcijk"] -= V["bb"];
-	Dabcijk["abcijk"] -= V["cc"];
-
-	CTF::Function<> fctr(&divide);
-	
-	CTF::Tensor<> T3(6, vvvooo, shapeNSNS, mp2.dw, "Tabcijk", 1); 
-	
-	T3["abcijk"]  = V["beck"]*T["aeij"];
-	T3["abcijk"] -= T["abim"]*V["mjck"]; 
-	T3["abcijk"] += V["cebj"]*T["aeik"];
-	T3["abcijk"] -= T["acim"]*V["mkbj"]; 
-	T3["abcijk"] += V["aeck"]*T["beji"];
-	T3["abcijk"] -= T["bajm"]*V["mick"]; 
-	T3["abcijk"] += V["ceai"]*T["bejk"];
-	T3["abcijk"] -= T["bcjm"]*V["mkai"]; 
-	T3["abcijk"] += V["beai"]*T["cekj"];
-	T3["abcijk"] -= T["cbkm"]*V["mjai"]; 
-	T3["abcijk"] += V["aebj"]*T["ceki"];
-	T3["abcijk"] -= T["cakm"]*V["mibj"]; 
- 
-  	{
-		CTF::Tensor<> T3bar(6, vvvooo, shapeNSNS, mp2.dw, "Tbarabcijk", 1); 
-		T3bar["abcijk"] = (4.0/3.0) * T3["abcijk"];
-		T3bar["abcijk"] -= 2.0 * T3["abcikj"]; 
-		T3bar["abcijk"] += (2.0/3.0) * T3["abckij"];  
-		
-		T3bar.contract(1.0, T3bar, "abcijk", Dabcijk, "abcijk", 0.0, "abcijk", fctr);
-		
-		dtrip = T3bar["abcijk"]*T3["abcijk"];
-	}
-
-	CTF::Tensor<> Z3(6, vvvooo, shapeNSNS, mp2.dw, "Zabcijk", 1); 
-	
-	Z3["abcijk"] = 4.0*T["ai"]*V["jbkc"]; 
-	Z3["abcijk"] += 4.0*T["bj"]*V["iakc"];
-	Z3["abcijk"] += 4.0*T["ck"]*V["iajb"]; 
-	Z3["abcijk"] -= 6.0*T["ai"]*V["jckb"];
-	Z3["abcijk"] -= 6.0*T["cj"]*V["iakb"];
-	Z3["abcijk"] -= 6.0*T["bk"]*V["iajc"]; 
-	Z3["abcijk"] += 2.0*T["bi"]*V["jcka"];
-	Z3["abcijk"] += 2.0*T["cj"]*V["ibka"];
-	Z3["abcijk"] += 2.0*T["ak"]*V["ibjc"]; 
-	
-	Z3.contract(1.0, Z3, "abcijk", Dabcijk, "abcijk", 0.0, "abcijk", fctr); 
-
-	ctrip = (1.0 / 3.0) * T3["abcijk"] * Z3["abcijk"]; 
-	std::cout << dtrip << " " << ctrip << std::endl; */
+	 
 	triples_energy = ctrip + dtrip;  
 }
 					

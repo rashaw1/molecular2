@@ -1,0 +1,39 @@
+memory, 1000
+direct, false
+molecule = {
+	 geometry = {
+	 	  x,  2.5, 0.0, 0.0
+	 	  he, 0.0, 0.0, 0.0
+		  he, 5.0, 0.0, 0.0
+	 }
+	 basis = {
+	       default, avdz
+	 }
+}	 
+rhf (
+    momap, true
+    mapfile, he2xbefore.map
+    fineness, 100
+)
+optx(
+	active, 1, 2, 3, 4, 5, 6
+	momap, true
+	mapfile, he2xfirstx.map
+	fineness, 100
+	trust, 3.0
+	gradconverge, 4e-4
+)
+optg(
+	gradconverge, 1e-5
+)
+optx(
+	active, 1, 2, 3, 4, 5, 6
+	momap, true
+	mapfile, he2xsecondx.map
+	fineness, 100
+	trust, 3.0
+	gradconverge, 1e-4
+)
+optg(
+	gradconverge, 1e-5
+)

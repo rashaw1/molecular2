@@ -388,7 +388,7 @@ void ProgramController::call_optg(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 8);
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
 	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5);
-	if(!c.is_option_set("gradconverge")) c.set_option<double>("gradconverge", 1e-3);  
+	if(!c.is_option_set("gradconverge")) c.set_option<double>("gradconverge", 1e-4);  
 	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12);
 	if(!c.is_option_set("trust")) c.set_option<double>("trust", 0.1); 
 	if(!c.is_option_set("freq")) c.set_option<bool>("freq", false); 
@@ -403,7 +403,7 @@ void ProgramController::call_optx(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 8);
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
 	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
-	if(!c.is_option_set("gradconverge")) c.set_option<double>("gradconverge", 1e-5);  
+	if(!c.is_option_set("gradconverge")) c.set_option<double>("gradconverge", 1e-4);  
 	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12);
 	if(!c.is_option_set("trust")) c.set_option<double>("trust", 5.0);
 	if(!c.is_option_set("active")) c.set_option<std::string>("active", "all"); 
