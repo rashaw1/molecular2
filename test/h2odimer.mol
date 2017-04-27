@@ -18,7 +18,9 @@ molecule = {
 	       default, avdz
 	 } 
 }
-optg()
 ralmo(
 	perturb, 2
+	rpa, true
+	longrange, true
 )
+rpa()

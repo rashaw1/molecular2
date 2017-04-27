@@ -13,6 +13,7 @@
 #include "logger.hpp"
 #include <cmath>
 #include <libint2.hpp>
+#include "rpa.hpp"
 
 // Constructor
 ALMOSCF::ALMOSCF(Command& c, SharedMolecule m, Fock& f) : molecule(m), cmd(c), focker(f) 
@@ -581,6 +582,15 @@ void ALMOSCF::rscf()
 				e_pert_4 = 0.0;
 			}
 			molecule->control->log.result("Total ALMO+CT interaction energy", (energy + e_pert_2 + e_pert_4) * Logger::TOKCAL, "kcal / mol");
+		}
+		if (cmd.get_option<bool>("rpa")) {
+			focker.transform();
+			focker.diagonalise(); 
+			
+			RPA rpa(cmd, focker); 
+			rpa.compute(); 
+			
+			molecule->control->log.result("E(RPA)", rpa.getEnergy() * Logger::TOKCAL, "kcal /mol"); 
 		}
 		
 	} else {

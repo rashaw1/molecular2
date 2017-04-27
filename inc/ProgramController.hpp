@@ -183,6 +183,7 @@ public:
 	void call_rhf(Command& c, SharedMolecule m);
 	void call_uhf(Command& c, SharedMolecule m);
 	void call_mp2(Command& c, SharedMolecule m);
+	void call_rpa(Command& c, SharedMolecule m); 
 	void call_ccsd(Command& c, SharedMolecule m);
 	void call_ralmo(Command& c, SharedMolecule m);
 	void call_ualmo(Command& c, SharedMolecule m);
