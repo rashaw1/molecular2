@@ -19,7 +19,7 @@
 ALMOSCF::ALMOSCF(Command& c, SharedMolecule m, Fock& f) : molecule(m), cmd(c), focker(f) 
 {	
 	// Zero out energies
-	dimer_energy = e_frz = e_pol = e_ct = e_int = 0.0;
+	dimer_energy = e_frz = e_pol = e_ct = e_int = e_disp = e_mon_rpa = 0.0;
 	MAX = cmd.get_option<int>("maxdiis");
 	diis.init(MAX, cmd.get_option<bool>("diis"));
 }
@@ -53,6 +53,14 @@ void ALMOSCF::setFragments(bool unrestricted)
 			SCF hf(cmd, frags[i], fragments[fragments.size()-1]);
 			hf.rhf(false);
 			molecule->control->log.print("Monomer " + std::to_string(nf) + " energy = " + std::to_string(hf.getEnergy()) + " Hartree");
+			
+			if(cmd.get_option<bool>("rpa")) {
+				RPA rpa(cmd, fragments[fragments.size()-1]); 
+				rpa.compute(false); 
+				e_mon_rpa += rpa.getEnergy(); 
+				molecule->control->log.print("+ RPA: " + std::to_string(rpa.getEnergy()) + " Hartree"); 
+			}
+			
 			molecule->control->log.flush();  
 			monomer_energies.push_back(hf.getEnergy()); 
 			fragments[fragments.size()-1].clearDiis(); 
@@ -61,6 +69,8 @@ void ALMOSCF::setFragments(bool unrestricted)
 
 		nf++;
 	}
+	molecule->control->log.print("Monomer calculations completed.");
+	molecule->control->log.localTime();
 }
 
 double ALMOSCF::makeDens(bool alpha) {
@@ -590,7 +600,9 @@ void ALMOSCF::rscf()
 			RPA rpa(cmd, focker); 
 			rpa.compute(); 
 			
-			molecule->control->log.result("E(RPA)", rpa.getEnergy() * Logger::TOKCAL, "kcal /mol"); 
+			e_disp = rpa.getEnergy() - e_mon_rpa; 
+			molecule->control->log.print("Dimer RPA energy: " + std::to_string(rpa.getEnergy()) + " Hartree"); 
+			molecule->control->log.result("E(Disp.)", e_disp * Logger::TOKCAL, "kcal /mol"); 
 		}
 		
 	} else {

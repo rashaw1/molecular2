@@ -14,23 +14,23 @@ RPA::RPA(Command& c, Fock& _focker) : cmd(c), focker(_focker)
 	energy = 0.0;
 }
 
-void RPA::compute() {
+void RPA::compute(bool print) {
 	
 	Logger& log = focker.getMolecule()->control->log; 
 	
 	auto &shells = focker.getMolecule()->getBasis().getIntShells();
 	std::vector<CTF::Tensor<> > V;
 	
-	log.print("Transforming integrals"); 
+	if (print) log.print("Transforming integrals"); 
 	if (cmd.get_option<bool>("longrange")) {
-		log.print("Using long-range potential, with mu = " + std::to_string(cmd.get_option<double>("mu"))); 
+		if(print) log.print("Using long-range potential, with mu = " + std::to_string(cmd.get_option<double>("mu"))); 
 		longrange_eris(shells, V);
 	} else { 
 		full_eris(V); 
 	}
-	log.localTime();  
+	if (print) log.localTime();  
 	
-	log.print("\nForming excitation matrices"); 
+	if (print) log.print("\nForming excitation matrices"); 
 	int64_t sz1, sz2, *i1, *i2;
 	double *viajb, *vijab;
 	V[0].read_local(&sz1, &i1, &viajb);
@@ -40,6 +40,7 @@ void RPA::compute() {
 	int nvnono = nocc*dim; 
 	Matrix A = Matrix::Zero(dim, dim); 
 	Matrix B = Matrix::Zero(dim, dim);
+	Matrix K = Matrix::Zero(dim, dim); 
 	
 	Vector& eps = focker.getEps(); 
 	bool sosex = cmd.get_option<bool>("sosex"); 
@@ -55,8 +56,9 @@ void RPA::compute() {
 				for (int b = 0; b < nvirt; b++) {
 					ix2 = j*nvirt + b;
 					
-					B(ix1, ix2) = 2.0 * viajb[i + a*nocc + j*dim + b*nvnono]; 
-					A(ix1, ix2) = B(ix1, ix2);
+					K(ix1, ix2) = 2.0 * viajb[i + a*nocc + j*dim + b*nvnono]; 
+					A(ix1, ix2) = K(ix1, ix2);
+					B(ix1, ix2) = K(ix1, ix2);
 					if (sosex) {
 						A(ix1, ix2) -= vijab[i + (j*(j+1))/2 + a*axis + axis*(b*(b+1))/2]; 
 						B(ix1, ix2) -= viajb[j + a*nocc + i*dim + b*nvnono]; 
@@ -70,24 +72,53 @@ void RPA::compute() {
 	delete i2;
 	delete vijab;
 	delete viajb; 
-	log.localTime(); 
+	if (print) log.localTime(); 
 	
-	log.print("\nSolving Riccatti equations"); 
-	Matrix M = (A + B) * (A - B); 
-	Eigen::EigenSolver<Matrix> solver(M);
-
-	const Eigen::VectorXcd& evals = solver.eigenvalues(); 
-	Vector omega = Vector::Zero(evals.size()); 
-	energy = 0.0; 
-	for (int i = 0; i < omega.size(); i++) { 
-		std::complex<double> ei = evals[i]; 
-		omega[i] = std::sqrt(ei.real()); 
-		energy += omega[i] - A(i, i); 
-	}	
-	log.print("\nRPA excitation energies: ");
-	log.print(omega); 
+	if (print) log.print("\nSolving Riccatti equations");
+	if (cmd.get_option<bool>("longrange")) {
+		
+		Matrix Ap = A; 
+		for (int i = 0; i < dim ;i++) Ap(i, i) = 0.0; 
+		
+		Matrix T = -B; 
+		
+		double delta = 1.0;
+		int iter = 0;
+		Matrix newT; 
+		while (delta > 1e-4 && iter < 15) {
+			newT = -(B + T*Ap);  
+			newT -= (T*B + Ap)*T; 
+			
+			for (int p = 0; p < dim; p++)
+				for (int q = 0; q < dim; q++)
+					newT(p, q) /= A(p, p) + A(q, q); 
+			
+			delta = (newT - T).norm(); 
+			iter++; 
+			T = newT; 
+		}
+		
+		energy = 0.5 * (K*T).trace(); 
+		
+	} else {
+		Matrix M = (A+B)*(A-B); 
+		Eigen::EigenSolver<Matrix> solver(M);
+		const Eigen::VectorXcd& evals = solver.eigenvalues(); 
+		Vector omega = Vector::Zero(evals.size()); 
 	
-	energy /= 2.0;
+		energy = 0.0; 
+		for (int i = 0; i < omega.size(); i++) { 
+			std::complex<double> ei = evals[i]; 
+			omega[i] = std::sqrt(ei.real()); 
+			energy += omega[i] - A(i, i); 
+		}	
+		if(print) log.print("\nRPA excitation energies: ");
+		if(print) log.print(omega); 
+	
+		energy /= 2.0;
+		if (sosex) energy /= 2.0; 
+	}
+	if (print) log.localTime(); 
 }
 
 void RPA::longrange_eris(const std::vector<libint2::Shell>& shells, std::vector<CTF::Tensor<> >& moInts) {
@@ -227,7 +258,7 @@ void RPA::longrange_eris(const std::vector<libint2::Shell>& shells, std::vector<
 		temp2["uvab"] = cp_virt["wa"] * temp1["uvwb"]; 
 		temp3["ujab"] = cp_occ["vj"] * temp2["uvab"];
 		Vijab["ijab"] = 0.25 * cp_occ["ui"] * temp3["ujab"]; 
- 	} 
+	} 
 	
 	
 	{
@@ -242,7 +273,7 @@ void RPA::longrange_eris(const std::vector<libint2::Shell>& shells, std::vector<
 		temp2["uvjb"] = cp_occ["wj"] * temp1["uvwb"]; 
 		temp3["uajb"] = cp_virt["va"] * temp2["uvjb"];
 		Viajb["iajb"] = cp_occ["ui"] * temp3["uajb"]; 
- 	}  
+	}  
 	
 	moInts.push_back(Viajb);
 	moInts.push_back(Vijab);
@@ -260,17 +291,26 @@ void RPA::full_eris(std::vector<CTF::Tensor<> > &moInts) {
 	CTF::Tensor<> ao_integrals(4, ao_lens, sysy, dw); 
 	int64_t sz, *i1, *i2, *i3;
 	double *v1, *v2, *v3;
-	int ctr;
-	
-	IntegralEngine& aoInts = focker.getIntegrals();
-	
+	int ctr = 0;
+			
 	ao_integrals.read_local(&sz, &i1, &v1);
-	ctr = 0;
-	for (int a = 0; a < N; a++) 
-		for (int b = 0; b <= a; b++)
-			for (int c = 0; c < N; c++)
-				for (int d = 0; d <= c; d++)
-					v1[ctr++] = aoInts.getERI(d, c, b, a); 
+	
+	IntegralEngine& intengine = focker.getIntegrals();
+	if(focker.getMolecule()->control->get_option<bool>("direct")) {
+		S8EvenTensor4 aoInts = intengine.compute_eris(focker.getMolecule()->getBasis().getIntShells());
+		for (int a = 0; a < N; a++) 
+			for (int b = 0; b <= a; b++)
+				for (int c = 0; c < N; c++)
+					for (int d = 0; d <= c; d++) 
+						v1[ctr++] = aoInts(d, c, b, a); 
+	} else {
+		for (int a = 0; a < N; a++) 
+			for (int b = 0; b <= a; b++)
+				for (int c = 0; c < N; c++)
+					for (int d = 0; d <= c; d++) 
+						v1[ctr++] = intengine.getERI(d, c, b, a); 
+	}
+
 	ao_integrals.write(sz, i1, v1);
 	
 	delete v1; 
@@ -315,7 +355,7 @@ void RPA::full_eris(std::vector<CTF::Tensor<> > &moInts) {
 		temp2["uvab"] = cp_virt["wa"] * temp1["uvwb"]; 
 		temp3["ujab"] = cp_occ["vj"] * temp2["uvab"];
 		Vijab["ijab"] = 0.25 * cp_occ["ui"] * temp3["ujab"]; 
- 	} 
+	} 
 	
 	{
 		int t1_lens[4] = {N, N, N, nvirt};
@@ -329,7 +369,7 @@ void RPA::full_eris(std::vector<CTF::Tensor<> > &moInts) {
 		temp2["uvjb"] = cp_occ["wj"] * temp1["uvwb"]; 
 		temp3["uajb"] = cp_virt["va"] * temp2["uvjb"];
 		Viajb["iajb"] = cp_occ["ui"] * temp3["uajb"]; 
- 	}  
+	}  
 	
 	moInts.push_back(Viajb);
 	moInts.push_back(Vijab);

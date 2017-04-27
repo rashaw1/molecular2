@@ -15,12 +15,12 @@ molecule = {
 		   4, 6, 0, 1
 	 }
 	 basis = {
-	       default, avdz
+	       default, avtz
 	 } 
 }
 ralmo(
 	perturb, 2
 	rpa, true
 	longrange, true
+	mu, 0.5
 )
-rpa()

@@ -16,4 +16,5 @@ rhf()
 !mp2()
 ccsd (
      triples, true
+     converge, 1e-6
 )
