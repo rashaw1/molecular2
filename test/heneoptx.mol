@@ -1,0 +1,30 @@
+memory, 1000
+direct, false
+molecule = {
+	 geometry = {
+	 	  x,  2.9, 0.0, 0.0
+	 	  he, 0.0, 0.0, 0.0
+		  ne, 5.8, 0.0, 0.0
+	 }
+	 basis = {
+	       he, avdz
+	       ne, avdz
+	       x, s3p2
+	 }
+	 frozen = {
+	 	2, 3
+	 }
+}	 
+optx(
+	active, 1, 2, 3, 4, 5
+	trust, 5.0
+	gradconverge, 2e-5
+	mp2, true
+)
+optg(
+	gradconverge, 1e-5
+)
+rhf()
+ccsd(
+	triples, true
+)
