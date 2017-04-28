@@ -22,7 +22,7 @@ private:
 	std::vector<UnrestrictedFockFragment> ufragments; 
 	std::vector<IntegralEngine> ints; 
 	DIISEngine diis;
-	double dimer_energy, e_frz, e_pol, e_ct, e_int, e_pert_2, e_pert_4; 
+	double dimer_energy, e_frz, e_pol, e_ct, e_int, e_disp, e_pert_2, e_pert_4, e_mon_rpa; 
 	double delta_e, delta_d;
 	std::vector<double> monomer_energies;
 	int nfrags, MAX; 

@@ -22,7 +22,7 @@ public:
 	void longrange_eris(const std::vector<libint2::Shell>&, std::vector<CTF::Tensor<> >&); 
 	void full_eris(std::vector<CTF::Tensor<> >&); 
 	
-	void compute(); 
+	void compute(bool print = true); 
 	
 	double getEnergy() const { return energy; }
 };

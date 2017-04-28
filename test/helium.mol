@@ -1,6 +1,13 @@
-basis, 6-311gdp
-geom,
-He, 0.0, 0.0, 0.0
-geomend
-multiplicity, 1
-hf,
+molecule = {
+	 geometry = {
+	 	  he, 0.0, 0.0, 0.0
+	 }
+	 basis = {	
+	       default, avdz
+	 }
+}
+rhf()
+rpa(
+	longrange, true
+	mu, 0.5
+)

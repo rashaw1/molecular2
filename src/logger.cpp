@@ -109,8 +109,9 @@ void Logger::print(const Vector& v, int digits, bool vertical) const
 	}
 	for (int i = 0; i < v.size(); i++){
 		outfile << std::fixed << std::setprecision(digits) << std::setw(digits+5) << v[i] << ender;
+		if (!vertical && i % 10 == 9) outfile << std::endl; 
 	}
-	outfile << "\n";
+	outfile << std::endl;
 }
 
 // Print out a matrix, row by row, to a given precision

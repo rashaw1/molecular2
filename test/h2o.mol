@@ -4,21 +4,17 @@ withcore, true
 molecule = {
 	 angstrom, true
 	 geometry = {
-	      O,  0.00000, -0.07579, 0.00000
-	      H,  0.86681,  0.60144, 0.00000
-    	      H, -0.86681,  0.60144, 0.00000
+ O,          1.3713218506,        0.1443839786,       -0.4014780051
+ H,          1.8928086272,        0.4860470340,        0.3358810903
+ H,          0.4546022869,        0.1669410666,       -0.0781236707
 	 }
 	 basis = {
-	       default, sto-3g
+	       default, avdz
 	 }
 }
-hf (
-diis,true
-converge, 1e-6
+rhf()
+rpa (
+    longrange, false
+    mu, 0.5
 )
-ccsd (
-     diis, false
-     triples, true
-)
-!mp2()
 

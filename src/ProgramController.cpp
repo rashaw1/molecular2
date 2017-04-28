@@ -386,7 +386,11 @@ void ProgramController::call_ralmo(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
 	if(!c.is_option_set("perturb")) c.set_option<int>("perturb", 0);
-	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12); 
+	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12);
+	if(!c.is_option_set("rpa")) c.set_option<bool>("rpa", false);  
+	if(!c.is_option_set("sosex")) c.set_option<bool>("sosex", true); 
+	if(!c.is_option_set("longrange")) c.set_option<bool>("longrange", false); 
+	if(!c.is_option_set("mu")) c.set_option<double>("mu", 0.5); 
 
 	focker = std::make_shared<Fock>(c, *ints, m); 
 	ALMOSCF almo(c, m, *focker); 
