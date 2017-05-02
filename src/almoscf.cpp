@@ -598,16 +598,6 @@ void ALMOSCF::rscf()
 			focker.diagonalise(); 
 			focker.makeDens(); 
 			
-			Matrix& H = focker.getHCore();
-			Matrix& F = focker.getFockAO();
-			Matrix& D = focker.getDens();
-			double einf = ((H+F)*D).trace(); 
-			einf *= 0.5; 
-			
-			e_pert_2 = einf - dimer_energy;  
-			
-			molecule->control->log.result("E(Inf)", e_pert_2 * Logger::TOKCAL, "kcal / mol"); 
-			
 			RPA rpa(cmd, focker); 
 			rpa.compute(); 
 			
