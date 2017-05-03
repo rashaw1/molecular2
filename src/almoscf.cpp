@@ -14,6 +14,7 @@
 #include <cmath>
 #include <libint2.hpp>
 #include "rpa.hpp"
+#include "cc.hpp"
 
 // Constructor
 ALMOSCF::ALMOSCF(Command& c, SharedMolecule m, Fock& f) : molecule(m), cmd(c), focker(f) 
@@ -53,13 +54,6 @@ void ALMOSCF::setFragments(bool unrestricted)
 			SCF hf(cmd, frags[i], fragments[fragments.size()-1]);
 			hf.rhf(false);
 			molecule->control->log.print("Monomer " + std::to_string(nf) + " energy = " + std::to_string(hf.getEnergy()) + " Hartree");
-			
-			if(cmd.get_option<bool>("rpa")) {
-				RPA rpa(cmd, fragments[fragments.size()-1]); 
-				rpa.compute(false); 
-				e_mon_rpa += rpa.getEnergy(); 
-				molecule->control->log.print("+ RPA: " + std::to_string(rpa.getEnergy()) + " Hartree"); 
-			}
 			
 			molecule->control->log.flush();  
 			monomer_energies.push_back(hf.getEnergy()); 
@@ -328,7 +322,7 @@ void ALMOSCF::rperturb(bool order4)
 	Matrix T = Eigen::MatrixXd::Zero(nbfs, nocc); 
 	Matrix V = Eigen::MatrixXd::Zero(nbfs, nvirt);
 	int row_offset = 0; int occ_col_offset = 0; int virt_col_offset = 0;
-	for (auto f : fragments) {
+	for (auto& f : fragments) {
 		Matrix& f_cp = f.getCP(); 
 		int f_nocc = f.getMolecule()->getNel() / 2;
 		int f_nbfs = f.getHCore().rows(); 
@@ -422,7 +416,7 @@ void ALMOSCF::uperturb(bool order4)
 	int row_offset = 0; 
 	int occ_col_offset_alpha = 0; int virt_col_offset_alpha = 0;
 	int occ_col_offset_beta = 0; int virt_col_offset_beta = 0;
-	for (auto f : ufragments) {
+	for (auto& f : ufragments) {
 		Matrix& f_cp_alpha = f.getCPAlpha(); 
 		Matrix& f_cp_beta = f.getCPBeta(); 
 		int f_nalpha = f.getMolecule()->nalpha();
@@ -596,16 +590,32 @@ void ALMOSCF::rscf()
 		if (cmd.get_option<bool>("rpa")) {
 			focker.transform();
 			focker.diagonalise(); 
-			focker.makeDens(); 
+			focker.makeDens();
+			
+			Matrix& Pinf = focker.getDens(); 
+			Matrix& H = focker.getHCore();
+			Matrix& F = focker.getFockAO(); 
+			
+			double e_inf =(F * (Pinf - 2.0*P)).trace();
+			molecule->control->log.result("E(Inf.)", e_inf * Logger::TOKCAL, "kcal /mol");
+
+			int i = 1;
+			for (auto& f : fragments) {
+				RPA rpa(cmd, f); 
+				rpa.compute(false); 
+				e_mon_rpa += rpa.getEnergy(); 
+				molecule->control->log.print("Monomer " + std::to_string(i++) + " RPA: " + std::to_string(rpa.getEnergy()) + " Hartree"); 	
+			}
 			
 			RPA rpa(cmd, focker); 
 			rpa.compute(); 
-			
 			e_disp = rpa.getEnergy() - e_mon_rpa; 
-			molecule->control->log.print("Dimer RPA energy: " + std::to_string(rpa.getEnergy()) + " Hartree"); 
-			molecule->control->log.result("E(Disp.)", e_disp * Logger::TOKCAL, "kcal /mol"); 
+			if (!cmd.get_option<bool>("longrange")) e_disp *= 0.5; 
+			molecule->control->log.print("Dimer RPA energy: " + std::to_string(rpa.getEnergy()) + " Hartree");
+			molecule->control->log.result("E(Disp.)",  e_disp * Logger::TOKCAL, "kcal /mol"); 
 			
-			molecule->control->log.result("Total ALMO+RPA interaction energy", (energy + e_pert_2 + e_disp) * Logger::TOKCAL, "kcal / mol"); 
+			molecule->control->log.result("Total ALMO+RPA interaction energy", (energy + e_disp + e_inf) * Logger::TOKCAL, "kcal / mol"); 
+	
 		}
 		
 	} else {

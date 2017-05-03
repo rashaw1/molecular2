@@ -42,7 +42,7 @@ void RPA::compute(bool print) {
 	Matrix B = Matrix::Zero(dim, dim);
 	Matrix K = Matrix::Zero(dim, dim); 
 	
-	Vector& eps = focker.getEps(); 
+	Matrix F = focker.getCP().transpose() * focker.getFockAO() * focker.getCP(); 
 	bool sosex = cmd.get_option<bool>("sosex"); 
 	
 	int axis = nocc*(nocc+1);
@@ -63,7 +63,8 @@ void RPA::compute(bool print) {
 						A(ix1, ix2) -= vijab[i + (j*(j+1))/2 + a*axis + axis*(b*(b+1))/2]; 
 						B(ix1, ix2) -= viajb[j + a*nocc + i*dim + b*nvnono]; 
 					}
-					if (i==j && a==b) A (ix1, ix2) += eps[a+nocc] - eps[i]; 
+					if (i==j) A(ix1, ix2) += F(a+nocc, b+nocc); 
+					if (a==b) A(ix1, ix2) -= F(i, j); 
 				}
 			}
 		}

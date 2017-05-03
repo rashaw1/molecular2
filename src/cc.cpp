@@ -564,6 +564,7 @@ void CCSD::compute()
 	Logger& log = mp2.getFock().getMolecule()->control->log;
 	
 	log.title("CCSD CALCULATION");
+	log.flush();
 	
 	log.print("MP2 Energy = " + std::to_string(mp2.getEnergy()) + "\n");
 	log.localTime();

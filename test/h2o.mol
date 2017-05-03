@@ -9,7 +9,7 @@ molecule = {
  H,          0.4546022869,        0.1669410666,       -0.0781236707
 	 }
 	 basis = {
-	       default, avdz
+	       default, sto-3g
 	 }
 }
 rhf()

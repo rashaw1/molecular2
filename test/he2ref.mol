@@ -1,15 +1,22 @@
 memory, 1000
-direct, false
+direct, true
 molecule = {
 	 geometry = {
 	 	  he, 0.0, 0.0, 0.0
-		  he, 5.65, 0.0, 0.0
+		  he, 6.5, 0.0, 0.0
 	 }
 	 basis = {
-	       he, avtz
+	       he, avdz
 	 }
+	 fragments = {
+	 	   1, 1, 0, 1
+		   2, 2, 0, 1
+	 }	 	   
 }	 
-rhf()
-ccsd(
-	triples, true
+ralmo(
+	perturb, 0
+	rpa, true
+	longrange, true
+	mu, 0.52
+	sosex, false
 )

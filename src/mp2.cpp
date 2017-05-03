@@ -131,6 +131,7 @@ void MP2::cctrans() {
 
 	focker.getMolecule()->control->log.print("No. of occ. orbitals: " + std::to_string(nocc));
 	focker.getMolecule()->control->log.print("No. of virt. orbitals: " + std::to_string(nvirt)); 
+	focker.getMolecule()->control->log.flush();
 	
 	int ao_lens[4] = {offN, offN, offN, offN};
 	int sysy[4] = {SY, NS, SY, NS}; 
@@ -153,7 +154,7 @@ void MP2::cctrans() {
 					values[ctr++] = aoInts.getERI(d, c, b, a); 
 	ao_integrals.write(sz, indices, values);
 	
-	//focker.getIntegrals().clearTwoInts();
+	focker.getIntegrals().clearTwoInts();
 	
 	CTF::Matrix<> cp_occ(offN, nocc, NS, dw); 
 	CTF::Matrix<> cp_virt(offN, nvirt, NS, dw); 
@@ -333,6 +334,7 @@ void MP2::cctrans() {
 		}
 	}
 	V.ij->write(sz, indices, values);
+
 }
 
 void MP2::tensormp2(bool print) {
