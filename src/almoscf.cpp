@@ -588,7 +588,7 @@ void ALMOSCF::rscf()
 			molecule->control->log.result("Total ALMO+CT interaction energy", (energy + e_pert_2 + e_pert_4) * Logger::TOKCAL, "kcal / mol");
 		}
 		if (cmd.get_option<bool>("rpa")) {
-			focker.transform();
+			/*focker.transform();
 			focker.diagonalise(); 
 			focker.makeDens();
 			
@@ -597,19 +597,48 @@ void ALMOSCF::rscf()
 			Matrix& F = focker.getFockAO(); 
 			
 			double e_inf =(F * (Pinf - 2.0*P)).trace();
-			molecule->control->log.result("E(Inf.)", e_inf * Logger::TOKCAL, "kcal /mol");
+			molecule->control->log.result("E(Inf.)", e_inf * Logger::TOKCAL, "kcal /mol");*/
+			double e_inf = 0.0;
+			int nbfs = focker.getHCore().rows(); 
+			int nocc = focker.getMolecule()->getNel() / 2;
+			int nvirt = nbfs - nocc;
+	
+			Matrix T = Eigen::MatrixXd::Zero(nbfs, nocc); 
+			Matrix V = Eigen::MatrixXd::Zero(nbfs, nvirt);
+			int row_offset = 0; int occ_col_offset = 0; int virt_col_offset = 0;
+			for (auto& f : fragments) {
+				Matrix& f_cp = f.getCP(); 
+				int f_nocc = f.getMolecule()->getNel() / 2;
+				int f_nbfs = f.getHCore().rows(); 
+				int f_nvirt = f_nbfs - f_nocc; 
+		
+				T.block(row_offset, occ_col_offset, f_nbfs, f_nocc) = f_cp.block(0, 0, f_nbfs, f_nocc); 
+				V.block(row_offset, virt_col_offset, f_nbfs, f_nvirt) = f_cp.block(0, f_nocc, f_nbfs, f_nvirt);
+		
+				row_offset += f_nbfs; 
+				occ_col_offset += f_nocc; 
+				virt_col_offset += f_nvirt; 
+			}
+			Matrix& S = focker.getS();
+			Matrix Q = Matrix::Identity(nbfs, nbfs) - P*S;
+			V = Q * V; 
+			
+			Matrix& CP = focker.getCP(); 
+			CP = Matrix::Zero(nbfs, nbfs); 
+			CP.block(0, 0, nbfs, nocc) = T;
+			CP.block(0, nocc, nbfs, nvirt) = V; 
 
-			int i = 1;
+			/*int i = 1;
 			for (auto& f : fragments) {
 				RPA rpa(cmd, f); 
 				rpa.compute(false); 
 				e_mon_rpa += rpa.getEnergy(); 
 				molecule->control->log.print("Monomer " + std::to_string(i++) + " RPA: " + std::to_string(rpa.getEnergy()) + " Hartree"); 	
-			}
+			}*/
 			
 			RPA rpa(cmd, focker); 
 			rpa.compute(); 
-			e_disp = rpa.getEnergy() - e_mon_rpa; 
+			e_disp = rpa.getEnergy();// - e_mon_rpa; 
 			if (!cmd.get_option<bool>("longrange")) e_disp *= 0.5; 
 			molecule->control->log.print("Dimer RPA energy: " + std::to_string(rpa.getEnergy()) + " Hartree");
 			molecule->control->log.result("E(Disp.)",  e_disp * Logger::TOKCAL, "kcal /mol"); 

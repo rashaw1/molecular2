@@ -100,6 +100,77 @@ void RPA::compute(bool print) {
 		}
 		
 		energy = 0.5 * (K*T).trace(); 
+
+		if (nocc > 5) {
+		energy = 0.0;
+		int ix1, ix2;
+		double eintra = 0.0; double edisp = 0.0; double edispexch = 0.0; double eionic = 0.0; double ebsse = 0.0;  
+		int ifrag, jfrag, afrag, bfrag; 
+		for (int i = 0; i < 18; i++) {
+			ifrag = i < 13 ? 1 : 2; 
+			for (int j = 0; j < i; j++) {
+				jfrag = j < 13 ? 1 : 2; 
+				for (int a = 0; a < 73; a++) {
+					afrag = a < 37 ? 1 : 2; 
+					ix1 = i*nvirt + a;
+					
+					for (int b = 0; b < 73; b++) {
+						bfrag = b < 37 ? 1 : 2; 
+						ix2 = j*nvirt+b; 
+						
+						int t = 8*ifrag + 4*jfrag + 2*afrag + bfrag - 15; 
+						switch(t) {
+							case 0: 
+							case 15: {
+								eintra += T(ix1, ix2) * K(ix1, ix2);
+								break;
+							}
+							
+							case 1:
+							case 2:
+							case 4:
+							case 7:
+							case 8:
+							case 11:
+							case 13:
+							case 14: {
+								eionic += T(ix1, ix2) * K(ix1, ix2);
+								break;
+							}
+							
+							case 3:
+							case 12: {
+								ebsse += T(ix1, ix2) * K(ix1, ix2);
+								break;
+							}
+							
+							case 5:
+							case 10: {
+								edisp += T(ix1, ix2) * K(ix1, ix2);
+								break;
+							}
+							
+							case 6:
+							case 9: {
+								edispexch += T(ix1, ix2) * K(ix1, ix2);
+								break;
+							}
+							
+							default: 
+							std::cout << t << " " << ifrag << " " << jfrag << " " << afrag << " " << bfrag << std::endl; 
+						}
+					} 
+				}
+			}
+		}
+		
+		energy = edisp + edispexch;
+		std::cout << "Eintra: " << eintra * Logger::TOKCAL << std::endl; 
+		 std::cout << "Edisp: " << edisp * Logger::TOKCAL << std::endl; 
+		 std::cout << "Edisp-exch: " << edispexch * Logger::TOKCAL << std::endl; 
+		 std::cout << "Eionic: " << eionic * Logger::TOKCAL << std::endl; 
+		 std::cout << "Ebsse: " << ebsse * Logger::TOKCAL << std::endl; 
+		}
 		
 	} else {
 		Matrix M = (A+B)*(A-B); 

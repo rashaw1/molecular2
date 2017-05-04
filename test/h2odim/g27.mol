@@ -21,7 +21,7 @@ molecule = {
 ralmo(
 	perturb, 2
 	rpa, true
-	longrange, false
+	longrange, true
 	mu, 0.5
 	sosex, false
 )
