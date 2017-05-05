@@ -345,7 +345,7 @@ void ProgramController::call_rpa(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("mu")) c.set_option<double>("mu", 0.5); 
 	
 	if(done_hf) { 
-		RPA rpa(c, *focker); 
+		RPA rpa(c, *focker, focker->getHCore().rows(), m->getNel()/2); 
 		
 		log.title("RPA CALCULATION"); 
 		rpa.compute();  

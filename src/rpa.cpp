@@ -6,27 +6,28 @@
 #include "logger.hpp"
 
 // Constructor
-RPA::RPA(Command& c, Fock& _focker) : cmd(c), focker(_focker)
+RPA::RPA(Command& c, Fock& _focker, int _N, int _nocc) : cmd(c), focker(_focker), N(_N), nocc(_nocc), nvirt(_N - _nocc)
 {
-	N = focker.getCP().rows();
-	nocc = focker.getMolecule()->getNel()/2;
-	nvirt = N - nocc; 
 	energy = 0.0;
 }
 
 void RPA::compute(bool print) {
 	
 	Logger& log = focker.getMolecule()->control->log; 
+	bool sosex = cmd.get_option<bool>("sosex"); 
 	
 	auto &shells = focker.getMolecule()->getBasis().getIntShells();
 	std::vector<CTF::Tensor<> > V;
 	
+	Matrix cp_occ = focker.getCP().block(0, 0, N, nocc); 
+	Matrix cp_virt = focker.getCP().block(0, nocc, N, nvirt); 
+	
 	if (print) log.print("Transforming integrals"); 
 	if (cmd.get_option<bool>("longrange")) {
 		if(print) log.print("Using long-range potential, with mu = " + std::to_string(cmd.get_option<double>("mu"))); 
-		longrange_eris(shells, V);
+		eris(shells, V, cp_occ, cp_virt, true);
 	} else { 
-		full_eris(V); 
+		eris(shells, V, cp_occ, cp_virt); 
 	}
 	if (print) log.localTime();  
 	
@@ -34,7 +35,7 @@ void RPA::compute(bool print) {
 	int64_t sz1, sz2, *i1, *i2;
 	double *viajb, *vijab;
 	V[0].read_local(&sz1, &i1, &viajb);
-	V[1].read_local(&sz2, &i2, &vijab);  
+	if(sosex) V[1].read_local(&sz2, &i2, &vijab);  
 	
 	int dim = nvirt*nocc; 
 	int nvnono = nocc*dim; 
@@ -43,7 +44,6 @@ void RPA::compute(bool print) {
 	Matrix K = Matrix::Zero(dim, dim); 
 	
 	Matrix F = focker.getCP().transpose() * focker.getFockAO() * focker.getCP(); 
-	bool sosex = cmd.get_option<bool>("sosex"); 
 	
 	int axis = nocc*(nocc+1);
 	axis /= 2; 
@@ -70,9 +70,11 @@ void RPA::compute(bool print) {
 		}
 	}
 	delete i1;
-	delete i2;
-	delete vijab;
-	delete viajb; 
+	delete viajb;
+	if (sosex) {
+		delete i2;
+		delete vijab;
+	} 
 	if (print) log.localTime(); 
 	
 	if (print) log.print("\nSolving Riccatti equations");
@@ -100,77 +102,6 @@ void RPA::compute(bool print) {
 		}
 		
 		energy = 0.5 * (K*T).trace(); 
-
-		if (nocc > 5) {
-		energy = 0.0;
-		int ix1, ix2;
-		double eintra = 0.0; double edisp = 0.0; double edispexch = 0.0; double eionic = 0.0; double ebsse = 0.0;  
-		int ifrag, jfrag, afrag, bfrag; 
-		for (int i = 0; i < 18; i++) {
-			ifrag = i < 13 ? 1 : 2; 
-			for (int j = 0; j < i; j++) {
-				jfrag = j < 13 ? 1 : 2; 
-				for (int a = 0; a < 73; a++) {
-					afrag = a < 37 ? 1 : 2; 
-					ix1 = i*nvirt + a;
-					
-					for (int b = 0; b < 73; b++) {
-						bfrag = b < 37 ? 1 : 2; 
-						ix2 = j*nvirt+b; 
-						
-						int t = 8*ifrag + 4*jfrag + 2*afrag + bfrag - 15; 
-						switch(t) {
-							case 0: 
-							case 15: {
-								eintra += T(ix1, ix2) * K(ix1, ix2);
-								break;
-							}
-							
-							case 1:
-							case 2:
-							case 4:
-							case 7:
-							case 8:
-							case 11:
-							case 13:
-							case 14: {
-								eionic += T(ix1, ix2) * K(ix1, ix2);
-								break;
-							}
-							
-							case 3:
-							case 12: {
-								ebsse += T(ix1, ix2) * K(ix1, ix2);
-								break;
-							}
-							
-							case 5:
-							case 10: {
-								edisp += T(ix1, ix2) * K(ix1, ix2);
-								break;
-							}
-							
-							case 6:
-							case 9: {
-								edispexch += T(ix1, ix2) * K(ix1, ix2);
-								break;
-							}
-							
-							default: 
-							std::cout << t << " " << ifrag << " " << jfrag << " " << afrag << " " << bfrag << std::endl; 
-						}
-					} 
-				}
-			}
-		}
-		
-		energy = edisp + edispexch;
-		std::cout << "Eintra: " << eintra * Logger::TOKCAL << std::endl; 
-		 std::cout << "Edisp: " << edisp * Logger::TOKCAL << std::endl; 
-		 std::cout << "Edisp-exch: " << edispexch * Logger::TOKCAL << std::endl; 
-		 std::cout << "Eionic: " << eionic * Logger::TOKCAL << std::endl; 
-		 std::cout << "Ebsse: " << ebsse * Logger::TOKCAL << std::endl; 
-		}
 		
 	} else {
 		Matrix M = (A+B)*(A-B); 
@@ -193,7 +124,7 @@ void RPA::compute(bool print) {
 	if (print) log.localTime(); 
 }
 
-void RPA::longrange_eris(const std::vector<libint2::Shell>& shells, std::vector<CTF::Tensor<> >& moInts) {
+void RPA::eris(const std::vector<libint2::Shell>& shells, std::vector<CTF::Tensor<> >& moInts, Matrix& T, Matrix& V, bool longrange) {
 	using libint2::Shell;
 	using libint2::Engine;
 	using libint2::Operator;
@@ -218,12 +149,19 @@ void RPA::longrange_eris(const std::vector<libint2::Shell>& shells, std::vector<
 	aoInts.read_local(&sz, &ix, &values); 
 	
 	double mu = cmd.get_option<double>("mu"); 
-	Engine engine(Operator::erf_coulomb, integrals.max_nprim(shells), integrals.max_l(shells), 0);
-	engine.set_params(mu); 
+	
+	Engine* engine; 
+	
+	if (longrange) {
+		engine = new Engine(Operator::erf_coulomb, integrals.max_nprim(shells), integrals.max_l(shells), 0);
+		engine->set_params(mu); 
+	} else {
+		engine = new Engine(Operator::coulomb, integrals.max_nprim(shells), integrals.max_l(shells), 0); 
+	}
 	
 	auto shell2bf = integrals.map_shell_to_basis_function(shells);
 
-	const auto& buf = engine.results();
+	const auto& buf = engine->results();
 
 	// loop over shell quartets
 	for (auto s1=0; s1 != shells.size(); ++s1) {
@@ -247,7 +185,7 @@ void RPA::longrange_eris(const std::vector<libint2::Shell>& shells, std::vector<
 					auto bf4_first = shell2bf[s4];
 					auto n4 = shells[s4].size();
 
-					engine.compute(shells[s1], shells[s2], shells[s3], shells[s4]);
+					engine->compute(shells[s1], shells[s2], shells[s3], shells[s4]);
 
 					const auto* buf_1234 = buf[0];
 					if (buf_1234 == nullptr)
@@ -287,19 +225,19 @@ void RPA::longrange_eris(const std::vector<libint2::Shell>& shells, std::vector<
 	aoInts.write(sz, ix, values);
 	delete ix; 
 	delete values; 
+	delete engine;
 	
 	int64_t sz1, sz2, *ix1, *ix2;
 	double *v1, *v2; 
 	
 	CTF::Matrix<> cp_occ(N, nocc, NS, dw); 
-	CTF::Matrix<> cp_virt(N, nvirt, NS, dw); 
-	Matrix& CP = focker.getCP(); 
+	CTF::Matrix<> cp_virt(N, nvirt, NS, dw);  
 
 	int ctr = 0; 
 	cp_occ.read_local(&sz1, &ix1, &v1);
 	for (int i = 0; i < nocc; i++)
 		for (int mu = 0; mu < N; mu++) 
-			v1[ctr++] = CP(mu, i); 
+			v1[ctr++] = T(mu, i); 
 	cp_occ.write(sz1, ix1, v1); 
 	
 	delete ix1;
@@ -307,32 +245,15 @@ void RPA::longrange_eris(const std::vector<libint2::Shell>& shells, std::vector<
 	
 	ctr = 0; 
 	cp_virt.read_local(&sz2, &ix2, &v2);
-	for (int a = nocc; a < N; a++)
+	for (int a = 0; a < nvirt; a++)
 		for (int mu = 0; mu < N; mu++)
-			v2[ctr++] = CP(mu, a); 
+			v2[ctr++] = V(mu, a); 
 	cp_virt.write(sz2, ix2, v2); 
 	
 	delete ix2; 
 	delete v2;
 	
 	CTF::Tensor<> Viajb(4, iajbshape, nsns, dw); 
-	CTF::Tensor<> Vijab(4, ijabshape, sysy, dw);
-	 
-	{
-		int t1_lens[4] = {N, N, N, nvirt}; 
-		int t2_lens[4] = {N, N, nvirt, nvirt};
-		int t3_lens[4] = {N, nocc, nvirt, nvirt};
-		CTF::Tensor<> temp1(4, t1_lens, syns, dw);
-		CTF::Tensor<> temp2(4, t2_lens, sysy, dw); 
-		CTF::Tensor<> temp3(4, t3_lens, nssy, dw);	
-		
-		temp1["uvwb"] = cp_virt["xb"] * aoInts["uvwx"]; 
-		temp2["uvab"] = cp_virt["wa"] * temp1["uvwb"]; 
-		temp3["ujab"] = cp_occ["vj"] * temp2["uvab"];
-		Vijab["ijab"] = 0.25 * cp_occ["ui"] * temp3["ujab"]; 
-	} 
-	
-	
 	{
 		int t1_lens[4] = {N, N, N, nvirt};
 		int t2_lens[4] = {N, N, nocc, nvirt};
@@ -346,105 +267,314 @@ void RPA::longrange_eris(const std::vector<libint2::Shell>& shells, std::vector<
 		temp3["uajb"] = cp_virt["va"] * temp2["uvjb"];
 		Viajb["iajb"] = cp_occ["ui"] * temp3["uajb"]; 
 	}  
-	
 	moInts.push_back(Viajb);
-	moInts.push_back(Vijab);
+	
+	if (cmd.get_option<bool>("sosex")) {
+		CTF::Tensor<> Vijab(4, ijabshape, sysy, dw);
+	 
+		{
+			int t1_lens[4] = {N, N, N, nvirt}; 
+			int t2_lens[4] = {N, N, nvirt, nvirt};
+			int t3_lens[4] = {N, nocc, nvirt, nvirt};
+			CTF::Tensor<> temp1(4, t1_lens, syns, dw);
+			CTF::Tensor<> temp2(4, t2_lens, sysy, dw); 
+			CTF::Tensor<> temp3(4, t3_lens, nssy, dw);	
+		
+			temp1["uvwb"] = cp_virt["xb"] * aoInts["uvwx"]; 
+			temp2["uvab"] = cp_virt["wa"] * temp1["uvwb"]; 
+			temp3["ujab"] = cp_occ["vj"] * temp2["uvab"];
+			Vijab["ijab"] = 0.25 * cp_occ["ui"] * temp3["ujab"]; 
+		} 
+	
+		moInts.push_back(Vijab);
+	}
 }
 
-void RPA::full_eris(std::vector<CTF::Tensor<> > &moInts) {
+void RPA::fcompute(fInfo& info, bool print) {
 	
-	int ao_lens[4] = {N, N, N, N};
-	int iajbshape[4] = {nocc, nvirt, nocc, nvirt};
-	int ijabshape[4] = {nocc, nocc, nvirt, nvirt}; 
-	int sysy[4] = {SY, NS, SY, NS}; 
-	int nssy[4] = {NS, NS, SY, NS};
-	int nsns[4] = {NS, NS, NS, NS};
-	int syns[4] = {SY, NS, NS, NS}; 
-	CTF::Tensor<> ao_integrals(4, ao_lens, sysy, dw); 
-	int64_t sz, *i1, *i2, *i3;
-	double *v1, *v2, *v3;
-	int ctr = 0;
+	Logger& log = focker.getMolecule()->control->log; 
+	bool sosex = cmd.get_option<bool>("sosex"); 
+	int nfrags = info.nocc.size();
+	
+	// Form MO overlap matrix
+	int i_offset = 0; int mu_offset = 0; 
+	Matrix sigma(nocc, nocc);
+	int f1_nocc, f2_nocc; 
+	for (int i = 0; i < nfrags; i++) {
+		f1_nocc = info.nocc[i]; 
+		int f1_nbfs = f1_nocc + info.nvirt[i]; 
+		
+		int j_offset = 0; int nu_offset = 0;
+		for (int j = 0; j <= i; j++) { 
+			f2_nocc = info.nocc[j];
+			int f2_nbfs = f2_nocc + info.nvirt[j]; 
 			
-	ao_integrals.read_local(&sz, &i1, &v1);
+			sigma.block(i_offset, j_offset, f1_nocc, f2_nocc) = info.T.block(mu_offset, i_offset, f1_nbfs, f1_nocc).transpose() 
+				* info.S.block(mu_offset, nu_offset, f1_nbfs, f2_nbfs) * info.T.block(nu_offset, j_offset, f2_nbfs, f2_nocc);
+
+			j_offset += f2_nocc;
+			nu_offset += f2_nbfs;
+		}
+		
+		mu_offset += f1_nbfs; 
+		i_offset += f1_nocc; 
+	}
+	sigma = sigma.selfadjointView<Eigen::Lower>();
+	sigma = sigma.inverse(); 
 	
-	IntegralEngine& intengine = focker.getIntegrals();
-	if(focker.getMolecule()->control->get_option<bool>("direct")) {
-		S8EvenTensor4 aoInts = intengine.compute_eris(focker.getMolecule()->getBasis().getIntShells());
-		for (int a = 0; a < N; a++) 
-			for (int b = 0; b <= a; b++)
-				for (int c = 0; c < N; c++)
-					for (int d = 0; d <= c; d++) 
-						v1[ctr++] = aoInts(d, c, b, a); 
-	} else {
-		for (int a = 0; a < N; a++) 
-			for (int b = 0; b <= a; b++)
-				for (int c = 0; c < N; c++)
-					for (int d = 0; d <= c; d++) 
-						v1[ctr++] = intengine.getERI(d, c, b, a); 
+	// Project virtual orbitals out of occupied subspace
+	Matrix P(N, N); 
+	i_offset = 0; mu_offset = 0;
+	for (int i = 0; i < nfrags; i++) {
+		f1_nocc = info.nocc[i];
+		int f1_nbfs = f1_nocc + info.nvirt[i];  
+		
+		int j_offset = 0; int nu_offset = 0;
+		for (int j = 0; j <= i; j++) {
+			f2_nocc = info.nocc[j];
+			int f2_nbfs = f2_nocc + info.nvirt[j]; 
+			
+			P.block(mu_offset, nu_offset, f1_nbfs, f2_nbfs) = info.T.block(mu_offset, i_offset, f1_nbfs, f1_nocc) 
+				* sigma.block(i_offset, j_offset, f1_nocc, f2_nocc) * info.T.block(nu_offset, j_offset, f2_nbfs, f2_nocc).transpose();
+			
+			j_offset += f2_nocc;
+			nu_offset += f2_nbfs;
+		}
+		
+		mu_offset += f1_nbfs; 
+		i_offset += f1_nocc; 
+	}
+	P = P.selfadjointView<Eigen::Lower>();
+
+	sigma = Matrix::Identity(N, N) - P * info.S; 
+	info.V = sigma * info.V; 
+	
+	// Compute and transform eris
+	auto &shells = info.shells;
+	std::vector<CTF::Tensor<> > V;
+	
+	if (print) log.print("Transforming integrals"); 
+	if (cmd.get_option<bool>("longrange")) {
+		if(print) log.print("Using long-range potential, with mu = " + std::to_string(cmd.get_option<double>("mu"))); 
+		eris(shells, V, info.T, info.V, true);
+	} else { 
+		eris(shells, V, info.T, info.V); 
+	}
+	if (print) log.localTime();  
+	
+	if (print) log.print("\nForming excitation matrices"); 
+	int64_t sz1, sz2, *i1, *i2;
+	double *viajb, *vijab;
+	V[0].read_local(&sz1, &i1, &viajb);
+	if(sosex) V[1].read_local(&sz2, &i2, &vijab);  
+	
+	int dim = nvirt*nocc; 
+	int nvnono = nocc*dim; 
+	Matrix A = Matrix::Zero(dim, dim); 
+	Matrix B = Matrix::Zero(dim, dim);
+	Matrix K = Matrix::Zero(dim, dim); 
+	
+	Matrix F = Matrix::Zero(N, N); 
+	F.block(0, 0, nocc, nocc) = info.T.transpose() * info.F * info.T; 
+	F.block(0, nocc, nocc, nvirt) = info.T.transpose() * info.F * info.V; 
+	F.block(nocc, 0, nvirt, nocc) = F.block(0, nocc, nocc, nvirt).transpose();
+	F.block(nocc, nocc, nvirt, nvirt) = info.V.transpose() * info.F * info.V; 
+	
+	int axis = nocc*(nocc+1);
+	axis /= 2; 
+	int ix1, ix2;  
+	for (int i = 0; i < nocc; i++) {
+		for (int a = 0; a < nvirt; a++) {
+			ix1 = i*nvirt+a;
+			
+			for (int j = 0; j < nocc; j++) {
+				for (int b = 0; b < nvirt; b++) {
+					ix2 = j*nvirt + b;
+					
+					K(ix1, ix2) = 2.0 * viajb[i + a*nocc + j*dim + b*nvnono]; 
+					A(ix1, ix2) = K(ix1, ix2);
+					B(ix1, ix2) = K(ix1, ix2);
+					if (sosex) {
+						A(ix1, ix2) -= vijab[i + (j*(j+1))/2 + a*axis + axis*(b*(b+1))/2]; 
+						B(ix1, ix2) -= viajb[j + a*nocc + i*dim + b*nvnono]; 
+					}
+					if (i==j) A(ix1, ix2) += F(a+nocc, b+nocc); 
+					if (a==b) A(ix1, ix2) -= F(i, j); 
+				}
+			}
+		}
+	}
+	delete i1;
+	delete viajb;
+	if (sosex) {
+		delete i2;
+		delete vijab;
+	} 
+	if (print) log.localTime(); 
+	
+	if (print) log.print("\nSolving Riccatti equations");
+		
+	Matrix Ap = A; 
+	for (int i = 0; i < dim ;i++) Ap(i, i) = 0.0; 
+		
+	Matrix T = -B; 
+		
+	double delta = 1.0;
+	int iter = 0;
+	Matrix newT; 
+	while (delta > 1e-4 && iter < 15) {
+		newT = -(B + T*Ap);  
+		newT -= (T*B + Ap)*T; 
+			
+		for (int p = 0; p < dim; p++)
+			for (int q = 0; q < dim; q++)
+				newT(p, q) /= A(p, p) + A(q, q); 
+			
+		delta = (newT - T).norm(); 
+		iter++; 
+		T = newT; 
+	}
+		
+	energy = 0.0; 
+	info.eintra = info.edisp = info.edispexch = info.eionic = info.ebsse = 0.0; 
+
+	std::vector<int> cum_occ, cum_virt; 
+	int currnocc = 0; int currvirt = 0;
+	for (int i = 0; i < nfrags; i++) {
+		currnocc += info.nocc[i]; 
+		currvirt += info.nvirt[i];
+		cum_occ.push_back(currnocc);
+		cum_virt.push_back(currvirt); 
 	}
 
-	ao_integrals.write(sz, i1, v1);
-	
-	delete v1; 
-	delete i1; 
-	
-	CTF::Matrix<> cp_occ(N, nocc, NS, dw); 
-	CTF::Matrix<> cp_virt(N, nvirt, NS, dw); 
-	Matrix& CP = focker.getCP(); 
-	
-	ctr = 0; 
-	cp_occ.read_local(&sz, &i2, &v2);
-	for (int i = 0; i < nocc; i++)
-		for (int mu = 0; mu < N; mu++)
-			v2[ctr++] = CP(mu, i); 
-	cp_occ.write(sz, i2, v2); 
-	
-	delete i2;
-	delete v2; 
-	
-	ctr = 0; 
-	cp_virt.read_local(&sz, &i3, &v3);
-	for (int a = nocc; a < N; a++)
-		for (int mu = 0; mu < N; mu++)
-			v3[ctr++] = CP(mu, a); 
-	cp_virt.write(sz, i3, v3); 
-	
-	delete i3; 
-	delete v3; 
-	
-	CTF::Tensor<> Viajb(4, iajbshape, nsns, dw); 
-	CTF::Tensor<> Vijab(4, ijabshape, sysy, dw);
-	 
-	{
-		int t1_lens[4] = {N, N, N, nvirt}; 
-		int t2_lens[4] = {N, N, nvirt, nvirt};
-		int t3_lens[4] = {N, nocc, nvirt, nvirt};
-		CTF::Tensor<> temp1(4, t1_lens, syns, dw);
-		CTF::Tensor<> temp2(4, t2_lens, sysy, dw); 
-		CTF::Tensor<> temp3(4, t3_lens, nssy, dw);	
+	int d1, d2, d3, d4, d; 
+	int ifrag, jfrag, afrag, bfrag; 
+	for (int i = 0; i < nocc; i++) {	
+			
+		for (int n = 0; n < nfrags; n++) {
+			if(i < cum_occ[n]) { ifrag = n; break; }
+		}
 		
-		temp1["uvwb"] = cp_virt["xb"] * ao_integrals["uvwx"]; 
-		temp2["uvab"] = cp_virt["wa"] * temp1["uvwb"]; 
-		temp3["ujab"] = cp_occ["vj"] * temp2["uvab"];
-		Vijab["ijab"] = 0.25 * cp_occ["ui"] * temp3["ujab"]; 
+		for (int j = 0; j <= i; j++) {
+			
+			for (int n = 0; n < nfrags; n++) {
+				if(j < cum_occ[n]) { jfrag = n; break; }
+			}
+		
+			for (int a = 0; a < nvirt; a++) {
+							
+				for (int n = 0; n < nfrags; n++) {
+					if(a < cum_virt[n]) { afrag = n; break; }
+				}
+							
+				d1 = ifrag == afrag ? 0 : 1; 
+				d2 = jfrag == afrag ? 0 : 1; 
+				ix1 = i*nvirt + a; 
+
+				for (int b = 0; b < nvirt; b++) {
+								
+					for (int n = 0; n < nfrags; n++) {
+						if(b < cum_virt[n]) { bfrag = n; break; }
+					}
+								
+					d3 = jfrag == bfrag ? 0 : 1;
+					d4 = ifrag == bfrag ? 0 : 1;  
+								
+					d = 8*d1 + 4*d2 + 2*d3 + d4; 
+					ix2 = j*nvirt + b;
+							
+					switch(d) {
+						case 0: {
+							info.eintra += T(ix1, ix2) * K(ix1, ix2);
+							break;
+						}
+										
+						case 5: {
+							info.edisp += T(ix1, ix2) * K(ix1, ix2);
+							break;
+						}
+										
+						case 10: {
+							info.edispexch += T(ix1, ix2) * K(ix1, ix2);
+							break;
+						}
+						case 15: {
+							info.ebsse += T(ix1, ix2) * K(ix1, ix2);
+							break;
+						}
+										
+						default: {
+							info.eionic += T(ix1, ix2) * K(ix1, ix2);
+						}
+					}
+									
+				}
+			}
+		}
+
+	}
+	
+	/*int ifrag, jfrag, afrag, bfrag; 
+	for (int i = 0; i < 10; i++) {
+	ifrag = i < 5 ? 1 : 2; 
+	for (int j = 0; j < i; j++) {
+	jfrag = j < 5 ? 1 : 2; 
+	for (int a = 0; a < 72; a++) {
+	afrag = a < 36 ? 1 : 2; 
+	ix1 = i*nvirt + a;
+				
+	for (int b = 0; b < 72; b++) {
+	bfrag = b < 36 ? 1 : 2; 
+	ix2 = j*nvirt+b; 
+					
+	int t = 8*ifrag + 4*jfrag + 2*afrag + bfrag - 15; 
+	switch(t) {
+	case 0: 
+	case 15: {
+	info.eintra += T(ix1, ix2) * K(ix1, ix2);
+	break;
+	}
+						
+	case 1:
+	case 2:
+	case 4:
+	case 7:
+	case 8:
+	case 11:
+	case 13:
+	case 14: {
+	info.eionic += T(ix1, ix2) * K(ix1, ix2);
+	break;
+	}
+						
+	case 3:
+	case 12: {
+	info.ebsse += T(ix1, ix2) * K(ix1, ix2);
+	break;
+	}
+						
+	case 5:
+	case 10: {
+	info.edisp += T(ix1, ix2) * K(ix1, ix2);
+	break;
+	}
+						
+	case 6:
+	case 9: {
+	info.edispexch += T(ix1, ix2) * K(ix1, ix2);
+	break;
+	}
+						
+	default: 
+	std::cout << t << " " << ifrag << " " << jfrag << " " << afrag << " " << bfrag << std::endl; 
+	}
 	} 
-	
-	{
-		int t1_lens[4] = {N, N, N, nvirt};
-		int t2_lens[4] = {N, N, nocc, nvirt};
-		int t3_lens[4] = {N, nvirt, nocc, nvirt}; 
-		CTF::Tensor<> temp1(4, t1_lens, syns, dw);
-		CTF::Tensor<> temp2(4, t2_lens, syns, dw); 
-		CTF::Tensor<> temp3(4, t3_lens, nsns, dw);	
+	}
+	}
+	}*/
 		
-		temp1["uvwb"] = cp_virt["xb"] * ao_integrals["uvwx"]; 
-		temp2["uvjb"] = cp_occ["wj"] * temp1["uvwb"]; 
-		temp3["uajb"] = cp_virt["va"] * temp2["uvjb"];
-		Viajb["iajb"] = cp_occ["ui"] * temp3["uajb"]; 
-	}  
-	
-	moInts.push_back(Viajb);
-	moInts.push_back(Vijab);
-	 
+	energy = info.edisp + info.edispexch;
+		
+	if (print) log.localTime(); 
 }
 
