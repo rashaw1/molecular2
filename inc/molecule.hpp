@@ -76,7 +76,7 @@ protected:
   int charge, nel, multiplicity, natoms;
   bool parent, angstrom, fragmented, has_ecps;
   std::vector<SharedFragment> fragments;
-  std::map<int, std::string> bnames;
+  std::map<int, std::string> bnames, dfbnames;
   double enuc;
 public:
 	
@@ -90,6 +90,7 @@ public:
   ~Molecule(); // Deletes the atom array
   
   Atom parseGeomLine(std::string line);
+  void parseBasis(Construct& sc, std::map<int, std::string>& names); 
   
   void buildShellBasis();
   void buildECPBasis();

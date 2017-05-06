@@ -639,7 +639,8 @@ void ALMOSCF::rscf()
 			rpa.fcompute(info, true); 
 			e_disp = rpa.getEnergy();// - e_mon_rpa; 
 			
-			std::cout << "Eintra: " << (info.eintra - e_mon_rpa) * Logger::TOKCAL << std::endl;  
+			std::cout << "Emon: " << e_mon_rpa * Logger::TOKCAL << std::endl; 
+			std::cout << "Eintra: " << info.eintra * Logger::TOKCAL << std::endl;  
 			std::cout << "Edisp: " << info.edisp * Logger::TOKCAL << std::endl;  
 			std::cout << "Edisp-exch: " << info.edispexch * Logger::TOKCAL << std::endl;  
 			std::cout << "Eionic: " << info.eionic * Logger::TOKCAL << std::endl;  

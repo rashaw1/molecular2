@@ -12,7 +12,7 @@ OPTIM = -O3 -Wall -Wno-unused-variable -Wno-sign-compare -Wno-format -std=c++11 
 COMPILE_OPTIONS = $(OPTIM)
 
 # Header include directories
-HEADERS = -I./inc -I./extern -I../ctf/include -I/usr/local/Cellar/eigen/3.3.1/include/eigen3 -I/usr/local/libint/2.3.0-beta.3/include -I/usr/local/libint/2.3.0-beta.3/include/libint2
+HEADERS = -I./inc -I./extern -I../ctf/include -I/usr/local/Cellar/eigen/3.3.3/include/eigen3 -I/usr/local/libint/2.3.0-beta.3/include -I/usr/local/libint/2.3.0-beta.3/include/libint2
 
 # Libraries for linking
 LIBS = -L/usr/local/libint/2.3.0-beta.3/lib -L../ctf/lib -lint2 -lctf -lblas -std=c++11 

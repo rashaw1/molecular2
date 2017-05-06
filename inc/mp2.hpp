@@ -198,6 +198,7 @@ public:
 	
 	void tensormp2(bool print = true); 
 	void cctrans(); 
+	void dfmp2(bool print = true);
 	
 	double getEnergy() const { return energy; }
 	std::shared_ptr<Integrals>& getSpinInts() { 

@@ -1,6 +1,5 @@
 memory, 500
 direct, false
-withcore, true
 molecule = {
 	 angstrom, true
 	 geometry = {
@@ -9,12 +8,12 @@ molecule = {
  H,          0.4546022869,        0.1669410666,       -0.0781236707
 	 }
 	 basis = {
-	       default, sto-3g
+	       default, avqz
+	 }
+	 dfbasis = {
+	       default, vdzmp2fit
 	 }
 }
 rhf()
-rpa (
-    longrange, false
-    mu, 0.5
-)
+dfmp2()
 

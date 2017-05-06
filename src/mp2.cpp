@@ -8,6 +8,7 @@
 #include <iostream>
 #include <thread>
 #include "ProgramController.hpp"
+#include <libint2.hpp>
 
 // Constructor
 MP2::MP2(Fock& _focker) : spinBasis(false), focker(_focker)
@@ -470,6 +471,108 @@ void MP2::calculateEnergy()
 					resolvent = eps[i] + eps[j] - eps[a] - eps[b]; 
 					energy += temp / resolvent; 
 				}
+	
+}
+
+void MP2::dfmp2(bool print) {
+	
+	Logger& log = focker.getMolecule()->control->log; 
+	
+	IntegralEngine& integrals = focker.getIntegrals(); 
+	std::vector<libint2::Shell>& obs = focker.getMolecule()->getBasis().getIntShells();
+	std::vector<libint2::Shell>& auxbs = focker.getMolecule()->getBasis().getDFShells();
+	
+	// Calculate (P|Q) and (P|mn) eris
+	
+	if (print) log.print("Calculating two-index eris...");
+	Matrix JPQ = integrals.compute_eris_2index(auxbs); 
+	if (print) log.localTime();  
+	
+	if (print) log.print("Calculating three-index eris..."); 
+	Matrix KmnP = integrals.compute_eris_3index(obs, auxbs);
+	if (print) log.localTime(); 
+
+	// Form inverse J-metric
+	JPQ = JPQ.inverse(); 
+	
+	int nobs = integrals.nbasis(obs);
+	int nabs = JPQ.rows(); 
+	
+	int nvirt = N-nocc; 
+	int offset = 0;
+
+	if(!focker.getMolecule()->control->get_option<bool>("withcore")) {
+		offset = nocc - focker.getMolecule()->getNValence() / 2; 
+		nocc -= offset; 
+		N = nocc + nvirt; 
+	}
+	int offN = offset + N; 
+	int offnocc = offset + nocc; 
+	
+	if (print) {
+		focker.getMolecule()->control->log.print("No. of occ. orbitals: " + std::to_string(nocc));
+		focker.getMolecule()->control->log.print("No. of virt. orbitals: " + std::to_string(nvirt)); 
+	}
+	
+	if (print) log.print("Transforming integrals to MO basis...");
+	Matrix cp_occ = focker.getCP().block(0, offset, offN, nocc); 
+	Matrix cp_virt = focker.getCP().block(0, offnocc, offN, nvirt); 
+	
+	Matrix BmnP = Matrix::Zero(nocc*nobs, nabs); 
+	int ix; 
+	for (int i = 0; i < nocc; i++) {
+		for (int nu = 0; nu < nobs; nu++) {
+			for (int P = 0; P < nabs; P++) {
+				
+				ix = i*nobs+nu; 
+				for (int mu = 0; mu < nobs; mu++)
+					BmnP(ix, P) += cp_occ(mu, i) * KmnP(mu*nobs+nu, P); 
+				
+			} 
+		}
+	}
+	
+	KmnP = Matrix::Zero(nocc*nvirt, nabs); 
+	for (int i = 0; i < nocc; i++) {
+		for (int a = 0; a < nvirt; a++) {
+			for (int P = 0; P < nabs; P++) {
+				
+				ix = i*nvirt+a; 
+				for (int nu = 0; nu < nobs; nu++)
+					KmnP(ix, P) += cp_virt(nu, a) * BmnP(i*nobs+nu, P); 
+				
+			}
+		}
+	}
+	if (print) log.localTime();
+	
+	BmnP = JPQ * KmnP.transpose(); 
+	
+	Vector& eps = focker.getEps(); 
+	double resolvent, viajb, vibja; 
+	int ia, jb, ib, ja; 
+	for (int i = 0; i < nocc; i++) {
+		for (int a = 0; a < nvirt; a++) {
+			ia = i * nvirt + a;
+			for (int j = 0; j < nocc; j++) {
+				ja = j*nvirt + a; 
+				for (int b = 0; b < nvirt; b++) {
+					ib = i*nvirt + b;
+					jb = j*nvirt + b;
+					resolvent = eps[i+offset] + eps[j+offset] - eps[a+offnocc] - eps[b+offnocc]; 
+					
+					viajb = vibja = 0.0; 
+					for (int Q = 0; Q < nabs; Q++) {
+						viajb += KmnP(ia, Q) * BmnP(Q, jb);
+						vibja += KmnP(ib, Q) * BmnP(Q, ja); 
+					}
+					
+					energy += viajb*(2.0*viajb - vibja) / resolvent;
+					
+				}
+			}
+		}
+	}
 	
 }
 

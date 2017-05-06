@@ -53,7 +53,7 @@ public:
   iVector readShells(iVector& qs);
   iVector readLnums(iVector& qs);
  
-  void readShellBasis(Basis& b, int q, double *pos, int atom);
+  void readShellBasis(Basis& b, int q, double *pos, int atom, bool df = false);
 };
 
 #endif

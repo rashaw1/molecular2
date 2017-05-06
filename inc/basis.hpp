@@ -66,7 +66,10 @@ private:
   int maxl, nexps;
   bool ecps; 
   std::vector<libint2::Shell> intShells;
+  std::vector<libint2::Shell> dfShells; 
   std::vector<int> shellAtomList;
+  std::vector<int> dfShellAtomList;
+  
 public:
   // Constructors and destructor
   // Note - no copy constructor, as it doesn't really seem necessary
@@ -90,14 +93,16 @@ public:
   int getShellSize(int q) const;
   iVector getShells(int q) const;
   int getShellAtom(int i) const { return shellAtomList[i]; }
+  int getDFShellAtom(int i) const { return dfShellAtomList[i]; }
   std::vector<libint2::Shell>& getIntShells() { return intShells; }
+  std::vector<libint2::Shell>& getDFShells() { return dfShells; }
   iVector getLnums(int q) const;
   
   int getNExps(); 
   double getExp(int i) const; 
   void setExp(int i, double value); 
   
-  void addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std::vector <libint2::real_t>> &coeffs, double *pos, int atom);
+  void addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std::vector <libint2::real_t>> &coeffs, double *pos, int atom, bool df = false);
   
   // Overloaded operators
   Basis& operator=(const Basis& other);

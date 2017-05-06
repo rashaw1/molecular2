@@ -78,7 +78,7 @@ void RPA::compute(bool print) {
 	if (print) log.localTime(); 
 	
 	if (print) log.print("\nSolving Riccatti equations");
-	if (cmd.get_option<bool>("longrange")) {
+	if (cmd.get_option<bool>("longrange") || cmd.get_option<bool>("iterative")) {
 		
 		Matrix Ap = A; 
 		for (int i = 0; i < dim ;i++) Ap(i, i) = 0.0; 
@@ -449,6 +449,7 @@ void RPA::fcompute(fInfo& info, bool print) {
 
 	int d1, d2, d3, d4, d; 
 	int ifrag, jfrag, afrag, bfrag; 
+	double scale = 1.0; 
 	for (int i = 0; i < nocc; i++) {	
 			
 		for (int n = 0; n < nfrags; n++) {
@@ -456,6 +457,7 @@ void RPA::fcompute(fInfo& info, bool print) {
 		}
 		
 		for (int j = 0; j <= i; j++) {
+			scale = i == j ? 0.5 : 1.0; 
 			
 			for (int n = 0; n < nfrags; n++) {
 				if(j < cum_occ[n]) { jfrag = n; break; }
@@ -485,7 +487,7 @@ void RPA::fcompute(fInfo& info, bool print) {
 							
 					switch(d) {
 						case 0: {
-							info.eintra += T(ix1, ix2) * K(ix1, ix2);
+							info.eintra += scale * T(ix1, ix2) * K(ix1, ix2);
 							break;
 						}
 										
@@ -499,12 +501,12 @@ void RPA::fcompute(fInfo& info, bool print) {
 							break;
 						}
 						case 15: {
-							info.ebsse += T(ix1, ix2) * K(ix1, ix2);
+							info.ebsse += scale * T(ix1, ix2) * K(ix1, ix2);
 							break;
 						}
 										
 						default: {
-							info.eionic += T(ix1, ix2) * K(ix1, ix2);
+							info.eionic += scale * T(ix1, ix2) * K(ix1, ix2);
 						}
 					}
 									
@@ -514,65 +516,6 @@ void RPA::fcompute(fInfo& info, bool print) {
 
 	}
 	
-	/*int ifrag, jfrag, afrag, bfrag; 
-	for (int i = 0; i < 10; i++) {
-	ifrag = i < 5 ? 1 : 2; 
-	for (int j = 0; j < i; j++) {
-	jfrag = j < 5 ? 1 : 2; 
-	for (int a = 0; a < 72; a++) {
-	afrag = a < 36 ? 1 : 2; 
-	ix1 = i*nvirt + a;
-				
-	for (int b = 0; b < 72; b++) {
-	bfrag = b < 36 ? 1 : 2; 
-	ix2 = j*nvirt+b; 
-					
-	int t = 8*ifrag + 4*jfrag + 2*afrag + bfrag - 15; 
-	switch(t) {
-	case 0: 
-	case 15: {
-	info.eintra += T(ix1, ix2) * K(ix1, ix2);
-	break;
-	}
-						
-	case 1:
-	case 2:
-	case 4:
-	case 7:
-	case 8:
-	case 11:
-	case 13:
-	case 14: {
-	info.eionic += T(ix1, ix2) * K(ix1, ix2);
-	break;
-	}
-						
-	case 3:
-	case 12: {
-	info.ebsse += T(ix1, ix2) * K(ix1, ix2);
-	break;
-	}
-						
-	case 5:
-	case 10: {
-	info.edisp += T(ix1, ix2) * K(ix1, ix2);
-	break;
-	}
-						
-	case 6:
-	case 9: {
-	info.edispexch += T(ix1, ix2) * K(ix1, ix2);
-	break;
-	}
-						
-	default: 
-	std::cout << t << " " << ifrag << " " << jfrag << " " << afrag << " " << bfrag << std::endl; 
-	}
-	} 
-	}
-	}
-	}*/
-		
 	energy = info.edisp + info.edispexch;
 		
 	if (print) log.localTime(); 

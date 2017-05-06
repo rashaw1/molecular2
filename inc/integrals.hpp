@@ -135,6 +135,8 @@ public:
 	
 
 	S8EvenTensor4 compute_eris(const std::vector<libint2::Shell>& shells);
+	Matrix compute_eris_3index(const std::vector<libint2::Shell>& obs, const std::vector<libint2::Shell>& auxbs);
+	Matrix compute_eris_2index(const std::vector<libint2::Shell>& auxbs);
   
 	template<libint2::Operator obtype>
 	std::vector<EMatrix> compute_1body_ints_deriv(unsigned deriv_order, const std::vector<libint2::Shell>& obs, const std::vector<Atom> &atoms)

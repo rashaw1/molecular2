@@ -98,6 +98,7 @@ ProgramController::ProgramController(std::ifstream& input, std::ofstream& output
 	command_list["rhf"] = std::bind(&ProgramController::call_rhf, this, _1, _2);  
 	command_list["uhf"] = std::bind(&ProgramController::call_uhf, this, _1, _2); 
 	command_list["mp2"] = std::bind(&ProgramController::call_mp2, this, _1, _2); 
+	command_list["dfmp2"] = std::bind(&ProgramController::call_dfmp2, this, _1, _2); 
 	command_list["rpa"] = std::bind(&ProgramController::call_rpa, this, _1, _2); 
 	command_list["ccsd"] = std::bind(&ProgramController::call_ccsd, this, _1, _2); 
 	command_list["ralmo"] = std::bind(&ProgramController::call_ralmo, this, _1, _2); 
@@ -339,10 +340,27 @@ void ProgramController::call_mp2(Command& c, SharedMolecule m) {
 	}
 }
 
+void ProgramController::call_dfmp2(Command& c, SharedMolecule m) {
+	if(done_hf) { 
+		mp2obj = std::make_shared<MP2>(*focker); 
+		
+		log.title("DF-MP2 CALCULATION"); 
+		mp2obj->dfmp2(true); 
+
+		log.result("DF-MP2 Energy Correction", mp2obj->getEnergy(), "Hartree");
+		log.result("Total Energy = ", hf->getEnergy() + mp2obj->getEnergy(), "Hartree");
+		
+	} else {
+		Error e("MP2", "HF is required before DF-MP2 can be done.");
+		log.error(e);
+	}
+}
+
 void ProgramController::call_rpa(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("sosex")) c.set_option<bool>("sosex", true); 
 	if(!c.is_option_set("longrange")) c.set_option<bool>("longrange", false); 
 	if(!c.is_option_set("mu")) c.set_option<double>("mu", 0.5); 
+	if(!c.is_option_set("iterative")) c.set_option<bool>("iterative", false);
 	
 	if(done_hf) { 
 		RPA rpa(c, *focker, focker->getHCore().rows(), m->getNel()/2); 
@@ -388,9 +406,10 @@ void ProgramController::call_ralmo(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("perturb")) c.set_option<int>("perturb", 0);
 	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12);
 	if(!c.is_option_set("rpa")) c.set_option<bool>("rpa", false);  
-	if(!c.is_option_set("sosex")) c.set_option<bool>("sosex", true); 
+	if(!c.is_option_set("sosex")) c.set_option<bool>("sosex", false); 
 	if(!c.is_option_set("longrange")) c.set_option<bool>("longrange", false); 
 	if(!c.is_option_set("mu")) c.set_option<double>("mu", 0.5); 
+	if(!c.is_option_set("iterative")) c.set_option<bool>("iterative", true);
 
 	focker = std::make_shared<Fock>(c, *ints, m); 
 	ALMOSCF almo(c, m, *focker); 

@@ -77,6 +77,29 @@ Atom Molecule::parseGeomLine(std::string line) {
 	return Atom(coords, q, m);
 }
 
+void Molecule::parseBasis(Construct& sc, std::map<int, std::string>& names) { 
+
+	for (auto& line : sc.content) {
+		size_t pos = line.find(',');
+		std::string token; 
+		
+		if (pos != std::string::npos) {
+			token = line.substr(0, pos);
+			token.erase(std::remove(token.begin(), token.end(), ' '), token.end());
+			std::transform(token.begin(), token.end(), token.begin(), ::tolower);
+			std::string token2 = line.substr(pos+1, line.length());
+			token2.erase(std::remove(token2.begin(), token2.end(), ' '), token2.end());
+			if (token == "default")
+				names[0] = token2;
+			else {
+				int q = getAtomCharge(token);
+				names[q] = token2;
+			}	
+		}
+	}
+
+}
+
 // An initialisation function, for code reuse purposes
 void Molecule::init(Construct& c)
 {
@@ -107,29 +130,21 @@ void Molecule::init(Construct& c)
 			// Parse basis
 			if (sc.content.size() > 0) {
 				basis_found = true; 
-				
-				for (auto& line : sc.content) {
-					size_t pos = line.find(',');
-					if (pos != std::string::npos) {
-						token = line.substr(0, pos);
-						token.erase(std::remove(token.begin(), token.end(), ' '), token.end());
-						std::transform(token.begin(), token.end(), token.begin(), ::tolower);
-						std::string token2 = line.substr(pos+1, line.length());
-						token2.erase(std::remove(token2.begin(), token2.end(), ' '), token2.end());
-						if (token == "default")
-							bnames[0] = token2;
-						else {
-							int q = getAtomCharge(token);
-							bnames[q] = token2;
-						}	
-					}
-				}
+				parseBasis(sc, bnames); 
 				
 			} else {
 				Error e("INIT", "Basis specification is empty!"); 
 				control->log.error(e); 
 			}
 			
+		} else if (sc.name == "dfbasis") { 
+			// Parse basis
+			if (sc.content.size() > 0)
+					parseBasis(sc, dfbnames); 
+			else {
+				Error e("INIT", "DF Basis specification is empty!"); 
+				control->log.error(e); 
+			}
 		} else if (sc.name == "geometry") {
 			// Parse geometry
 			natoms = sc.content.size(); 
@@ -647,11 +662,18 @@ Vector Molecule::rConsts(int units)
 
 void Molecule::buildShellBasis() {
 	BasisReader b(bnames);
+	BasisReader b2(dfbnames); 
+	
 	for (int i = 0; i < natoms; i++) {
 		Atom &a = atoms[i];
 		double pos[3] = { a.getX(), a.getY(), a.getZ() };
-		b.readShellBasis(bfset, a.getCharge(), pos, i);
+		b.readShellBasis(bfset, a.getCharge(), pos, i, false);
+		
+		if (dfbnames.size() == bnames.size()) 
+			b2.readShellBasis(bfset, a.getCharge(), pos, i, true);
 	}
+	
+	
 }
 
 void Molecule::buildECPBasis() {
@@ -672,6 +694,8 @@ void Molecule::buildECPBasis() {
 
 void Molecule::updateBasisPositions() {
 	std::vector<libint2::Shell>& shells = bfset.getIntShells();
+	std::vector<libint2::Shell>& dfshells = bfset.getDFShells();
+	
 	for (int i = 0; i < natoms; i++) {
 		auto x = atoms[i].getX(); auto y = atoms[i].getY(); auto z = atoms[i].getZ();
 		for (int j = 0; j < shells.size(); j++) {
@@ -679,6 +703,14 @@ void Molecule::updateBasisPositions() {
 				shells[j].O[0] = x;
 				shells[j].O[1] = y;
 				shells[j].O[2] = z;
+			}
+		}
+		
+		for (int j = 0; j < dfshells.size(); j++) {
+			if (bfset.getDFShellAtom(j) == i) {
+				dfshells[j].O[0] = x;
+				dfshells[j].O[1] = y;
+				dfshells[j].O[2] = z;
 			}
 		}
 		

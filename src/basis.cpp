@@ -176,7 +176,7 @@ iVector Basis::getLnums(int q) const
   return l;
 }
 
-void Basis::addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std::vector <libint2::real_t>> &coeffs, double *pos, int atom) {
+void Basis::addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std::vector <libint2::real_t>> &coeffs, double *pos, int atom, bool df) {
 	using libint2::Shell;
 	
 	maxl = l > maxl ? l : maxl; 
@@ -188,12 +188,17 @@ void Basis::addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std:
 		for (auto c : contr) newC.coeff.push_back(c);
 		contr_arr.push_back(newC);
 	}
-	raw_contractions.push_back(contr_arr); 
+	if (!df) raw_contractions.push_back(contr_arr); 
 	
 	std::array<libint2::real_t, 3> O = { {pos[0], pos[1], pos[2]} };
 
-	intShells.push_back(Shell(exps, contr_arr, O));
-	shellAtomList.push_back(atom);
+	if (df) {
+		dfShells.push_back(Shell(exps, contr_arr, O)); 
+		dfShellAtomList.push_back(atom); 	
+	} else {
+		intShells.push_back(Shell(exps, contr_arr, O));
+		shellAtomList.push_back(atom);
+	}
 }
 
   

@@ -1,0 +1,19 @@
+direct, true
+memory, 500
+molecule = {
+	 angstrom, true
+	 geometry =  {
+  O,                 -1.40502255,    0.10362858,    0.29481559
+  H,                 -1.89606432,    0.62024223,   -0.35890101
+  H,                 -1.73845733,   -0.79756845,    0.18511400
+	 }
+	 basis = {
+	       default, avdz
+	 } 
+}
+rhf()
+rpa(
+	sosex, false
+	iterative, true
+)
+
