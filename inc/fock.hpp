@@ -28,6 +28,7 @@
 #include "molecule.hpp"
 #include "eigen_wrapper.hpp"
 #include <vector>
+#include <string>
 
 // Forward declarations
 class Atom;
@@ -44,18 +45,26 @@ protected:
   Matrix orthog;
   Matrix fockm;
   Matrix focka;
+  Matrix fockinc; 
   Matrix CP;
   Matrix forces;
   Matrix hessian;
+  Matrix xyK; 
   Vector eps;
   std::vector<Matrix> focks;
-  Matrix dens;
+  Matrix dens, dens_diff;
   IntegralEngine& integrals;
   SharedMolecule molecule;
-  bool direct, twoints, fromfile, diis;
+  bool direct, twoints, fromfile, diis, density_fitted;
   double precision; 
   int nbfs, iter, MAX, nocc;
+  std::string guess; 
 public:
+	
+    bool reset_incremental, started_incremental; 
+    double next_reset, rms_error, incremental_threshold; 
+	int last_reset; 
+  
   Fock(Command& cmd, IntegralEngine& ints, SharedMolecule m);
   Fock(const Fock& other);
   IntegralEngine& getIntegrals() { return integrals; }
@@ -95,6 +104,7 @@ public:
   void formJK(Matrix& P, double multiplier = 1.0);
   void formJKdirect(const Matrix& Schwarz, Matrix& P1, double multiplier = 1.0);
   virtual void formJKfile();
+  virtual void formJKdf(double multiplier = 1.0); 
   virtual void makeFock();
   virtual void makeDens();
   virtual void average(Vector &w);
@@ -105,6 +115,16 @@ public:
   virtual void compute_forces(const std::vector<Atom> &atoms, int nocc); 
   virtual void compute_hessian(const std::vector<Atom> &atoms, int nocc);
   virtual void compute_hessian_numeric(const std::vector<Atom> &atoms, int nocc, Command &cmd);
+  
+  Matrix compute_2body_fock_general(
+  	const std::vector<libint2::Shell>& obs, const Matrix& D, const std::vector<libint2::Shell>& D_bs,
+  bool D_is_sheldiagonal = false,  // set D_is_shelldiagonal if doing SOAD
+  double precision = std::numeric_limits<double>::epsilon()  // discard contributions smaller than this
+  		); 
+
+  Matrix compute_2body_fock_df(const Matrix& Cocc); 
+  
+  void compute_soad_guess(); 
   
   virtual Vector compute_xgrad(double fx, Matrix& xhessian, std::vector<int>& activex, Command& cmd); 
   
@@ -145,6 +165,7 @@ public:
     virtual void makeJK();
    	void formJK(Matrix& P1, Matrix& P2, double multiplier = 1.0);
     void formJKdirect(const Matrix& Schwarz, Matrix& P1, Matrix& P2, double multiplier = 1.0);
+	void formJKdf(double multiplier = 1.0); 
     virtual void formJKfile();
     virtual void makeFock();
     virtual void makeDens();

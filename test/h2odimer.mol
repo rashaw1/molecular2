@@ -1,5 +1,5 @@
-direct, true
 memory, 500
+direct, true
 molecule = {
 	 angstrom, true
 	 geometry =  {
@@ -17,11 +17,9 @@ molecule = {
 	 basis = {
 	       default, avdz
 	 } 
+	 dfbasis = {
+	 	 default, vdzmp2fit
+	 }
 }
-ralmo(
-	perturb, 2
-	rpa, true
-	longrange, false
-	mu, 0.5
-	sosex, false
-)
+rhf()
+dfmp2()

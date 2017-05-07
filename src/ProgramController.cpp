@@ -302,6 +302,8 @@ void ProgramController::call_rhf(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("mapfile")) c.set_option<std::string>("mapfile", "mo.map");
 	if(!c.is_option_set("fineness")) c.set_option<int>("fineness", 50); 
 	if(!c.is_option_set("orbital")) c.set_option<int>("orbital", 0);
+	if(!c.is_option_set("df")) c.set_option<bool>("df", false); 
+	if(!c.is_option_set("guess")) c.set_option<std::string>("guess", "soad"); 
 	
 	focker = std::make_shared<Fock>(c, *ints, m);
 	hf = std::make_shared<SCF>(c, m, *focker); 
@@ -315,6 +317,8 @@ void ProgramController::call_uhf(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
 	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
 	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12); 
+	if(!c.is_option_set("df")) c.set_option<bool>("df", false); 
+	if(!c.is_option_set("guess")) c.set_option<std::string>("guess", "soad"); 
 
 	focker = std::make_shared<UnrestrictedFock>(c, *ints, m);
 	hf = std::make_shared<SCF>(c, m, *focker); 
@@ -410,6 +414,8 @@ void ProgramController::call_ralmo(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("longrange")) c.set_option<bool>("longrange", false); 
 	if(!c.is_option_set("mu")) c.set_option<double>("mu", 0.5); 
 	if(!c.is_option_set("iterative")) c.set_option<bool>("iterative", true);
+	if(!c.is_option_set("df")) c.set_option<bool>("df", false); 
+	if(!c.is_option_set("guess")) c.set_option<std::string>("guess", "soad"); 
 
 	focker = std::make_shared<Fock>(c, *ints, m); 
 	ALMOSCF almo(c, m, *focker); 
@@ -423,6 +429,8 @@ void ProgramController::call_ualmo(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
 	if(!c.is_option_set("perturb")) c.set_option<int>("perturb", 0);
 	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12); 
+	if(!c.is_option_set("df")) c.set_option<bool>("df", false); 
+	if(!c.is_option_set("guess")) c.set_option<std::string>("guess", "soad"); 
 
 	focker = std::make_shared<UnrestrictedFock>(c, *ints, m);
 	ALMOSCF almo(c, m, *focker); 

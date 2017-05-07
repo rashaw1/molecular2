@@ -110,7 +110,6 @@ void SCF::rhf(bool print)
 		focker.diagonalise();
 		focker.makeDens();
 		Matrix old_dens = focker.getDens();
-		focker.makeJK();
 		focker.makeFock();
 	
 		std::vector<Vector> errs;
@@ -138,17 +137,20 @@ void SCF::rhf(bool print)
 			focker.makeDens();
 			dd = (focker.getDens() - old_dens).norm();
 			old_dens = focker.getDens();
-			focker.makeJK();
 			focker.makeFock();
   	  
 			errs.push_back(calcErr());
-			weights = diis.compute(errs);
+			focker.rms_error = errs[0].norm() / (old_dens.rows() * old_dens.cols());
+			if (focker.rms_error < focker.next_reset || iter - focker.last_reset > 8) 
+				focker.reset_incremental = true; 
+				 
+			if (iter > 2) weights = diis.compute(errs);
 			errs.clear();
       
 			calcE();
 			delta = fabs(energy-last_energy);
 			if(print) molecule->control->log.iteration(iter, energy, delta, dd);
-			focker.average(weights);
+			if (iter > 2) focker.average(weights);
 			focker.transform(false);
 			converged = (testConvergence(dd) && delta < CONVERGE/100.0) || (delta < CONVERGE/1000.0);
 			
@@ -217,6 +219,7 @@ void SCF::uhf_internal(bool print, UnrestrictedFock& ufocker)
 	int MAXITER = cmd.get_option<int>("maxiter"); 
 	double CONVERGE = cmd.get_option<double>("converge");
 	
+	Vector weights; 
 	while (!converged && iter < MAXITER) {
 		
 		ufocker.makeDens();
@@ -231,9 +234,9 @@ void SCF::uhf_internal(bool print, UnrestrictedFock& ufocker)
 		err2_last = err2;
 		err2 = error;
 	
-		Vector weights = diis.compute(errs);
+		if(iter > 2) weights = diis.compute(errs);
 		errs.clear();
-		ufocker.average(weights);
+		if(iter > 2) ufocker.average(weights);
 
 		ea = calcE(ufocker.getHCore(), ufocker.getDensAlpha(), ufocker.getFockAlphaAO());
 		eb = calcE(ufocker.getHCore(), ufocker.getDensBeta(), ufocker.getFockBetaAO());
