@@ -139,7 +139,7 @@ class Fragment : public Molecule
 private:
 	std::vector<Atom> frag_atoms; 
 public:
-	Fragment(std::shared_ptr<ProgramController> control, Atom* as, int nat, const Basis& _bfset, std::map<int, std::string> _bnames, bool _has_ecps = false, int q = 0, int mult = 1); 
+	Fragment(std::shared_ptr<ProgramController> control, Atom* as, int nat, const Basis& _bfset, std::map<int, std::string> _bnames, std::map<int, std::string> _dfbnames, bool _has_ecps = false, int q = 0, int mult = 1); 
 	Fragment(const Fragment& other);
 	~Fragment();
 	void init(Atom* as, int nat, int q, int mult, bool _has_ecps, const Basis& _bfset);

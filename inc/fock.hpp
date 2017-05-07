@@ -100,12 +100,13 @@ public:
   void formOrthog();
   virtual void transform(bool first = false);
   virtual void diagonalise();
-  virtual void makeJK();
+  virtual void makeJK(Matrix& P, double multiplier = 1.0);
   void formJK(Matrix& P, double multiplier = 1.0);
   void formJKdirect(const Matrix& Schwarz, Matrix& P1, double multiplier = 1.0);
   virtual void formJKfile();
-  virtual void formJKdf(double multiplier = 1.0); 
-  virtual void makeFock();
+  virtual void formJKdf(Matrix& Cocc, double multiplier = 1.0); 
+  virtual void makeFock(); 
+  virtual void makeFock(Matrix& P, double multiplier = 1.0 );
   virtual void makeDens();
   virtual void average(Vector &w);
   void simpleAverage(Matrix& D0, double weight = 0.5);
@@ -165,7 +166,7 @@ public:
     virtual void makeJK();
    	void formJK(Matrix& P1, Matrix& P2, double multiplier = 1.0);
     void formJKdirect(const Matrix& Schwarz, Matrix& P1, Matrix& P2, double multiplier = 1.0);
-	void formJKdf(double multiplier = 1.0); 
+	void formJKdf(Matrix& ca, Matrix& cb, double multiplier = 1.0); 
     virtual void formJKfile();
     virtual void makeFock();
     virtual void makeDens();

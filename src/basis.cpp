@@ -219,6 +219,11 @@ Basis& Basis::operator=(const Basis& other)
   maxl = other.maxl; 
   ecps = other.ecps;
   
+  intShells = other.intShells; 
+  dfShells = other.dfShells; 
+  shellAtomList = other.shellAtomList; 
+  dfShellAtomList = other.dfShellAtomList; 
+  
   // Copy across bfs
   int nbfs = charges.size();
   if (nbfs > 0){

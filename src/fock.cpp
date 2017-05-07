@@ -81,12 +81,14 @@ Fock::Fock(const Fock& other) : integrals(other.integrals), molecule(other.molec
 	orthog = other.orthog;
 	fockm = other.fockm;
 	focka = other.focka;
+	fockinc = other.fockinc; 
 	CP = other.CP;
 	forces = other.forces;
 	hessian = other.hessian;
 	eps = other.eps;
 	focks = other.focks;
 	dens = other.dens;
+	dens_diff = other.dens_diff; 
 	direct = other.direct;
 	twoints = other.twoints;
 	fromfile = other.fromfile;
@@ -98,6 +100,14 @@ Fock::Fock(const Fock& other) : integrals(other.integrals), molecule(other.molec
 	iter = other.iter;
 	MAX = other.MAX; 
 	precision = other.precision; 
+	
+    reset_incremental = other.reset_incremental;
+	started_incremental = other.started_incremental; 
+   	next_reset = other.next_reset; 
+	rms_error = other.rms_error;
+	incremental_threshold = other.incremental_threshold; 
+	last_reset = other.last_reset; 
+	
 }
 
 // Form the core hamiltonian matrix
@@ -248,6 +258,7 @@ void Fock::clearDiis() {
 
 FockFragment::FockFragment(Command& cmd, IntegralEngine& ints, SharedMolecule m, int _start, int _end) : Fock(cmd, ints, m), start(_start), end(_end) { 
 	Sxx = ints.getOverlap();
+	incremental_threshold = 0.0; 
 }
 
 FockFragment::FockFragment(const FockFragment& other) : Fock(other) {

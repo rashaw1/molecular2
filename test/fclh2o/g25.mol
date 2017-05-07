@@ -13,13 +13,17 @@ H,  1.441643890,    0.836441347,   -4.998417936
 		   3, 5, 0, 1
 	 }
 	 basis = {
-	       default, avdz
+	       default, cc-pvtz
 	 } 
+	 dfbasis = {
+	 	default, vtzri
+	}
 }
 ralmo(
 	perturb, 2
 	rpa, true
-	longrange, true
+	longrange, false
 	mu, 0.5
 	sosex, false
+	df, false
 )

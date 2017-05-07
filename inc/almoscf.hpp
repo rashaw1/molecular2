@@ -26,7 +26,7 @@ private:
 	double delta_e, delta_d;
 	std::vector<double> monomer_energies;
 	int nfrags, MAX; 
-	Matrix P, P_alpha, P_beta; 
+	Matrix P, P_alpha, P_beta, sigma, sigma_alpha, sigma_beta; 
 public:
 	// Constructor
 	ALMOSCF(Command& c, SharedMolecule m, Fock& f);

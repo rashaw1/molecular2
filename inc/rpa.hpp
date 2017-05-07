@@ -12,10 +12,11 @@ struct fInfo {
 	std::vector<int> nocc, nvirt;
 	Matrix F, S, T, V; 
 	std::vector<libint2::Shell>& shells;
+	std::vector<libint2::Shell>& df_shells; 
 	
 	double eintra, edisp, edispexch, eionic, ebsse;  
 	
-	fInfo(std::vector<libint2::Shell>& s) : shells(s) {} 
+	fInfo(std::vector<libint2::Shell>& s1, std::vector<libint2::Shell>& s2) : shells(s1), df_shells(s2) {} 
 
 };
 
@@ -35,6 +36,7 @@ public:
 	RPA(Command& c, Fock& f, int _N, int _nocc);
 	
 	void eris(const std::vector<libint2::Shell>&, std::vector<CTF::Tensor<> >&, Matrix& T, Matrix& V, bool longrange = false); 
+	std::vector<Matrix> df_eris(const std::vector<libint2::Shell>& obs, const std::vector<libint2::Shell>& auxbs, Matrix& T, Matrix& V); 
 	
 	void compute(bool print = true); 
 	void fcompute(fInfo& info, bool print = false); 

@@ -253,7 +253,7 @@ void Molecule::init(Construct& c)
 		if (fragmented) {
 			for(auto& f : frags) 
 				if (f.size() > 3)
-					fragments.push_back(std::make_shared<Fragment>(control, &atoms[f[0]], f[1] - f[0], bfset, bnames, has_ecps, f[2], f[3]));
+					fragments.push_back(std::make_shared<Fragment>(control, &atoms[f[0]], f[1] - f[0], bfset, bnames, dfbnames, has_ecps, f[2], f[3]));
 		}
 	}
 
@@ -305,10 +305,12 @@ Molecule::Molecule(const Molecule& other) : control(other.control)
 		atoms = new Atom[natoms];
 		for (int i = 0; i < natoms; i++) atoms[i] = other.atoms[i]; 
 	}
+	frozen_atoms = other.frozen_atoms; 
 		
 	bfset = other.bfset;
 	ecpset = other.ecpset;
 	bnames = other.bnames;
+	dfbnames = other.dfbnames; 
 	enuc = other.enuc;
 }
 
@@ -337,20 +339,24 @@ Molecule& Molecule::operator=(const Molecule& other) {
 		for (int i = 0; i < natoms; i++) atoms[i] = other.atoms[i]; 
 	}
 		
+	frozen_atoms = other.frozen_atoms; 	
 	bfset = other.bfset;
 	ecpset = other.ecpset;
 	bnames = other.bnames;
+	dfbnames = other.dfbnames; 
 	enuc = other.enuc;
 	return *this; 
 }
 
-Fragment::Fragment(SharedPC control, Atom* as, int nat, const Basis& _bfset, std::map<int, std::string> _bnames, bool _has_ecps, int q, int mult) : Molecule(control, q)  {
+Fragment::Fragment(SharedPC control, Atom* as, int nat, const Basis& _bfset, std::map<int, std::string> _bnames, std::map<int, std::string> _dfbnames, bool _has_ecps, int q, int mult) : Molecule(control, q)  {
 	bnames = _bnames; 
+	dfbnames = _dfbnames; 
 	init(as, nat, q, mult, _has_ecps, _bfset); 
 }
 
 Fragment::Fragment(const Fragment& other) : Molecule(other.control, other.charge) {
 	bnames = other.bnames; 
+	dfbnames = other.dfbnames; 
 	init(other.atoms, other.natoms, other.charge, other.multiplicity, other.has_ecps, other.bfset);
 }
 Fragment::~Fragment() { }
@@ -358,6 +364,7 @@ Fragment::~Fragment() { }
 Fragment& Fragment::operator=(const Fragment& other) {
 	control = other.control;
 	bnames = other.bnames;
+	dfbnames = other.dfbnames; 
 	init(other.atoms, other.natoms, other.charge, other.multiplicity, other.has_ecps, other.bfset);
 	return *this;
 }

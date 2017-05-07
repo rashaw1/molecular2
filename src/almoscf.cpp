@@ -23,6 +23,7 @@ ALMOSCF::ALMOSCF(Command& c, SharedMolecule m, Fock& f) : molecule(m), cmd(c), f
 	dimer_energy = e_frz = e_pol = e_ct = e_int = e_disp = e_mon_rpa = 0.0;
 	MAX = cmd.get_option<int>("maxdiis");
 	diis.init(MAX, cmd.get_option<bool>("diis"));
+	focker.incremental_threshold = 0.0; 
 }
 
 void ALMOSCF::setFragments(bool unrestricted)
@@ -55,14 +56,6 @@ void ALMOSCF::setFragments(bool unrestricted)
 			hf.rhf(false);
 			molecule->control->log.print("Monomer " + std::to_string(nf+1) + " energy = " + std::to_string(hf.getEnergy()) + " Hartree");
 			
-			if (cmd.get_option<bool>("rpa")) {
-				auto& f = fragments[fragments.size() - 1]; 
-				RPA rpa(cmd, f, f.getHCore().rows(), f.getMolecule()->getNel()/2); 
-				rpa.compute(false); 
-				e_mon_rpa += rpa.getEnergy(); 
-				molecule->control->log.print("Monomer " + std::to_string(nf+1) + " RPA: " + std::to_string(rpa.getEnergy()) + " Hartree"); 
-			}
-			
 			molecule->control->log.flush();  
 			monomer_energies.push_back(hf.getEnergy()); 
 			fragments[fragments.size()-1].clearDiis(); 
@@ -91,7 +84,7 @@ double ALMOSCF::makeDens(bool alpha) {
 	//Build T matrix
 	int nbfs = S.rows();
 	int i_offset = 0; int mu_offset = 0; 
-	Matrix sigma(nocc, nocc);
+	sigma = Matrix::Zero(nocc, nocc);
 	int f1_nocc, f2_nocc; 
 	for (int i = 0; i < ufragments.size(); i++) {
 		auto& f1 = ufragments[i];
@@ -123,6 +116,9 @@ double ALMOSCF::makeDens(bool alpha) {
 	}
 	sigma = sigma.selfadjointView<Eigen::Lower>();
 	sigma = sigma.inverse(); 
+	
+	if (alpha) sigma_alpha = sigma;
+	else sigma_beta = sigma; 
 	
 	i_offset = 0; mu_offset = 0;
 	for (int i = 0; i < ufragments.size(); i++) {
@@ -173,17 +169,22 @@ void ALMOSCF::rcompute() {
 	Matrix& S = focker.getS();
 	Matrix& H = focker.getHCore(); 
 	Matrix P_old = P;
+	Matrix T; 
+	bool density_fitted = cmd.get_option<bool>("df"); 
+	if (density_fitted) T = Matrix::Zero(H.rows(), focker.getMolecule()->getNel()/2); 
 	int nocc = focker.getMolecule()->getNel() / 2;
 	
 	//Build T matrix
 	int nbfs = S.rows();
 	int i_offset = 0; int mu_offset = 0; 
-	Matrix sigma(nocc, nocc);
+	sigma = Matrix::Zero(nocc, nocc);
 	int f1_nocc, f2_nocc; 
 	for (int i = 0; i < fragments.size(); i++) {
 		auto& f1 = fragments[i];
 		f1_nocc = f1.getMolecule()->getNel()/2;
 		int f1_nbfs = f1.getHCore().rows(); 
+		
+		if (density_fitted) T.block(mu_offset, i_offset, f1_nbfs, f1_nocc) = f1.getCP().block(0, 0, f1_nbfs, f1_nocc); 
 		
 		int j_offset = 0; int nu_offset = 0;
 		for (int j = 0; j <= i; j++) {
@@ -228,12 +229,13 @@ void ALMOSCF::rcompute() {
 	delta_d = (P - P_old).norm(); 
 	
 	// Build Fock matrix
-	if (focker.getMolecule()->control->get_option<bool>("direct"))
-		focker.formJKdirect(focker.getIntegrals().getPrescreen(), P, 2.0);
-	else 
-		focker.formJK(P, 2.0);
+	if (density_fitted) {
+		EigenSolver es(sigma); 
+		T = T * es.operatorSqrt(); 
+		focker.makeFock(T, 1.0); 
+	} else
+		focker.makeFock(P, 2.0); 
 	
-	focker.makeFock();
 	Matrix& F = focker.getFockAO(); 
 	
 	// Calculate errors
@@ -274,7 +276,33 @@ void ALMOSCF::ucompute() {
 	delta_d += makeDens(false); 
 	
 	// Build Fock matrix
-	if (ufocker.getMolecule()->control->get_option<bool>("direct"))
+	if (cmd.get_option<bool>("df")) {
+		Matrix ca_occ = Matrix::Zero(nbfs, focker.getMolecule()->nalpha()); 
+		Matrix cb_occ = Matrix::Zero(nbfs, focker.getMolecule()->nbeta()); 
+		
+		int ia_offset = 0; int ib_offset = 0; int mu_offset = 0; 
+		int f1_nalpha, f1_nbeta; 
+		for (int i = 0; i < ufragments.size(); i++) {
+			auto& f1 = ufragments[i];
+			f1_nalpha = f1.getMolecule()->nalpha();
+			f1_nbeta = f1.getMolecule()->nbeta(); 
+			int f1_nbfs = f1.getHCore().rows(); 
+			
+			ca_occ.block(mu_offset, ia_offset, f1_nbfs, f1_nalpha) = f1.getCPAlpha().block(0, 0, f1_nbfs, f1_nalpha); 
+			cb_occ.block(mu_offset, ib_offset, f1_nbfs, f1_nbeta) = f1.getCPBeta().block(0, 0, f1_nbfs, f1_nbeta); 
+		
+			mu_offset += f1_nbfs; 
+			ia_offset += f1_nalpha;
+			ib_offset += f1_nbeta; 
+		}
+		
+		EigenSolver esa(sigma_alpha); 
+		ca_occ = ca_occ * esa.operatorSqrt(); 
+		EigenSolver esb(sigma_beta);
+		cb_occ = cb_occ * esb.operatorSqrt(); 
+		
+		ufocker.formJKdf(ca_occ, cb_occ, 1.0); 
+	} else if (ufocker.getMolecule()->control->get_option<bool>("direct"))
 		ufocker.formJKdirect(focker.getIntegrals().getPrescreen(), P_alpha, P_beta, 2.0);
 	else 
 		ufocker.formJK(P_alpha, P_beta, 2.0);
@@ -346,7 +374,7 @@ void ALMOSCF::rperturb(bool order4)
 	
 	// Form MO overlap matrix
 	Matrix& S = focker.getS();
-	Matrix sigma(nbfs, nbfs);
+	sigma = Matrix::Zero(nbfs, nbfs);
 	sigma.block(0, 0, nocc, nocc) = T.transpose() * S * T; 
 	sigma.block(nocc, 0, nvirt, nocc) = V.transpose() * S * T;
 	sigma.block(nocc, nocc, nvirt, nvirt) = V.transpose() * S * V;
@@ -447,8 +475,8 @@ void ALMOSCF::uperturb(bool order4)
 	
 	// Form MO overlap matrix
 	Matrix& S = ufocker.getS();
-	Matrix sigma_alpha(nbfs, nbfs);
-	Matrix sigma_beta(nbfs, nbfs);
+	sigma_alpha = Matrix::Zero(nbfs, nbfs);
+	sigma_beta = Matrix::Zero(nbfs, nbfs);
 	sigma_alpha.block(0, 0, nalpha, nalpha) = T_alpha.transpose() * S * T_alpha; 
 	sigma_alpha.block(nalpha, 0, nvirt_alpha, nalpha) = V_alpha.transpose() * S * T_alpha;
 	sigma_alpha.block(nalpha, nalpha, nvirt_alpha, nvirt_alpha) = V_alpha.transpose() * S * V_alpha;
@@ -612,7 +640,7 @@ void ALMOSCF::rscf()
 			int nocc = focker.getMolecule()->getNel() / 2;
 			int nvirt = nbfs - nocc;
 	
-			fInfo info(focker.getMolecule()->getBasis().getIntShells()); 
+			fInfo info(focker.getMolecule()->getBasis().getIntShells(), focker.getMolecule()->getBasis().getDFShells()); 
 			info.T = Eigen::MatrixXd::Zero(nbfs, nocc); 
 			info.V = Eigen::MatrixXd::Zero(nbfs, nvirt);
 			int row_offset = 0; int occ_col_offset = 0; int virt_col_offset = 0;

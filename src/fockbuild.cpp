@@ -11,15 +11,15 @@
 
 typedef std::vector<libint2::Shell> BasisSet; 
  
-void Fock::makeJK()
+void Fock::makeJK(Matrix& P, double multiplier)
 {
 	
 	if (twoints){
-		formJK(dens_diff); 
+		formJK(P, multiplier); 
 	} else if (density_fitted) {
-		formJKdf(); 
+		formJKdf(P, multiplier); 
 	} else if (direct) {
-		formJKdirect(integrals.getPrescreen(), dens_diff);
+		formJKdirect(integrals.getPrescreen(), P, multiplier);
 	} else {
 		try {
 			formJKfile();
@@ -155,12 +155,11 @@ void Fock::formJKfile()
 {
 }
 	
-void Fock::formJKdf(double multiplier) {
-	Matrix cocc = CP.block(0, 0, nbfs, nocc); 
-	jkints = multiplier * compute_2body_fock_df(cocc); 
+void Fock::formJKdf(Matrix& Cocc, double multiplier) {
+	jkints = multiplier * compute_2body_fock_df(Cocc); 
 }	
 
-void Fock::makeFock()
+void Fock::makeFock(Matrix& P, double multiplier)
 {
 	if (not density_fitted) {
 		focka = fockinc; 
@@ -183,7 +182,7 @@ void Fock::makeFock()
 	 } else 
 		 focka = hcore; 
 	
-	makeJK(); 
+	makeJK(P, multiplier);  
 	focka += jkints; 
 	if (not density_fitted) fockinc = focka; 
 	if (diis) { // Archive for averaging
@@ -193,6 +192,15 @@ void Fock::makeFock()
 		focks.push_back(focka);
 		iter++;
 	}		
+}
+
+void Fock::makeFock() {
+	if (not density_fitted)
+		makeFock(dens_diff); 
+	else {
+		Matrix cocc = CP.block(0, 0, nbfs, nocc); 
+		makeFock(cocc); 
+	}
 }
 
 Vector FockFragment::buildFock(Matrix& qfq, Matrix& qfp, Matrix& pfp, bool alpha) 
@@ -331,9 +339,7 @@ void UnrestrictedFock::formJKdirect(const Matrix& Schwarz, Matrix& Da, Matrix& D
 	jkints_beta = 0.25 * (jkints_beta + jkints_beta.transpose()).eval();
 }
 
-void UnrestrictedFock::formJKdf(double multiplier) {
-	Matrix ca_occ = CP_alpha.block(0, 0, nbfs, nalpha); 
-	Matrix cb_occ = CP_beta.block(0, 0, nbfs, nbeta); 
+void UnrestrictedFock::formJKdf(Matrix& ca_occ, Matrix& cb_occ, double multiplier) {
 	jkints_alpha = multiplier * compute_2body_fock_df(ca_occ); 
 	jkints_beta = multiplier * compute_2body_fock_df(cb_occ); 
 }
@@ -344,7 +350,9 @@ void UnrestrictedFock::makeJK()
 	if (twoints){
 		formJK(dens_alpha, dens_beta); 
 	} else if (density_fitted) {
-		formJKdf(); 
+		Matrix ca_occ = CP_alpha.block(0, 0, nbfs, nalpha); 
+		Matrix cb_occ = CP_beta.block(0, 0, nbfs, nbeta); 
+		formJKdf(ca_occ, cb_occ); 
 	} else if (direct) {
 		formJKdirect(integrals.getPrescreen(), dens_alpha, dens_beta);
 	} else {

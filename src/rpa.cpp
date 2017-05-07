@@ -349,25 +349,6 @@ void RPA::fcompute(fInfo& info, bool print) {
 	sigma = Matrix::Identity(N, N) - P * info.S; 
 	info.V = sigma * info.V; 
 	
-	// Compute and transform eris
-	auto &shells = info.shells;
-	std::vector<CTF::Tensor<> > V;
-	
-	if (print) log.print("Transforming integrals"); 
-	if (cmd.get_option<bool>("longrange")) {
-		if(print) log.print("Using long-range potential, with mu = " + std::to_string(cmd.get_option<double>("mu"))); 
-		eris(shells, V, info.T, info.V, true);
-	} else { 
-		eris(shells, V, info.T, info.V); 
-	}
-	if (print) log.localTime();  
-	
-	if (print) log.print("\nForming excitation matrices"); 
-	int64_t sz1, sz2, *i1, *i2;
-	double *viajb, *vijab;
-	V[0].read_local(&sz1, &i1, &viajb);
-	if(sosex) V[1].read_local(&sz2, &i2, &vijab);  
-	
 	int dim = nvirt*nocc; 
 	int nvnono = nocc*dim; 
 	Matrix A = Matrix::Zero(dim, dim); 
@@ -380,36 +361,95 @@ void RPA::fcompute(fInfo& info, bool print) {
 	F.block(nocc, 0, nvirt, nocc) = F.block(0, nocc, nocc, nvirt).transpose();
 	F.block(nocc, nocc, nvirt, nvirt) = info.V.transpose() * info.F * info.V; 
 	
-	int axis = nocc*(nocc+1);
-	axis /= 2; 
-	int ix1, ix2;  
-	for (int i = 0; i < nocc; i++) {
-		for (int a = 0; a < nvirt; a++) {
-			ix1 = i*nvirt+a;
+	// Compute and transform eris
+	auto &shells = info.shells;
+	bool density_fitted = cmd.get_option<bool>("df"); 
+	int ix1, ix2; 
+	
+	if (print) log.print("Transforming integrals"); 
+	if(!density_fitted) {
+		std::vector<CTF::Tensor<> > V;
+	
+		if (cmd.get_option<bool>("longrange")) {
+			if(print) log.print("Using long-range potential, with mu = " + std::to_string(cmd.get_option<double>("mu"))); 
+			eris(shells, V, info.T, info.V, true);
+		} else { 
+			eris(shells, V, info.T, info.V); 
+		}
+		if (print) log.localTime();  
+	
+		if (print) log.print("\nForming excitation matrices"); 
+		int64_t sz1, sz2, *i1, *i2;
+		double *viajb, *vijab;
+		V[0].read_local(&sz1, &i1, &viajb);
+		if(sosex) V[1].read_local(&sz2, &i2, &vijab);  
+	
+		int axis = nocc*(nocc+1);
+		axis /= 2;  
+		for (int i = 0; i < nocc; i++) {
+			for (int a = 0; a < nvirt; a++) {
+				ix1 = i*nvirt+a;
 			
-			for (int j = 0; j < nocc; j++) {
-				for (int b = 0; b < nvirt; b++) {
-					ix2 = j*nvirt + b;
+				for (int j = 0; j < nocc; j++) {
+					for (int b = 0; b < nvirt; b++) {
+						ix2 = j*nvirt + b;
+						if (ix2 > ix1) continue; 
 					
-					K(ix1, ix2) = 2.0 * viajb[i + a*nocc + j*dim + b*nvnono]; 
-					A(ix1, ix2) = K(ix1, ix2);
-					B(ix1, ix2) = K(ix1, ix2);
-					if (sosex) {
-						A(ix1, ix2) -= vijab[i + (j*(j+1))/2 + a*axis + axis*(b*(b+1))/2]; 
-						B(ix1, ix2) -= viajb[j + a*nocc + i*dim + b*nvnono]; 
+						K(ix1, ix2) = 2.0 * viajb[i + a*nocc + j*dim + b*nvnono]; 
+						A(ix1, ix2) = K(ix1, ix2);
+						B(ix1, ix2) = K(ix1, ix2);
+						if (sosex) {
+							A(ix1, ix2) -= vijab[i + (j*(j+1))/2 + a*axis + axis*(b*(b+1))/2]; 
+							B(ix1, ix2) -= viajb[j + a*nocc + i*dim + b*nvnono]; 
+						}
+						if (i==j) A(ix1, ix2) += F(a+nocc, b+nocc); 
+						if (a==b) A(ix1, ix2) -= F(i, j); 
+						
+						K(ix2, ix1) = K(ix1, ix2);
+						A(ix2, ix1) = A(ix1, ix2);
+						B(ix2, ix1) = B(ix1, ix2); 
 					}
-					if (i==j) A(ix1, ix2) += F(a+nocc, b+nocc); 
-					if (a==b) A(ix1, ix2) -= F(i, j); 
+				}
+			}
+		}
+		delete i1;
+		delete viajb;
+		if (sosex) {
+			delete i2;
+			delete vijab;
+		} 
+	} else {
+		std::vector<Matrix> dferis = df_eris(shells, info.df_shells, info.T, info.V); 
+		Matrix& KiaP = dferis[0];
+		Matrix& BiaP = dferis[1]; 
+		 
+		for (int i = 0; i < nocc; i++) {
+			for (int a = 0; a < nvirt; a++) {
+				ix1 = i*nvirt+a;
+			
+				for (int j = 0; j < nocc; j++) {
+					for (int b = 0; b < nvirt; b++) {
+						ix2 = j*nvirt + b;
+						if (ix2 > ix1) continue;
+					
+						double viajb = 0.0; 
+						for (int Q = 0; Q < KiaP.cols(); Q++)
+							viajb += KiaP(ix1, Q) * BiaP(Q, ix2); 
+						
+						K(ix1, ix2) = 2.0 * viajb; 
+						A(ix1, ix2) = K(ix1, ix2);
+						B(ix1, ix2) = K(ix1, ix2);
+						if (i==j) A(ix1, ix2) += F(a+nocc, b+nocc); 
+						if (a==b) A(ix1, ix2) -= F(i, j); 
+						
+						K(ix2, ix1) = K(ix1, ix2);
+						A(ix2, ix1) = A(ix1, ix2);
+						B(ix2, ix1) = B(ix1, ix2); 
+					}
 				}
 			}
 		}
 	}
-	delete i1;
-	delete viajb;
-	if (sosex) {
-		delete i2;
-		delete vijab;
-	} 
 	if (print) log.localTime(); 
 	
 	if (print) log.print("\nSolving Riccatti equations");
@@ -423,18 +463,26 @@ void RPA::fcompute(fInfo& info, bool print) {
 	int iter = 0;
 	Matrix newT; 
 	while (delta > 1e-4 && iter < 15) {
-		newT = -(B + T*Ap);  
-		newT -= (T*B + Ap)*T; 
+		newT.noalias() = -(B + T*Ap);  
+		newT.noalias() -= (T*B + Ap)*T; 
 			
-		for (int p = 0; p < dim; p++)
-			for (int q = 0; q < dim; q++)
+		for (int p = 0; p < dim; p++){
+			for (int q = 0; q <= p; q++) {
 				newT(p, q) /= A(p, p) + A(q, q); 
-			
+				newT(q, p) = newT(p, q); 
+			}
+		}
+				
 		delta = (newT - T).norm(); 
 		iter++; 
 		T = newT; 
 	}
 		
+	if (print) {
+		log.localTime();
+		log.print("Decomposing energy contributions...");
+	}
+	
 	energy = 0.0; 
 	info.eintra = info.edisp = info.edispexch = info.eionic = info.ebsse = 0.0; 
 
@@ -446,7 +494,7 @@ void RPA::fcompute(fInfo& info, bool print) {
 		cum_occ.push_back(currnocc);
 		cum_virt.push_back(currvirt); 
 	}
-
+		
 	int d1, d2, d3, d4, d; 
 	int ifrag, jfrag, afrag, bfrag; 
 	double scale = 1.0; 
@@ -521,3 +569,55 @@ void RPA::fcompute(fInfo& info, bool print) {
 	if (print) log.localTime(); 
 }
 
+std::vector<Matrix> RPA::df_eris(const std::vector<libint2::Shell>& obs, const std::vector<libint2::Shell>& auxbs, Matrix& T, Matrix& V) {
+	IntegralEngine& integrals = focker.getIntegrals(); 
+	
+	// Calculate (P|Q) and (P|mn) eris
+	
+	Matrix JPQ = integrals.compute_eris_2index(auxbs);  
+	Matrix KmnP = integrals.compute_eris_3index(obs, auxbs);
+
+	// Form inverse J-metric
+	JPQ = JPQ.inverse(); 
+	
+	int nobs = integrals.nbasis(obs);
+	int nabs = JPQ.rows(); 
+
+	int nvirt = N-nocc; 
+	int offset = 0;
+	int offN = offset + N; 
+	int offnocc = offset + nocc; 
+	
+	Matrix BmnP = Matrix::Zero(nocc*nobs, nabs); 
+	int ix; 
+	for (int i = 0; i < nocc; i++) {
+		for (int nu = 0; nu < nobs; nu++) {
+			for (int P = 0; P < nabs; P++) {
+				
+				ix = i*nobs+nu; 
+				for (int mu = 0; mu < nobs; mu++)
+					BmnP(ix, P) +=  T(mu, i) * KmnP(mu*nobs+nu, P); 
+				
+			} 
+		}
+	}
+	
+	KmnP = Matrix::Zero(nocc*nvirt, nabs); 
+	for (int i = 0; i < nocc; i++) {
+		for (int a = 0; a < nvirt; a++) {
+			for (int P = 0; P < nabs; P++) {
+				
+				ix = i*nvirt+a; 
+				for (int nu = 0; nu < nobs; nu++)
+					KmnP(ix, P) += V(nu, a) * BmnP(i*nobs+nu, P); 
+				
+			}
+		}
+	}
+	
+	BmnP.noalias() = JPQ * KmnP.transpose(); 
+	
+	std::vector<Matrix> dferis = { KmnP, BmnP }; 
+	
+	return dferis; 
+}
