@@ -16,6 +16,6 @@ molecule = {
 }
 rhf()
 rpa(
-	sosex, false
+	sosex, true
 )
 

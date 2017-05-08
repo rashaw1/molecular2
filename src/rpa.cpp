@@ -33,9 +33,8 @@ void RPA::compute(bool print) {
 	
 	if (print) log.print("\nForming excitation matrices"); 
 	int64_t sz1, sz2, *i1, *i2;
-	double *viajb, *vijab;
+	double *viajb;
 	V[0].read_local(&sz1, &i1, &viajb);
-	if(sosex) V[1].read_local(&sz2, &i2, &vijab);  
 	
 	int dim = nvirt*nocc; 
 	int nvnono = nocc*dim; 
@@ -60,7 +59,6 @@ void RPA::compute(bool print) {
 					A(ix1, ix2) = K(ix1, ix2);
 					B(ix1, ix2) = K(ix1, ix2);
 					if (sosex) {
-						A(ix1, ix2) -= vijab[i + (j*(j+1))/2 + a*axis + axis*(b*(b+1))/2]; 
 						B(ix1, ix2) -= viajb[j + a*nocc + i*dim + b*nvnono]; 
 					}
 					if (i==j) A(ix1, ix2) += F(a+nocc, b+nocc); 
@@ -71,10 +69,6 @@ void RPA::compute(bool print) {
 	}
 	delete i1;
 	delete viajb;
-	if (sosex) {
-		delete i2;
-		delete vijab;
-	} 
 	if (print) log.localTime(); 
 	
 	if (print) log.print("\nSolving Riccatti equations");
@@ -83,14 +77,14 @@ void RPA::compute(bool print) {
 		Matrix Ap = A; 
 		for (int i = 0; i < dim ;i++) Ap(i, i) = 0.0; 
 		
-		Matrix T = -B; 
+		Matrix T = -K; 
 		
 		double delta = 1.0;
 		int iter = 0;
 		Matrix newT; 
 		while (delta > 1e-4 && iter < 15) {
-			newT = -(B + T*Ap);  
-			newT -= (T*B + Ap)*T; 
+			newT = -(K + T*Ap);  
+			newT -= (T*K + Ap)*T; 
 			
 			for (int p = 0; p < dim; p++)
 				for (int q = 0; q < dim; q++)
@@ -101,7 +95,7 @@ void RPA::compute(bool print) {
 			T = newT; 
 		}
 		
-		energy = 0.5 * (K*T).trace(); 
+		energy = 0.5 * (B*T).trace(); 
 		
 	} else {
 		Matrix M = (A+B)*(A-B); 
@@ -268,26 +262,6 @@ void RPA::eris(const std::vector<libint2::Shell>& shells, std::vector<CTF::Tenso
 		Viajb["iajb"] = cp_occ["ui"] * temp3["uajb"]; 
 	}  
 	moInts.push_back(Viajb);
-	
-	if (cmd.get_option<bool>("sosex")) {
-		CTF::Tensor<> Vijab(4, ijabshape, sysy, dw);
-	 
-		{
-			int t1_lens[4] = {N, N, N, nvirt}; 
-			int t2_lens[4] = {N, N, nvirt, nvirt};
-			int t3_lens[4] = {N, nocc, nvirt, nvirt};
-			CTF::Tensor<> temp1(4, t1_lens, syns, dw);
-			CTF::Tensor<> temp2(4, t2_lens, sysy, dw); 
-			CTF::Tensor<> temp3(4, t3_lens, nssy, dw);	
-		
-			temp1["uvwb"] = cp_virt["xb"] * aoInts["uvwx"]; 
-			temp2["uvab"] = cp_virt["wa"] * temp1["uvwb"]; 
-			temp3["ujab"] = cp_occ["vj"] * temp2["uvab"];
-			Vijab["ijab"] = 0.25 * cp_occ["ui"] * temp3["ujab"]; 
-		} 
-	
-		moInts.push_back(Vijab);
-	}
 }
 
 void RPA::fcompute(fInfo& info, bool print) {
@@ -380,9 +354,8 @@ void RPA::fcompute(fInfo& info, bool print) {
 	
 		if (print) log.print("\nForming excitation matrices"); 
 		int64_t sz1, sz2, *i1, *i2;
-		double *viajb, *vijab;
+		double *viajb;
 		V[0].read_local(&sz1, &i1, &viajb);
-		if(sosex) V[1].read_local(&sz2, &i2, &vijab);  
 	
 		int axis = nocc*(nocc+1);
 		axis /= 2;  
@@ -399,7 +372,6 @@ void RPA::fcompute(fInfo& info, bool print) {
 						A(ix1, ix2) = K(ix1, ix2);
 						B(ix1, ix2) = K(ix1, ix2);
 						if (sosex) {
-							A(ix1, ix2) -= vijab[i + (j*(j+1))/2 + a*axis + axis*(b*(b+1))/2]; 
 							B(ix1, ix2) -= viajb[j + a*nocc + i*dim + b*nvnono]; 
 						}
 						if (i==j) A(ix1, ix2) += F(a+nocc, b+nocc); 
@@ -414,14 +386,10 @@ void RPA::fcompute(fInfo& info, bool print) {
 		}
 		delete i1;
 		delete viajb;
-		if (sosex) {
-			delete i2;
-			delete vijab;
-		} 
 	} else {
 		std::vector<Matrix> dferis = df_eris(shells, info.df_shells, info.T, info.V); 
 		Matrix& KiaP = dferis[0];
-		Matrix& BiaP = dferis[1]; 
+		// Matrix& BiaP = dferis[1]; 
 		 
 		for (int i = 0; i < nocc; i++) {
 			for (int a = 0; a < nvirt; a++) {
@@ -434,11 +402,17 @@ void RPA::fcompute(fInfo& info, bool print) {
 					
 						double viajb = 0.0; 
 						for (int Q = 0; Q < KiaP.cols(); Q++)
-							viajb += KiaP(ix1, Q) * BiaP(Q, ix2); 
+							viajb += KiaP(ix1, Q) * KiaP(ix2, Q); 
 						
 						K(ix1, ix2) = 2.0 * viajb; 
 						A(ix1, ix2) = K(ix1, ix2);
 						B(ix1, ix2) = K(ix1, ix2);
+						if (sosex) {
+							double vjaib = 0.0;
+							for (int Q = 0; Q < KiaP.cols(); Q++)
+								vjaib += KiaP(j*nvirt+a, Q) * KiaP(i*nvirt+b, Q); 
+							B(ix1, ix2) -= vjaib; 
+						}
 						if (i==j) A(ix1, ix2) += F(a+nocc, b+nocc); 
 						if (a==b) A(ix1, ix2) -= F(i, j); 
 						
@@ -457,14 +431,14 @@ void RPA::fcompute(fInfo& info, bool print) {
 	Matrix Ap = A; 
 	for (int i = 0; i < dim ;i++) Ap(i, i) = 0.0; 
 		
-	Matrix T = -B; 
+	Matrix T = -K; 
 		
 	double delta = 1.0;
 	int iter = 0;
 	Matrix newT; 
 	while (delta > 1e-4 && iter < 15) {
-		newT.noalias() = -(B + T*Ap);  
-		newT.noalias() -= (T*B + Ap)*T; 
+		newT.noalias() = -(K + T*Ap);  
+		newT.noalias() -= (T*K + Ap)*T; 
 			
 		for (int p = 0; p < dim; p++){
 			for (int q = 0; q <= p; q++) {
@@ -522,7 +496,7 @@ void RPA::fcompute(fInfo& info, bool print) {
 				ix1 = i*nvirt + a; 
 
 				for (int b = 0; b < nvirt; b++) {
-								
+					
 					for (int n = 0; n < nfrags; n++) {
 						if(b < cum_virt[n]) { bfrag = n; break; }
 					}
@@ -533,28 +507,30 @@ void RPA::fcompute(fInfo& info, bool print) {
 					d = 8*d1 + 4*d2 + 2*d3 + d4; 
 					ix2 = j*nvirt + b;
 							
+					if (fabs(T(ix1, ix2)) > 1e-2) std::cout << i << " " << a << " " << j << " " << b << " " << T(ix1, ix2) << std::endl; 
+					
 					switch(d) {
 						case 0: {
-							info.eintra += scale * T(ix1, ix2) * K(ix1, ix2);
+							info.eintra += scale * T(ix1, ix2) * B(ix1, ix2);
 							break;
 						}
 										
 						case 5: {
-							info.edisp += T(ix1, ix2) * K(ix1, ix2);
+							info.edisp += T(ix1, ix2) * B(ix1, ix2);
 							break;
 						}
 										
 						case 10: {
-							info.edispexch += T(ix1, ix2) * K(ix1, ix2);
+							info.edispexch += T(ix1, ix2) * B(ix1, ix2);
 							break;
 						}
 						case 15: {
-							info.ebsse += scale * T(ix1, ix2) * K(ix1, ix2);
+							info.ebsse += scale * T(ix1, ix2) * B(ix1, ix2);
 							break;
 						}
 										
 						default: {
-							info.eionic += scale * T(ix1, ix2) * K(ix1, ix2);
+							info.eionic += scale * T(ix1, ix2) * B(ix1, ix2);
 						}
 					}
 									
@@ -578,7 +554,8 @@ std::vector<Matrix> RPA::df_eris(const std::vector<libint2::Shell>& obs, const s
 	Matrix KmnP = integrals.compute_eris_3index(obs, auxbs);
 
 	// Form inverse J-metric
-	JPQ = JPQ.inverse(); 
+	EigenSolver es(JPQ); 
+	JPQ = es.operatorInverseSqrt(); 
 	
 	int nobs = integrals.nbasis(obs);
 	int nabs = JPQ.rows(); 
@@ -615,9 +592,9 @@ std::vector<Matrix> RPA::df_eris(const std::vector<libint2::Shell>& obs, const s
 		}
 	}
 	
-	BmnP.noalias() = JPQ * KmnP.transpose(); 
+	BmnP.noalias() =  KmnP * JPQ; 
 	
-	std::vector<Matrix> dferis = { KmnP, BmnP }; 
+	std::vector<Matrix> dferis = { BmnP }; 
 	
 	return dferis; 
 }
