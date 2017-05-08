@@ -234,9 +234,9 @@ void SCF::uhf_internal(bool print, UnrestrictedFock& ufocker)
 		err2_last = err2;
 		err2 = error;
 	
-		if(iter > 2) weights = diis.compute(errs);
+		weights = diis.compute(errs);
 		errs.clear();
-		if(iter > 2) ufocker.average(weights);
+		ufocker.average(weights);
 
 		ea = calcE(ufocker.getHCore(), ufocker.getDensAlpha(), ufocker.getFockAlphaAO());
 		eb = calcE(ufocker.getHCore(), ufocker.getDensBeta(), ufocker.getFockBetaAO());
@@ -245,7 +245,7 @@ void SCF::uhf_internal(bool print, UnrestrictedFock& ufocker)
 		ufocker.diagonalise();
     
 		last_energy = energy;
-		energy = (ea + eb)/2.0 + molecule->getEnuc();
+		energy = (ea + eb) + molecule->getEnuc();
 		delta = fabs(energy - last_energy);
     
 		dist = (ufocker.getDensAlpha() + ufocker.getDensBeta() - old_dens_alpha - old_dens_beta).norm();

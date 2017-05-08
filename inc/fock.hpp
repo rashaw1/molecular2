@@ -139,7 +139,7 @@ protected:
 	Matrix fock_alpha_ao, fock_beta_ao; 
 	Matrix fock_alpha_mo, fock_beta_mo;
 	Matrix dens_alpha, dens_beta; 
-	Matrix jkints_alpha, jkints_beta; 
+	Matrix kints_alpha, kints_beta, jints_alpha, jints_beta; 
 	Matrix CP_alpha, CP_beta;
 	Vector eps_alpha, eps_beta; 
 	std::vector<Matrix> alpha_focks, beta_focks;
@@ -154,8 +154,10 @@ public:
 	Matrix& getFockBetaMO() { return fock_beta_ao; }
 	Matrix& getDensAlpha() { return dens_alpha; }
 	Matrix& getDensBeta() { return dens_beta; }
-	Matrix& getJKAlpha() { return jkints_alpha; }
-	Matrix& getJKBeta() { return jkints_beta; }
+	Matrix& getKAlpha() { return kints_alpha; }
+	Matrix& getKBeta() { return kints_beta; }
+	Matrix& getJAlpha() { return jints_alpha; }
+	Matrix& getJBeta() { return jints_beta; }
 	Matrix& getCPAlpha() { return CP_alpha; }
 	Matrix& getCPBeta() { return CP_beta; }
 	Vector& getEpsAlpha() { return eps_alpha; }

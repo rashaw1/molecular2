@@ -225,18 +225,20 @@ Vector FockFragment::buildFock(Matrix& qfq, Matrix& qfp, Matrix& pfp, bool alpha
 // Form the 2J-K matrix, given that twoints is stored in memory
 void UnrestrictedFock::formJK(Matrix& Pa, Matrix& Pb, double multiplier)
 {
-	jkints_alpha = Matrix::Zero(nbfs, nbfs);
-	jkints_beta = Matrix::Zero(nbfs, nbfs);
+	kints_alpha = Matrix::Zero(nbfs, nbfs);
+	kints_beta = Matrix::Zero(nbfs, nbfs); 
+	jints_alpha = Matrix::Zero(nbfs, nbfs);
+	jints_beta = Matrix::Zero(nbfs, nbfs);
 	for (int u = 0; u < nbfs; u++){
 		for (int v = 0; v < nbfs ; v++){
 			for (int s = 0; s < nbfs; s++){
 				for (int l = 0; l < nbfs; l++){
 					auto ival = multiplier * integrals.getERI(u, v, s, l); 
-					jkints_alpha(u, v) += Pa(s, l) * ival;
-					jkints_beta(u, v) += Pb(s, l) * ival;
-					ival = 0.5 * multiplier * integrals.getERI(u, l, s, v);
-					jkints_alpha(u, v) -= Pa(s, l) * ival;
-					jkints_beta(u, v) -= Pb(s, l) * ival;
+					jints_alpha(u, v) += Pa(s, l) * ival;
+					jints_beta(u, v) += Pb(s, l) * ival;
+					ival =  multiplier * integrals.getERI(u, l, s, v);
+					kints_alpha(u, v) += Pa(s, l) * ival;
+					kints_beta(u, v) += Pb(s, l) * ival;
 				}
 			}
 		}
@@ -252,8 +254,10 @@ void UnrestrictedFock::formJKdirect(const Matrix& Schwarz, Matrix& Da, Matrix& D
 		
 	std::vector<Shell>& shells = molecule->getBasis().getIntShells();
 	const auto n = integrals.nbasis(shells);
-	jkints_alpha = Matrix::Zero(n, n);
-	jkints_beta = Matrix::Zero(n, n);
+	kints_alpha = Matrix::Zero(n, n);
+	kints_beta = Matrix::Zero(n, n); 
+	jints_alpha = Matrix::Zero(n, n);
+	jints_beta = Matrix::Zero(n, n);
 		
 	const auto do_schwarz_screen = Schwarz.cols() != 0 && Schwarz.rows() != 0;
 	Matrix D_tot = Da + Db; 
@@ -312,19 +316,19 @@ void UnrestrictedFock::formJKdirect(const Matrix& Schwarz, Matrix& Da, Matrix& D
 									const auto bf4 = f4 + bf4_first;
 									const auto value = buf_1234[f1234];
 									const auto value_scal_by_deg = multiplier * value * s1234_deg;
-									jkints_alpha(bf1,bf2) += Da(bf3,bf4) * value_scal_by_deg;
-									jkints_alpha(bf3,bf4) += Da(bf1,bf2) * value_scal_by_deg;
-									jkints_alpha(bf1,bf3) -= 0.25 * Da(bf2,bf4) * value_scal_by_deg;
-									jkints_alpha(bf2,bf4) -= 0.25 * Da(bf1,bf3) * value_scal_by_deg;
-									jkints_alpha(bf1,bf4) -= 0.25 * Da(bf2,bf3) * value_scal_by_deg;
-									jkints_alpha(bf2,bf3) -= 0.25 * Da(bf1,bf4) * value_scal_by_deg;
+									jints_alpha(bf1,bf2) += Da(bf3, bf4) * value_scal_by_deg;
+									jints_alpha(bf3,bf4) += Da(bf1, bf2) * value_scal_by_deg;
+									kints_alpha(bf1,bf3) += 0.5 * Da(bf2,bf4) * value_scal_by_deg;
+									kints_alpha(bf2,bf4) += 0.5 * Da(bf1,bf3) * value_scal_by_deg;
+									kints_alpha(bf1,bf4) += 0.5 * Da(bf2,bf3) * value_scal_by_deg;
+									kints_alpha(bf2,bf3) += 0.5 * Da(bf1,bf4) * value_scal_by_deg;
 										
-									jkints_beta(bf1,bf2) += Db(bf3,bf4) * value_scal_by_deg;
-									jkints_beta(bf3,bf4) += Db(bf1,bf2) * value_scal_by_deg;
-									jkints_beta(bf1,bf3) -= 0.25 * Db(bf2,bf4) * value_scal_by_deg;
-									jkints_beta(bf2,bf4) -= 0.25 * Db(bf1,bf3) * value_scal_by_deg;
-									jkints_beta(bf1,bf4) -= 0.25 * Db(bf2,bf3) * value_scal_by_deg;
-									jkints_beta(bf2,bf3) -= 0.25 * Db(bf1,bf4) * value_scal_by_deg;
+									jints_beta(bf1,bf2) += Db(bf3, bf4) * value_scal_by_deg;
+									jints_beta(bf3,bf4) += Db(bf1, bf2) * value_scal_by_deg;
+									kints_beta(bf1,bf3) += 0.5 * Db(bf2,bf4) * value_scal_by_deg;
+									kints_beta(bf2,bf4) += 0.5 * Db(bf1,bf3) * value_scal_by_deg;
+									kints_beta(bf1,bf4) += 0.5 * Db(bf2,bf3) * value_scal_by_deg;
+									kints_beta(bf2,bf3) += 0.5 * Db(bf1,bf4) * value_scal_by_deg;
 								}
 							}
 						}
@@ -335,13 +339,15 @@ void UnrestrictedFock::formJKdirect(const Matrix& Schwarz, Matrix& Da, Matrix& D
 	}
 	
 	// symmetrize the result
-	jkints_alpha = 0.25 * (jkints_alpha + jkints_alpha.transpose()).eval();
-	jkints_beta = 0.25 * (jkints_beta + jkints_beta.transpose()).eval();
+	kints_alpha = 0.25 * (kints_alpha + kints_alpha.transpose()).eval();
+	kints_beta = 0.25 * (kints_beta + kints_beta.transpose()).eval();
+	jints_alpha = 0.25 * (jints_alpha + jints_alpha.transpose()).eval();
+	jints_beta = 0.25 * (jints_beta + jints_beta.transpose()).eval();
 }
 
 void UnrestrictedFock::formJKdf(Matrix& ca_occ, Matrix& cb_occ, double multiplier) {
-	jkints_alpha = multiplier * compute_2body_fock_df(ca_occ); 
-	jkints_beta = multiplier * compute_2body_fock_df(cb_occ); 
+	/*jkints_alpha = multiplier * compute_2body_fock_df(ca_occ); 
+	jkints_beta = multiplier * compute_2body_fock_df(cb_occ); */
 }
 
 // Make the JK matrix, depending on how two electron integrals are stored/needed
@@ -366,8 +372,9 @@ void UnrestrictedFock::makeJK()
 
 void UnrestrictedFock::makeFock()
 {
-	fock_alpha_ao = hcore + jkints_alpha;
-	fock_beta_ao = hcore + jkints_beta; 
+	fock_alpha_ao = hcore + jints_alpha + jints_beta;
+	fock_beta_ao = fock_alpha_ao - kints_beta; 
+	fock_alpha_ao -= kints_alpha; 
 	if (diis) { // Archive for averaging
 		if (iter >= MAX) {
 			alpha_focks.erase(alpha_focks.begin());

@@ -1,4 +1,5 @@
-direct, true
+direct, false
+memory, 1000
 nthreads, 4
 molecule = {
 	 multiplicity, 2
@@ -11,6 +12,4 @@ molecule = {
 	       default, avtz
 	 }
 }
-hf (
-   maxiter, 100
-)
+uhf()

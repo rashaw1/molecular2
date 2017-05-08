@@ -293,8 +293,10 @@ UnrestrictedFock::UnrestrictedFock(const UnrestrictedFock& other) : Fock(other)
 	eps_alpha = other.eps_alpha;
 	CP_beta = other.CP_beta;
 	eps_beta = other.eps_beta;
-	jkints_alpha = other.jkints_alpha;
-	jkints_beta = other.jkints_beta;
+	kints_alpha = other.kints_alpha;
+	kints_beta = other.kints_beta;
+	jints_alpha = other.kints_alpha;
+	jints_beta = other.kints_beta;
 	nalpha = other.nalpha;
 	nbeta = other.nbeta; 
 }
@@ -335,8 +337,8 @@ void UnrestrictedFock::diagonalise()
 void UnrestrictedFock::makeDens()
 {
 	// Form the density matrix
-	dens_alpha = 2.0 * CP_alpha.block(0, 0, nbfs, nalpha) * CP_alpha.transpose().block(0, 0, nalpha, nbfs);
-	dens_beta = 2.0 * CP_beta.block(0, 0, nbfs, nbeta) * CP_beta.transpose().block(0, 0, nbeta, nbfs); 
+	dens_alpha =  CP_alpha.block(0, 0, nbfs, nalpha) * CP_alpha.transpose().block(0, 0, nalpha, nbfs);
+	dens_beta = CP_beta.block(0, 0, nbfs, nbeta) * CP_beta.transpose().block(0, 0, nbeta, nbfs); 
 }
 
 void UnrestrictedFock::average(Vector &w) {

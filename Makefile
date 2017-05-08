@@ -7,8 +7,8 @@ CXX = mpicxx
 COMMANDLINE_OPTIONS = 
 
 # Compiler options
-DEBUG = -g -Wall -O0 -Wno-unused-variable -Wno-sign-compare -Wno-format -std=c++11 -D_GLIBCXX_DEBUG -omp -DLIBINT2_MAX_DERIV_ORDER=2 
-OPTIM = -O3 -Wall -Wno-unused-variable -Wno-sign-compare -Wno-format -std=c++11 -omp -DLIBINT2_MAX_DERIV_ORDER=2
+DEBUG = -g -Wall -O0 -Wno-unused-variable -Wno-sign-compare -Wno-format -Wno-overloaded-virtual -std=c++11 -D_GLIBCXX_DEBUG -omp -DLIBINT2_MAX_DERIV_ORDER=2 
+OPTIM = -O3 -Wall -Wno-unused-variable -Wno-sign-compare -Wno-format -Wno-overloaded-virtual -std=c++11 -omp -DLIBINT2_MAX_DERIV_ORDER=2
 COMPILE_OPTIONS = $(OPTIM)
 
 # Header include directories
