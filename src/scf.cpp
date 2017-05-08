@@ -72,7 +72,7 @@ Vector SCF::calcErr()
 // matrices for convergence testing
 bool SCF::testConvergence(double val)
 {
-	bool result = (val < cmd.get_option<double>("converge") ? true : false);
+	bool result = (val < cmd.get_option<double>("densconverge") ? true : false);
 	last_err = error;
 	return result;
 }
@@ -129,7 +129,8 @@ void SCF::rhf(bool print)
 		Vector mocoeffs;
 		
 		int MAXITER = cmd.get_option<int>("maxiter"); 
-		double CONVERGE = cmd.get_option<double>("converge");
+		double E_CONVERGE = cmd.get_option<double>("enconverge");
+		double D_CONVERGE = cmd.get_option<double>("densconverge");
     
 		while (!converged && iter < MAXITER) {
 			// Recalculate
@@ -152,7 +153,7 @@ void SCF::rhf(bool print)
 			if(print) molecule->control->log.iteration(iter, energy, delta, dd);
 			if (iter > 2) focker.average(weights);
 			focker.transform(false);
-			converged = (testConvergence(dd) && delta < CONVERGE/100.0) || (delta < CONVERGE/1000.0);
+			converged = (testConvergence(dd) && delta < E_CONVERGE);
 			
 			if (momap)
 				mocoeffs = focker.getCP().row(orbital); 
@@ -217,7 +218,8 @@ void SCF::uhf_internal(bool print, UnrestrictedFock& ufocker)
 	Matrix old_dens_alpha = Matrix::Zero(nbfs, nbfs);
 	Matrix old_dens_beta = Matrix::Zero(nbfs, nbfs);
 	int MAXITER = cmd.get_option<int>("maxiter"); 
-	double CONVERGE = cmd.get_option<double>("converge");
+	double E_CONVERGE = cmd.get_option<double>("enconverge");
+	double D_CONVERGE = cmd.get_option<double>("densconverge");
 	
 	Vector weights; 
 	while (!converged && iter < MAXITER) {
@@ -255,7 +257,7 @@ void SCF::uhf_internal(bool print, UnrestrictedFock& ufocker)
     
 		if(print) molecule->control->log.iteration(iter, energy, delta, dist);
 
-		if (delta < CONVERGE/100.0 && dist < CONVERGE) { converged = true; }
+		if (delta < E_CONVERGE && dist < D_CONVERGE) { converged = true; }
 		iter++;
 	}
 

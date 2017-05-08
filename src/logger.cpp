@@ -518,6 +518,18 @@ void Logger::initIterationCC()
 	outfile << std::string(150, '-') << "\n";
 }
 
+void Logger::initALMOTable()
+{
+	outfile << "\n";
+	outfile << std::setw(12) << "Frag. A";
+	outfile << std::setw(12) << "Frag. B";
+	outfile << std::setw(20) << "RCOM (Bohr)"; 
+	outfile << std::setw(24) << "Disp. (kcal/mol)"; 
+	outfile << std::setw(24) << "Disp. exch.";
+	outfile << std::setw(20) << "Time elapsed\n";
+	outfile << std::string(115, '-') << "\n";
+}
+
 // Print a single iteration
 void Logger::iteration(int iter, double energy, double delta, double dd)
 {
@@ -525,6 +537,19 @@ void Logger::iteration(int iter, double energy, double delta, double dd)
 	outfile << std::setw(24) << std::setprecision(12) << energy;
 	outfile << std::setw(24) << delta;
 	outfile << std::setw(24) << dd;
+	outfile << std::setw(20) << std::setprecision(6) << getLocalTime();
+	outfile << "\n";
+  
+	flush();
+}
+
+void Logger::ALMORow(int f1, int f2, double sep, double edisp, double edispexch)
+{
+	outfile << std::setw(12) << f1+1;
+	outfile << std::setw(12) << f2+1;
+	outfile << std::setw(20) << std::setprecision(3) << sep;
+	outfile << std::setw(24) << std::setprecision(8) << edisp * TOKCAL; 
+	outfile << std::setw(24) << edispexch * TOKCAL; 
 	outfile << std::setw(20) << std::setprecision(6) << getLocalTime();
 	outfile << "\n";
   

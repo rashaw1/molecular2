@@ -124,6 +124,8 @@ public:
   void iterationCC(int iter, double energy, double delta_e, double delta_s, double delta_d, double t_interm, double t_amps, double t_iter);
   void initIteration();
   void initIterationCC();
+  void initALMOTable(); 
+  void ALMORow(int f1, int f2, double sep, double edisp, double edispexch); 
   void orbitals(const Vector& eps, int nel, bool one = false);
   void coefficient_matrix(const Vector& eps, int nel, const Matrix& coeffs, bool one = false); 
   void frequencies(const Vector& freqs, const Matrix& modes, bool printmodes); 

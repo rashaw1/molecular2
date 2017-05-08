@@ -296,7 +296,8 @@ void ProgramController::call_rhf(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true); 
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 8);
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
-	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
+	if(!c.is_option_set("enconverge")) c.set_option<double>("enconverge", 1e-7); 
+	if(!c.is_option_set("densconverge")) c.set_option<double>("densconverge", 1e-4);  
 	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12); 
 	if(!c.is_option_set("momap")) c.set_option<bool>("momap", false);
 	if(!c.is_option_set("mapfile")) c.set_option<std::string>("mapfile", "mo.map");
@@ -315,7 +316,8 @@ void ProgramController::call_uhf(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true); 
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 8);
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
-	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
+	if(!c.is_option_set("enconverge")) c.set_option<double>("enconverge", 1e-7); 
+	if(!c.is_option_set("densconverge")) c.set_option<double>("densconverge", 1e-4);  
 	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12); 
 	if(!c.is_option_set("df")) c.set_option<bool>("df", false); 
 	if(!c.is_option_set("guess")) c.set_option<std::string>("guess", "soad"); 
@@ -387,7 +389,8 @@ void ProgramController::call_ccsd(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("triples")) c.set_option<bool>("triples", false);
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 5);
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 30); 
-	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
+	if(!c.is_option_set("enconverge")) c.set_option<double>("converge", 1e-7); 
+	if(!c.is_option_set("densconverge")) c.set_option<double>("converge", 1e-4); 
 	
 	if (done_hf) {
 		if(!done_transform) {
@@ -405,7 +408,8 @@ void ProgramController::call_ccsd(Command& c, SharedMolecule m) {
 void ProgramController::call_ralmo(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true);
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 6);
-	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
+	if(!c.is_option_set("enconverge")) c.set_option<double>("enconverge", 1e-7); 
+	if(!c.is_option_set("densconverge")) c.set_option<double>("densconverge", 1e-4);  
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
 	if(!c.is_option_set("perturb")) c.set_option<int>("perturb", 0);
 	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12);
@@ -414,6 +418,8 @@ void ProgramController::call_ralmo(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("longrange")) c.set_option<bool>("longrange", false); 
 	if(!c.is_option_set("mu")) c.set_option<double>("mu", 0.5); 
 	if(!c.is_option_set("iterative")) c.set_option<bool>("iterative", true);
+	if(!c.is_option_set("pairwise")) c.set_option<bool>("pairwise", true); 
+	if(!c.is_option_set("rcutoff")) c.set_option<double>("rcutoff", 15.0);
 	if(!c.is_option_set("df")) c.set_option<bool>("df", false); 
 	if(!c.is_option_set("guess")) c.set_option<std::string>("guess", "soad"); 
 
@@ -425,7 +431,8 @@ void ProgramController::call_ralmo(Command& c, SharedMolecule m) {
 void ProgramController::call_ualmo(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true);
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 6);
-	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
+	if(!c.is_option_set("enconverge")) c.set_option<double>("enconverge", 1e-7); 
+	if(!c.is_option_set("densconverge")) c.set_option<double>("densconverge", 1e-4); 
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
 	if(!c.is_option_set("perturb")) c.set_option<int>("perturb", 0);
 	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12); 
@@ -441,7 +448,8 @@ void ProgramController::call_optg(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true); 
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 8);
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
-	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5);
+	if(!c.is_option_set("enconverge")) c.set_option<double>("enconverge", 1e-7); 
+	if(!c.is_option_set("densconverge")) c.set_option<double>("densconverge", 1e-4); 
 	if(!c.is_option_set("gradconverge")) c.set_option<double>("gradconverge", 1e-4);  
 	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12);
 	if(!c.is_option_set("trust")) c.set_option<double>("trust", 0.1); 
@@ -456,7 +464,8 @@ void ProgramController::call_optx(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true); 
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 8);
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
-	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
+	if(!c.is_option_set("enconverge")) c.set_option<double>("enconverge", 1e-7); 
+	if(!c.is_option_set("densconverge")) c.set_option<double>("densconverge", 1e-4); 
 	if(!c.is_option_set("gradconverge")) c.set_option<double>("gradconverge", 1e-4);  
 	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12);
 	if(!c.is_option_set("trust")) c.set_option<double>("trust", 5.0);
@@ -473,7 +482,8 @@ void ProgramController::call_optx(Command& c, SharedMolecule m) {
 
 void ProgramController::call_nuctest(Command& c, SharedMolecule m) {
 	
-	if(!c.is_option_set("converge")) c.set_option<double>("converge", 1e-5); 
+	if(!c.is_option_set("enconverge")) c.set_option<double>("enconverge", 1e-7); 
+	if(!c.is_option_set("densconverge")) c.set_option<double>("densconverge", 1e-4); 
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
 	
 	Atom& a = m->getAtom(0); 
@@ -536,7 +546,7 @@ void ProgramController::call_nuctest(Command& c, SharedMolecule m) {
 	double energy = en_elec + en_kin_nuc; 
 	
 	int MAXITER = c.get_option<int>("maxiter");
-	double CONVERGE = c.get_option<double>("converge"); 
+	double CONVERGE = c.get_option<double>("enconverge"); 
 	
 	int iter = 0;
 	bool converged = false; 

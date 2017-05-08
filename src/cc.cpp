@@ -573,7 +573,8 @@ void CCSD::compute()
 	log.flush();
 	bool converged = false; 
 	int MAXITER = cmd.get_option<int>("maxiter");
-	double CONVERGE = cmd.get_option<double>("converge");
+	double E_CONVERGE = cmd.get_option<double>("enconverge");
+	double D_CONVERGE = cmd.get_option<double>("densconverge");
 	iter = 1;
 		
 	Amplitudes& T = *(mp2.getAmplitudes());
@@ -637,7 +638,7 @@ void CCSD::compute()
 		nt1 = newnt1;
 		nt2 = newnt2; 
 		log.iterationCC(iter, energy, delta_e, delta_singles, delta_doubles, -1, -1, time_tot); 
-		converged = (fabs(delta_e) < CONVERGE) && (fabs(delta_doubles) < CONVERGE); 
+		converged = (fabs(delta_e) < E_CONVERGE) && (fabs(delta_doubles) < D_CONVERGE); 
 		iter++;
 	}
 	

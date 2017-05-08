@@ -1,12 +1,12 @@
 /*
- *
- *   PURPOSE: To implement class SCF, which carries out HF self-consistent field calculations.
- *
- *   DATE        AUTHOR         CHANGES
- *   ===============================================================
- *   15/09/15    Robert Shaw    Original code.
- *
- */
+*
+*   PURPOSE: To implement class SCF, which carries out HF self-consistent field calculations.
+*
+*   DATE        AUTHOR         CHANGES
+*   ===============================================================
+*   15/09/15    Robert Shaw    Original code.
+*
+*/
 
 #include "almoscf.hpp"
 #include "scf.hpp"
@@ -69,7 +69,7 @@ void ALMOSCF::setFragments(bool unrestricted)
 }
 
 double ALMOSCF::makeDens(bool alpha) {
-// Make inverse overlap metric
+	// Make inverse overlap metric
 	Matrix& S = focker.getS();
 	Matrix P_old; int nocc;
 	
@@ -192,7 +192,7 @@ void ALMOSCF::rcompute() {
 			int f2_nbfs = f2.getHCore().rows(); 
 			f2_nocc = f2.getMolecule()->getNel()/2;
 			sigma.block(i_offset, j_offset, f1_nocc, f2_nocc) = f1.getCP().block(0, 0, f1_nbfs, f1_nocc).transpose() 
-					* S.block(mu_offset, nu_offset, f1_nbfs, f2_nbfs) * f2.getCP().block(0, 0, f2_nbfs, f2_nocc);
+				* S.block(mu_offset, nu_offset, f1_nbfs, f2_nbfs) * f2.getCP().block(0, 0, f2_nbfs, f2_nocc);
 
 			j_offset += f2_nocc;
 			nu_offset += f2_nbfs;
@@ -216,7 +216,7 @@ void ALMOSCF::rcompute() {
 			int f2_nbfs = f2.getHCore().rows(); 
 			f2_nocc = f2.getMolecule()->getNel()/2;
 			P.block(mu_offset, nu_offset, f1_nbfs, f2_nbfs) = f1.getCP().block(0, 0, f1_nbfs, f1_nocc) 
-					* sigma.block(i_offset, j_offset, f1_nocc, f2_nocc) * f2.getCP().block(0, 0, f2_nbfs, f2_nocc).transpose();
+				* sigma.block(i_offset, j_offset, f1_nocc, f2_nocc) * f2.getCP().block(0, 0, f2_nbfs, f2_nocc).transpose();
 			
 			j_offset += f2_nocc;
 			nu_offset += f2_nbfs;
@@ -593,13 +593,14 @@ void ALMOSCF::rscf()
 	delta_d = 1.0; delta_e = 1.0; 
 	bool converged = false;
 	int iter = 0;
-	double CONVERGE = cmd.get_option<double>("converge");
+	double E_CONVERGE = cmd.get_option<double>("enconverge");
+	double D_CONVERGE = cmd.get_option<double>("densconverge");
 	int MAXITER = cmd.get_option<int>("maxiter");
 	
 	while (!converged && iter < MAXITER) {
 		rcompute(); 
 		molecule->control->log.iteration(iter++, dimer_energy, delta_e, delta_d);
-		converged = (fabs(delta_e) < CONVERGE) && (fabs(delta_d) < CONVERGE);
+		converged = (fabs(delta_e) < E_CONVERGE) && (fabs(delta_d) < D_CONVERGE);
 	}
 	
 	if (converged) {
@@ -636,45 +637,133 @@ void ALMOSCF::rscf()
 			molecule->control->log.result("E(Inf.)", e_inf * Logger::TOKCAL, "kcal /mol");*/
 			
 			double e_inf = e_pert_2;
-			int nbfs = focker.getHCore().rows(); 
-			int nocc = focker.getMolecule()->getNel() / 2;
-			int nvirt = nbfs - nocc;
 	
-			fInfo info(focker.getMolecule()->getBasis().getIntShells(), focker.getMolecule()->getBasis().getDFShells()); 
-			info.T = Eigen::MatrixXd::Zero(nbfs, nocc); 
-			info.V = Eigen::MatrixXd::Zero(nbfs, nvirt);
-			int row_offset = 0; int occ_col_offset = 0; int virt_col_offset = 0;
-			for (auto& f : fragments) {
-				Matrix& f_cp = f.getCP(); 
-				int f_nocc = f.getMolecule()->getNel() / 2;
-				int f_nbfs = f.getHCore().rows(); 
-				int f_nvirt = f_nbfs - f_nocc; 
+			if (cmd.get_option<bool>("pairwise")) {
 				
-				info.nocc.push_back(f_nocc);
-				info.nvirt.push_back(f_nvirt); 
+				double rcut = cmd.get_option<double>("rcutoff"); 
+				molecule->control->log.title("Pairwise RPAxd"); 
+				molecule->control->log.print("Using COM distance cutoff of " + std::to_string(rcut) + " Bohr"); 
+				
+				molecule->control->log.initALMOTable(); 
+				
+				int mu_offset = 0; 
+				int f1_nocc, f2_nocc, f1_nbfs, f2_nbfs, f1_nvirt, f2_nvirt; 
+				double sep, edisp, edispexch;
+				Vector com1, com2;  
+				for (int n1 = 0; n1 < nfrags; n1++) {
+					auto& f1 = fragments[n1]; 
+					f1_nocc = f1.getMolecule()->getNel()/2; 
+					f1_nbfs = f1.getHCore().rows(); 
+					f1_nvirt = f1_nbfs - f1_nocc; 
+					 
+					com1 = f1.getMolecule()->com(); 
+					std::vector<libint2::Shell>& f1obs = f1.getMolecule()->getBasis().getIntShells();
+					std::vector<libint2::Shell>& f1auxbs = f1.getMolecule()->getBasis().getDFShells();
+					
+					int nu_offset = mu_offset + f1_nbfs;
+					for (int n2 = n1+1; n2 < nfrags; n2++) {
+						auto& f2 = fragments[n2]; 
+						f2_nocc = f2.getMolecule()->getNel()/2; 
+						f2_nbfs = f2.getHCore().rows(); 
+						f2_nvirt = f2_nbfs - f2_nocc; 
+						
+						std::vector<libint2::Shell>& f2obs = f2.getMolecule()->getBasis().getIntShells();
+						std::vector<libint2::Shell>& f2auxbs = f2.getMolecule()->getBasis().getDFShells();
+						com2 = f2.getMolecule()->com(); 
+						
+						sep = (com1 - com2).norm(); 
+						edisp = edispexch = 0.0; 
+						
+						if (sep < rcut) {
+							
+							std::vector<libint2::Shell> obs = f1obs; 
+							obs.insert(obs.end(), f2obs.begin(), f2obs.end()); 
+							std::vector<libint2::Shell> auxbs = f1auxbs; 
+							auxbs.insert(auxbs.end(), f2auxbs.begin(), f2auxbs.end()); 
+							
+							fInfo info(obs, auxbs); 
+							
+							int nbfs = f1_nbfs + f2_nbfs; 
+							int nocc = f1_nocc + f2_nocc; 
+							int nvirt = nbfs - nocc; 
+							
+							info.nocc.push_back(f1_nocc);
+							info.nocc.push_back(f2_nocc);
+							info.nvirt.push_back(f1_nvirt);
+							info.nvirt.push_back(f2_nvirt);
+							
+							info.T = Matrix::Zero(nbfs, nocc);
+							info.V = Matrix::Zero(nbfs, nvirt);
+							info.S = Matrix::Zero(nbfs, nbfs);
+							info.F = Matrix::Zero(nbfs, nbfs); 
+							
+							info.T.block(0, 0, f1_nbfs, f1_nocc) = f1.getCP().block(0, 0, f1_nbfs, f1_nocc); 
+							info.V.block(0, 0, f1_nbfs, f1_nvirt) = f1.getCP().block(0, f1_nocc, f1_nbfs, f1_nvirt); 
+							info.T.block(f1_nbfs, f1_nocc, f2_nbfs, f2_nocc) = f2.getCP().block(0, 0, f2_nbfs, f2_nocc);
+							info.V.block(f1_nbfs, f1_nvirt, f2_nbfs, f2_nvirt) = f2.getCP().block(0, f2_nocc, f2_nbfs, f2_nvirt); 
+							
+							info.S.block(0, 0, f1_nbfs, f1_nbfs) = focker.getS().block(mu_offset, mu_offset, f1_nbfs, f1_nbfs); 
+							info.S.block(f1_nbfs, f1_nbfs, f2_nbfs, f2_nbfs) = focker.getS().block(nu_offset, nu_offset, f2_nbfs, f2_nbfs); 
+							info.S.block(0, f1_nbfs, f1_nbfs, f2_nbfs) = focker.getS().block(mu_offset, nu_offset, f1_nbfs, f2_nbfs); 
+							info.S.block(f1_nbfs, 0, f2_nbfs, f1_nbfs) = info.S.block(0, f1_nbfs, f1_nbfs, f2_nbfs).transpose(); 
+							
+							info.F.block(0, 0, f1_nbfs, f1_nbfs) = focker.getFockAO().block(mu_offset, mu_offset, f1_nbfs, f1_nbfs); 
+							info.F.block(f1_nbfs, f1_nbfs, f2_nbfs, f2_nbfs) = focker.getFockAO().block(nu_offset, nu_offset, f2_nbfs, f2_nbfs); 
+							info.F.block(0, f1_nbfs, f1_nbfs, f2_nbfs) = focker.getFockAO().block(mu_offset, nu_offset, f1_nbfs, f2_nbfs); 
+							info.F.block(f1_nbfs, 0, f2_nbfs, f1_nbfs) = info.F.block(0, f1_nbfs, f1_nbfs, f2_nbfs).transpose(); 
+							
+							RPA rpa(cmd, focker, nbfs, nocc); 
+							rpa.fcompute(info, false); 
+							
+							edisp = info.edisp;
+							edispexch = info.edispexch; 
+							e_disp += edisp + edispexch; 
+							
+						}
+						
+						molecule->control->log.ALMORow(n1, n2, sep, edisp, edispexch); 
+						
+						nu_offset += f2_nbfs; 
+					}
+
+					mu_offset += f1_nbfs; 
+				}
+				
+				
+			} else { 
+				int nbfs = focker.getHCore().rows(); 
+				int nocc = focker.getMolecule()->getNel() / 2;
+				int nvirt = nbfs - nocc;
+			
+				fInfo info(focker.getMolecule()->getBasis().getIntShells(), focker.getMolecule()->getBasis().getDFShells()); 
+				info.T = Eigen::MatrixXd::Zero(nbfs, nocc); 
+				info.V = Eigen::MatrixXd::Zero(nbfs, nvirt);
+				int row_offset = 0; int occ_col_offset = 0; int virt_col_offset = 0;
+				for (auto& f : fragments) {
+					Matrix& f_cp = f.getCP(); 
+					int f_nocc = f.getMolecule()->getNel() / 2;
+					int f_nbfs = f.getHCore().rows(); 
+					int f_nvirt = f_nbfs - f_nocc; 
+				
+					info.nocc.push_back(f_nocc);
+					info.nvirt.push_back(f_nvirt); 
 		
-				info.T.block(row_offset, occ_col_offset, f_nbfs, f_nocc) = f_cp.block(0, 0, f_nbfs, f_nocc); 
-				info.V.block(row_offset, virt_col_offset, f_nbfs, f_nvirt) = f_cp.block(0, f_nocc, f_nbfs, f_nvirt);
+					info.T.block(row_offset, occ_col_offset, f_nbfs, f_nocc) = f_cp.block(0, 0, f_nbfs, f_nocc); 
+					info.V.block(row_offset, virt_col_offset, f_nbfs, f_nvirt) = f_cp.block(0, f_nocc, f_nbfs, f_nvirt);
 		
-				row_offset += f_nbfs; 
-				occ_col_offset += f_nocc; 
-				virt_col_offset += f_nvirt; 
+					row_offset += f_nbfs; 
+					occ_col_offset += f_nocc; 
+					virt_col_offset += f_nvirt; 
+				}
+				info.S = focker.getS();
+				info.F = focker.getFockAO(); 
+			
+				RPA rpa(cmd, focker, nbfs, nocc); 
+				rpa.fcompute(info, true); 
+				e_disp = rpa.getEnergy();// - e_mon_rpa; 
+			
 			}
-			info.S = focker.getS();
-			info.F = focker.getFockAO(); 
-			
-			RPA rpa(cmd, focker, nbfs, nocc); 
-			rpa.fcompute(info, true); 
-			e_disp = rpa.getEnergy();// - e_mon_rpa; 
-			
-			std::cout << "Emon: " << e_mon_rpa * Logger::TOKCAL << std::endl; 
-			std::cout << "Eintra: " << info.eintra * Logger::TOKCAL << std::endl;  
-			std::cout << "Edisp: " << info.edisp * Logger::TOKCAL << std::endl;  
-			std::cout << "Edisp-exch: " << info.edispexch * Logger::TOKCAL << std::endl;  
-			std::cout << "Eionic: " << info.eionic * Logger::TOKCAL << std::endl;  
-			std::cout << "Ebsse: " << info.ebsse * Logger::TOKCAL << std::endl;  
-			
-			molecule->control->log.print("Dimer RPA energy: " + std::to_string(rpa.getEnergy()) + " Hartree");
+		
 			molecule->control->log.result("E(Disp.)",  e_disp * Logger::TOKCAL, "kcal /mol"); 
 			
 			molecule->control->log.result("Total ALMO+RPA interaction energy", (energy + e_disp + e_inf) * Logger::TOKCAL, "kcal / mol"); 
@@ -699,13 +788,14 @@ void ALMOSCF::uscf()
 	delta_d = 1.0; delta_e = 1.0; 
 	bool converged = false;
 	int iter =0 ;
-	double CONVERGE = cmd.get_option<double>("converge");
+	double E_CONVERGE = cmd.get_option<double>("enconverge");
+	double D_CONVERGE = cmd.get_option<double>("densconverge");
 	int MAXITER = cmd.get_option<int>("maxiter");
 	
 	while (!converged && iter < MAXITER) {
 		ucompute(); 
 		molecule->control->log.iteration(iter++, dimer_energy, delta_e, delta_d);
-		converged = (fabs(delta_e) < CONVERGE) && (fabs(delta_d) < CONVERGE);
+		converged = (fabs(delta_e) < E_CONVERGE) && (fabs(delta_d) < D_CONVERGE);
 	}
 	
 	if (converged) {
