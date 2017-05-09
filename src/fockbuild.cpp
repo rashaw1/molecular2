@@ -548,8 +548,7 @@ Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 		Eigen::LLT<Matrix> V_LLt(V);
 		Matrix I = Matrix::Identity(ndf, ndf);
 		auto L = V_LLt.matrixL();
-		Matrix V_L = L;
-		Matrix Linv = L.solve(I).transpose();
+		Linv = L.solve(I).transpose();
 
 		Vector row; 
 		for (int x = 0; x < n; x++) {
@@ -634,10 +633,9 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 		Eigen::LLT<Matrix> V_LLt(V);
 		Matrix I = Matrix::Identity(ndf, ndf);
 		auto L = V_LLt.matrixL();
-		Matrix V_L = L;
-		Matrix Linv = L.solve(I).transpose();
+		Linv = L.solve(I).transpose();
 
-		Vector row; 
+		/*Vector row; 
 		for (int x = 0; x < n; x++) {
 			for (int y = 0; y<= x; y++) {
 				int xy = x*n+y; 
@@ -647,7 +645,7 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 				for (int K = 0; K < ndf; K++)
 					xyK(xy, K) = xyK(yx, K) = row.dot(Linv.col(K)); 
 			}
-		} 
+		} */
 	
 		int i_offset = 0; 
 		for (int B = 0; B < finfo.size(); B++) {
@@ -691,6 +689,8 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 					notcentres = newnc; 
 				}
 			
+				d.sumsizes();
+				dao.sumsizes(); 
 				lmo_domains.push_back(d); 
 				ao_domains.push_back(dao); 
 			}
@@ -724,37 +724,124 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 					center++; 
 					mu_offset += f2.nbfs; 
 				}
-			
+				
+				d.sumsizes();
 				fit_domains.push_back(d); 
 			}
 			
 			i_offset += f1.occ; 
 		}
 		
+		for (int i = 0; i < nocc; i++) {
+			
+			auto& lmo_d = lmo_domains[i]; 
+			auto& fit_d = fit_domains[i];
+			int fitsize = fit_d.centres.size();  
+			
+			Matrix GAB = Matrix::Zero(fit_d.totalsize, fit_d.totalsize); 
+			int A = 0; 
+			for (int a = 0; a < fitsize; a++) {
+				for (int Ax = fit_d.starts[a]; Ax < fit_d.starts[a] + fit_d.sizes[a]; Ax++) {
+					
+					int B = 0; 
+					for (int b = 0; b < fitsize; b++) {
+						for (int Bx = fit_d.starts[b]; Bx < fit_d.starts[b] + fit_d.sizes[b]; Bx++) {
+							GAB(A, B) = V(Ax, Bx); 
+							B++; 
+						}
+					}
+					
+					A++; 
+				}
+			}
+			
+			Eigen::LLT<Matrix> G_LLt(GAB);
+			Matrix I = Matrix::Identity(fit_d.totalsize, fit_d.totalsize);
+			auto GL = G_LLt.matrixL();
+			lmo_d.G = GL.solve(I).transpose();
+			
+		}
+		
 	}  // if (xyK.size() == 0) 
+	
+	Matrix G = Matrix::Zero(n, n); 
 	
 	// compute exchange
 	int nfrags = finfo.size(); 
 	double start = log.getGlobalTime(); 
-	std::cout << "Exchange: "; 
-	Matrix xiK = Matrix::Zero(n*nocc, ndf); 
-	for (int x = 0; x < n; x++) {
-		for (int i = 0; i < nocc; i++) {
-			for (int K = 0; K < ndf; K++) {
-				for (int y = 0; y < n; y++) 
-					xiK(x*nocc+i, K) += xyK(x*n+y, K) * Cocc(y, i); 
+
+	for (int i = 0; i < nocc; i++) {
+		auto& lmo_d = lmo_domains[i]; 
+		auto& ao_d = ao_domains[i];
+		auto& fit_d = fit_domains[i]; 
+		
+		int nmo = lmo_d.centres.size();
+		int nao = ao_d.centres.size();
+		int nfit = fit_d.centres.size(); 
+		
+		Matrix uA = Matrix::Zero(ao_d.totalsize, fit_d.totalsize); 
+		
+		int Al = 0; 
+		int fitstart, aostart, mostart, fitsize, aosize, mosize; 
+		for (int fit = 0; fit < nfit; fit++) {
+			fitstart = fit_d.starts[fit]; 
+			fitsize = fit_d.sizes[fit]; 
+			
+			for (int A = fitstart; A < fitstart + fitsize; A++) {
+				
+				int ul = 0;
+				for (int ao = 0; ao < nao; ao++) {
+					aostart = ao_d.starts[ao]; 
+					aosize = ao_d.sizes[ao]; 
+					
+					for (int u = aostart; u < aostart + aosize; u++) {
+						for (int mo = 0; mo < nmo; mo++) {
+							mostart = lmo_d.starts[mo];
+							mosize = lmo_d.sizes[mo]; 
+							
+							for (int nu = mostart; nu < mostart + mosize; nu++)  
+								uA(ul, Al) += xyK(u*n+nu, A) * Cocc(nu, i); 
+							
+						}
+						ul++; 
+						
+					}
+				}
+				Al++; 
+			}
+		}
+		
+		uA *= lmo_d.G; 
+		uA = uA * uA.transpose(); 
+		
+		int ao1start, ao2start, ao1size, ao2size; 
+		int u = 0; 
+		for (int ao1 = 0; ao1 < nao; ao1++) {
+			ao1start = ao_d.starts[ao1];
+			ao1size = ao_d.sizes[ao1]; 
+			
+			for (int mu = ao1start; mu < ao1start + ao1size; mu++) {
+				
+				int v = 0; 
+				for (int ao2 = 0; ao2 < nao; ao2++) {
+					ao2start = ao_d.starts[ao2]; 
+					ao2size = ao_d.sizes[ao2]; 
+					
+					int numax = ao2start + ao2size;
+					numax = numax > mu ? mu+1 : numax; 
+					for (int nu = ao2start; nu < numax; nu++) {
+
+						G(mu, nu) -= uA(u, v); 
+						G(nu, mu) = G(mu, nu); 
+						
+						v++; 
+					}
+				}
+				u++; 
 			}
 		}
 	}
 
-	Matrix G = Matrix::Zero(n, n); 
-	for (int x = 0; x < n; x++) {
-		for (int y = 0; y <= x; y++) {
-			for (int i = 0; i < nocc; i++)
-				for (int K = 0; K < ndf; K++)
-					G(x, y) -= xiK(x*nocc+i, K) * xiK(y*nocc+i, K); 
-		}
-	}
 	double end = log.getGlobalTime(); 
 	std::cout << end - start << " seconds" << std::endl; 
 	
@@ -763,33 +850,15 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 	std::cout << "Coulomb: "; 
 	
 	Vector Pv(Eigen::Map<Vector>(Pt.data(), Pt.cols()*Pt.rows()));
-	Pv = xyK.transpose() * Pv; 
-	Pv = 2.0 * xyK * Pv; 
+	Pv = xyK.transpose() * Pv;
+	Pv = Linv * Linv.transpose() * Pv;  
+	Pv = 2.0 * xyK *  Pv; 
 	for (int x = 0; x < n; x++)
 		for (int y = 0; y <=x; y++) {
 			G(x, y) += Pv[x*n+y];
 			G(y, x) = G(x, y); 
 		}
-	/*Vector Jtmp = Vector::Zero(ndf); 
-	for (int K = 0; K < ndf; K++) {
-		int i_offset = 0; int mu_offset = 0;
-		for (int A = 0; A < nfrags; A++) {
-			for (int x = mu_offset; x < mu_offset + finfo[A].nbfs; x++)
-				for (int i = i_offset; i < i_offset + finfo[A].occ; i++)
-					for(int j = 0; j < nocc; j++)
-						Jtmp[K] += xiK(x*nocc+j, K) * sigmainv(j, i) * Cocc(x, i);
-			i_offset += finfo[A].occ; mu_offset += finfo[A].nbfs; 
-		}
-	} 
-	xiK.resize(0, 0);
-  
-	for (int x = 0; x < n; x++) {
-		for (int y = 0; y <= x; y++) { 
-			for (int K = 0; K < ndf; K++)  
-				G(x, y) += 2.0 * xyK(x*n+y, K) * Jtmp[K]; 
-			G(y, x) = G(x, y); 
-		}
-	}*/
+		
 	end = log.getGlobalTime(); 
 	std::cout << end - start << " seconds" << std::endl << std::endl; 
 

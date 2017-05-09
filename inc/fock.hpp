@@ -36,12 +36,21 @@ class Command;
 
 struct Domain {
 	std::vector<int> starts, sizes, centres;
+	int totalsize; 
+	Matrix G; 
 	
 	Domain() {}
 	Domain(const Domain& other) {
 		starts = other.starts;
 		sizes = other.sizes;
 		centres = other.centres;
+		totalsize = other.totalsize; 
+	}
+	
+	void sumsizes() {
+		totalsize = 0; 
+		for (auto s : sizes)
+			totalsize += s;
 	}
 	
 	void print() {
@@ -67,12 +76,13 @@ struct FragmentInfo {
 	double radius; 
 	Vector com; 
 	
-	FragmentInfo() : occ(0), nbfs(0), naux(0), start(0), radius(0.0) {}
+	FragmentInfo() : occ(0), nbfs(0), naux(0), start(0), auxstart(0), radius(0.0) {}
 	FragmentInfo(const FragmentInfo& other) {
 		occ = other.occ;
 		nbfs = other.nbfs;
 		naux = other.naux;
-		start = other.start; 
+		start = other.start;
+		auxstart = other.auxstart; 
 		radius = other.radius;
 		com = other.com; 
 	}
@@ -94,6 +104,7 @@ protected:
   Matrix forces;
   Matrix hessian;
   Matrix xyK; 
+  Matrix Linv; 
   Vector eps;
   std::vector<Matrix> focks;
   std::vector<Domain> lmo_domains, ao_domains, fit_domains;
@@ -123,6 +134,8 @@ public:
   Matrix& getJK() { return jkints; }
   Matrix& getJ() { return jints; } 
   Matrix& getK() { return kints; }
+  Matrix& getXYK() { return xyK; }
+  Matrix& getLinv() { return Linv; }
   Matrix& getDens() { return dens; }
   Matrix& getForces() { return forces; }
   Matrix& getHessian() { return hessian; }

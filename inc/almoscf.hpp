@@ -42,6 +42,7 @@ public:
 	void uscf();
 	void rcompute();
 	void ucompute();
+	double r_energy_df(); 
 	double makeDens(bool alpha);
 };
 

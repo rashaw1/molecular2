@@ -390,7 +390,7 @@ void ALMOSCF::rperturb(bool order4)
 	sigma.block(0, 0, nocc, nocc) = T.transpose() * S * T; 
 	sigma.block(nocc, 0, nvirt, nocc) = V.transpose() * S * T;
 	sigma.block(nocc, nocc, nvirt, nvirt) = V.transpose() * S * V;
-	 
+	
 	// Cholesky decompose
 	LLT llt(sigma); 
 	Matrix C0 = llt.matrixL();
@@ -619,6 +619,13 @@ void ALMOSCF::rscf()
 		
 		double energy = dimer_energy;
 		for (auto en : monomer_energies) energy -= en; 
+		
+		if (cmd.get_option<bool>("df")) {
+			double localcorrection = r_energy_df(); 
+			molecule->control->log.print("Local exchange correction: " + std::to_string(localcorrection) + " Hartree"); 
+			energy += localcorrection; 
+		}
+		
 		molecule->control->log.result("ALMO Interaction Energy", energy * Logger::TOKCAL, "kcal / mol"); 
 		
 		int perturbation = cmd.get_option<int>("perturb"); 
@@ -831,5 +838,72 @@ void ALMOSCF::uscf()
 		molecule->control->log.result("ALMO SCF failed to converge");
 	}
 	
+}
+
+double ALMOSCF::r_energy_df() {
+	
+	int nbfs = focker.getHCore().rows(); 
+	int nocc = focker.getMolecule()->getNel() / 2;
+	
+	Matrix T = Eigen::MatrixXd::Zero(nbfs, nocc); 
+	int row_offset = 0; int occ_col_offset = 0;
+	for (auto& f : fragments) {
+		Matrix& f_cp = f.getCP(); 
+		int f_nocc = f.getMolecule()->getNel() / 2;
+		int f_nbfs = f.getHCore().rows(); 
+		
+		T.block(row_offset, occ_col_offset, f_nbfs, f_nocc) = f_cp.block(0, 0, f_nbfs, f_nocc); 
+		
+		row_offset += f_nbfs; 
+		occ_col_offset += f_nocc; 
+	}
+ 
+ 	EigenSolver es(sigma); 
+	T *= es.operatorSqrt(); 
+	
+	Matrix& xyK = focker.getXYK(); 
+	int ndf = xyK.cols(); 
+	
+	Matrix xiK = Matrix::Zero(nbfs * nocc, ndf); 
+	for (int x = 0; x < nbfs; x++) {
+		for (int i = 0; i < nocc; i++) {
+			for (int K = 0; K < ndf; K++) {
+				for (int y = 0; y < nbfs; y++)
+					xiK(x*nocc+i, K) += T(y, i) * xyK(x*nbfs+y, K); 
+			}
+		}
+	}
+	
+	Matrix ijK = Matrix::Zero(nocc * nocc, ndf); 
+	for (int i = 0; i < nocc; i++) {
+		for (int j = 0; j <= i; j++) {
+			for (int K = 0; K < ndf; K++) {
+				for (int x = 0; x < nbfs; x++)
+					ijK(i*nocc+j, K) += T(x, j) * xiK(x*nocc+i, K); 
+				ijK(j*nocc+i, K) = ijK(i*nocc+j, K); 
+			}
+		}
+	}
+	Matrix& Linv = focker.getLinv(); 
+	ijK *= Linv; 
+	
+	Matrix& H = focker.getHCore(); 
+	double ren = (P*H).trace() + focker.getMolecule()->getEnuc(); 
+	ren -= (ijK*ijK.transpose()).trace(); 
+	
+	Vector Pv(Eigen::Map<Vector>(P.data(), P.cols()*P.rows()));
+	Pv = xyK.transpose() * Pv;
+	Pv = Linv * Linv.transpose() * Pv;  
+	Pv = 2.0 * xyK *  Pv; 
+	Matrix J = Matrix::Zero(nbfs, nbfs); 
+	for (int x = 0; x < nbfs; x++)
+		for (int y = 0; y <=x; y++) {
+			J(x, y) += Pv[x*nbfs+y];
+			J(y, x) = J(x, y); 
+		}
+		
+	ren += (P*J).trace(); 
+	
+	return ren;
 }
 
