@@ -163,24 +163,24 @@ void Fock::makeFock(Matrix& P, double multiplier)
 {
 	if (not density_fitted) {
 		focka = fockinc; 
-		  if (not started_incremental &&
-	          rms_error < incremental_threshold) {
-	        started_incremental = true;
-	        reset_incremental = false;
-	        next_reset = rms_error / 1e1;
+		if (not started_incremental &&
+		rms_error < incremental_threshold) {
+			started_incremental = true;
+			reset_incremental = false;
+			next_reset = rms_error / 1e1;
 			last_reset = iter - 1; 
-	      }
-	      if (reset_incremental || not started_incremental) {
-	        focka = hcore;
-	        dens_diff = dens;
-	      }
-	      if (reset_incremental && started_incremental) {
-	        reset_incremental = false;
+		}
+		if (reset_incremental || not started_incremental) {
+			focka = hcore;
+			dens_diff = dens;
+		}
+		if (reset_incremental && started_incremental) {
+			reset_incremental = false;
 			last_reset = iter; 
-	        next_reset = rms_error / 1e1;
-	      }
-	 } else 
-		 focka = hcore; 
+			next_reset = rms_error / 1e1;
+		}
+	} else 
+		focka = hcore; 
 	
 	makeJK(P, multiplier);  
 	focka += jkints; 
@@ -417,7 +417,7 @@ Vector UnrestrictedFockFragment::buildFock(Matrix& qfq, Matrix& qfp, Matrix& pfp
 
 // an Fock builder that can accept densities expressed a separate basis
 Matrix Fock::compute_2body_fock_general(const BasisSet& obs, const Matrix& D, const BasisSet& D_bs,
- bool D_is_shelldiagonal, double precision)
+bool D_is_shelldiagonal, double precision)
 {
 		
 	const auto n = integrals.nbasis(obs);
@@ -526,71 +526,71 @@ Matrix Fock::compute_2body_fock_general(const BasisSet& obs, const Matrix& D, co
 
 Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 
-  BasisSet& obs = molecule->getBasis().getIntShells(); 
-  BasisSet& dfbs = molecule->getBasis().getDFShells(); 
+	BasisSet& obs = molecule->getBasis().getIntShells(); 
+	BasisSet& dfbs = molecule->getBasis().getDFShells(); 
   
-  const auto n = integrals.nbasis(obs); 
-  const auto ndf = integrals.nbasis(dfbs); 
+	const auto n = integrals.nbasis(obs); 
+	const auto ndf = integrals.nbasis(dfbs); 
 
-  // using first time? compute 3-center ints and transform to inv sqrt
-  // representation
-  if (xyK.rows() == 0) {
+	// using first time? compute 3-center ints and transform to inv sqrt
+	// representation
+	if (xyK.rows() == 0) {
 
-    const auto nshells = obs.size();
-    const auto nshells_df = dfbs.size();
+		const auto nshells = obs.size();
+		const auto nshells_df = dfbs.size();
 
 
-    Matrix Zxy = integrals.compute_eris_3index(obs, dfbs); 
-	Matrix V = integrals.compute_eris_2index(dfbs);
+		Matrix Zxy = integrals.compute_eris_3index(obs, dfbs); 
+		Matrix V = integrals.compute_eris_2index(dfbs);
 	
-    Eigen::LLT<Matrix> V_LLt(V);
-    Matrix I = Matrix::Identity(ndf, ndf);
-    auto L = V_LLt.matrixL();
-    Matrix V_L = L;
-    Matrix Linv = L.solve(I).transpose();
+		Eigen::LLT<Matrix> V_LLt(V);
+		Matrix I = Matrix::Identity(ndf, ndf);
+		auto L = V_LLt.matrixL();
+		Matrix V_L = L;
+		Matrix Linv = L.solve(I).transpose();
 
-    xyK = Zxy * Linv; 
-	Zxy.resize(0, 0); 
+		xyK = Zxy * Linv; 
+		Zxy.resize(0, 0); 
 	
-  }  // if (xyK.size() == 0)
+	}  // if (xyK.size() == 0)
 
-  // compute exchange
+	// compute exchange
 
-  Matrix xiK = Matrix::Zero(n*nocc, ndf); 
-  for (int x = 0; x < n; x++) {
-	  for (int i = 0; i < nocc; i++) {
-		  for (int K = 0; K < ndf; K++) {
-			  for (int y = 0; y < n; y++) 
-				  xiK(x*nocc+i, K) += xyK(x*n+y, K) * Cocc(y, i); 
-		  }
-	  }
-  }
-
-  Matrix G = Matrix::Zero(n, n); 
-  for (int x = 0; x < n; x++) {
-	  for (int y = 0; y <= x; y++) {
-	  	for (int i = 0; i < nocc; i++)
-		  for (int K = 0; K < ndf; K++)
-			  G(x, y) -= xiK(x*nocc+i, K) * xiK(y*nocc+i, K); 
+	Matrix xiK = Matrix::Zero(n*nocc, ndf); 
+	for (int x = 0; x < n; x++) {
+		for (int i = 0; i < nocc; i++) {
+			for (int K = 0; K < ndf; K++) {
+				for (int y = 0; y < n; y++) 
+					xiK(x*nocc+i, K) += xyK(x*n+y, K) * Cocc(y, i); 
+			}
 		}
 	}
 
-  // compute Coulomb
+	Matrix G = Matrix::Zero(n, n); 
+	for (int x = 0; x < n; x++) {
+		for (int y = 0; y <= x; y++) {
+			for (int i = 0; i < nocc; i++)
+				for (int K = 0; K < ndf; K++)
+					G(x, y) -= xiK(x*nocc+i, K) * xiK(y*nocc+i, K); 
+		}
+	}
 
-  Vector Jtmp = Vector::Zero(ndf); 
-  for (int K = 0; K < ndf; K++) 
-	  for (int x = 0; x < n; x++)
-		  for (int i = 0; i < nocc; i++)
-			  Jtmp[K] += xiK(x*nocc+i, K) * Cocc(x, i); 
-  xiK.resize(0, 0); 
+	// compute Coulomb
+
+	Vector Jtmp = Vector::Zero(ndf); 
+	for (int K = 0; K < ndf; K++) 
+		for (int x = 0; x < n; x++)
+			for (int i = 0; i < nocc; i++)
+				Jtmp[K] += xiK(x*nocc+i, K) * Cocc(x, i); 
+	xiK.resize(0, 0); 
   
-  for (int x = 0; x < n; x++) {
-	  for (int y = 0; y <= x; y++) { 
-		  for (int K = 0; K < ndf; K++)  
-			  G(x, y) += 2.0 * xyK(x*n+y, K) * Jtmp[K]; 
-		  G(y, x) = G(x, y); 
-	  }
-  }
+	for (int x = 0; x < n; x++) {
+		for (int y = 0; y <= x; y++) { 
+			for (int K = 0; K < ndf; K++)  
+				G(x, y) += 2.0 * xyK(x*n+y, K) * Jtmp[K]; 
+			G(y, x) = G(x, y); 
+		}
+	}
 
-  return G; 
+	return G; 
 }

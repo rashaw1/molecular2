@@ -379,6 +379,31 @@ void ALMOSCF::rperturb(bool order4)
 	sigma.block(nocc, 0, nvirt, nocc) = V.transpose() * S * T;
 	sigma.block(nocc, nocc, nvirt, nvirt) = V.transpose() * S * V;
 	 
+	EigenSolver es(S); 
+	Matrix SC = es.operatorSqrt() * T; 
+	int i_offset = 0;
+	for (auto& f1 : fragments) {
+		int f1_nocc = f1.getMolecule()->getNel() / 2;
+		
+		int mu_offset = 0; int center = 1; 
+		for (auto& f2 : fragments) {
+			int f2_nbfs = f2.getHCore().rows(); 
+			
+			for (int i = i_offset; i < i_offset + f1_nocc; i++) {
+				double INi = 0.0; 
+				for (int mu = mu_offset; mu < mu_offset + f2_nbfs; mu++) {
+					INi += SC(mu, i) * SC(mu, i);	
+				}
+				std::cout << "Orbital " << i << " and center " << center << ": " << INi << std::endl; 
+				
+			}
+			center++; 
+			
+			mu_offset += f2_nbfs; 
+		}
+		i_offset += f1_nocc; 
+	}
+	 
 	// Cholesky decompose
 	LLT llt(sigma); 
 	Matrix C0 = llt.matrixL();
@@ -695,7 +720,7 @@ void ALMOSCF::rscf()
 							info.T = Matrix::Zero(nbfs, nocc);
 							info.V = Matrix::Zero(nbfs, nvirt);
 							info.S = Matrix::Zero(nbfs, nbfs);
-							info.F = Matrix::Zero(nbfs, nbfs); 
+							info.F = Matrix::Zero(nbfs, nbfs);  
 							
 							info.T.block(0, 0, f1_nbfs, f1_nocc) = f1.getCP().block(0, 0, f1_nbfs, f1_nocc); 
 							info.V.block(0, 0, f1_nbfs, f1_nvirt) = f1.getCP().block(0, f1_nocc, f1_nbfs, f1_nvirt); 

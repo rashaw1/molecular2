@@ -56,7 +56,7 @@ molecule = {
 ralmo (
       df, true
       perturb, 2
-      rpa, false
+      rpa, true
       longrange, false
       sosex, true
 )
