@@ -489,7 +489,8 @@ void MP2::dfmp2(bool print) {
 	if (print) log.localTime();  
 	
 	if (print) log.print("Calculating three-index eris..."); 
-	Matrix KmnP = integrals.compute_eris_3index(obs, auxbs);
+	Matrix KmnP;
+	integrals.compute_eris_3index(obs, auxbs, KmnP);
 	if (print) log.localTime(); 
 
 	// Form inverse J-metric

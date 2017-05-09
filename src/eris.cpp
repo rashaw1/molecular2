@@ -86,7 +86,7 @@ S8EvenTensor4 IntegralEngine::compute_eris(const std::vector<libint2::Shell>& sh
 	return eris;
 }
 
-Matrix IntegralEngine::compute_eris_3index(const std::vector<libint2::Shell>& obs, const std::vector<libint2::Shell>& auxbs)
+void IntegralEngine::compute_eris_3index(const std::vector<libint2::Shell>& obs, const std::vector<libint2::Shell>& auxbs, Matrix& eris)
 {
 	
 	using libint2::Shell;
@@ -96,7 +96,7 @@ Matrix IntegralEngine::compute_eris_3index(const std::vector<libint2::Shell>& ob
 
 	const auto n_obs = nbasis(obs);
 	const auto n_abs = nbasis(auxbs); 
-	Matrix eris = Matrix::Zero(n_obs*n_obs, n_abs);
+	eris = Matrix::Zero(n_obs*n_obs, n_abs);
 
 	Engine engine(Operator::coulomb, 
 	std::max(max_nprim(obs), max_nprim(auxbs)),
@@ -153,10 +153,7 @@ Matrix IntegralEngine::compute_eris_3index(const std::vector<libint2::Shell>& ob
 				}
 			}
 		}
-	}
-	
-	return eris;
-							
+	}						
 } 
 						
 Matrix IntegralEngine::compute_eris_2index(const std::vector<libint2::Shell>& auxbs) {

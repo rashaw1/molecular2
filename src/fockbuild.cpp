@@ -542,7 +542,7 @@ Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 	// representation
 	if (xyK.rows() == 0) {
 		
-		Matrix Zxy = integrals.compute_eris_3index(obs, dfbs); 
+		integrals.compute_eris_3index(obs, dfbs, xyK); 
 		Matrix V = integrals.compute_eris_2index(dfbs);
 	
 		Eigen::LLT<Matrix> V_LLt(V);
@@ -551,8 +551,17 @@ Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 		Matrix V_L = L;
 		Matrix Linv = L.solve(I).transpose();
 
-		xyK = Zxy * Linv; 
-		Zxy.resize(0, 0);  
+		Vector row; 
+		for (int x = 0; x < n; x++) {
+			for (int y = 0; y<= x; y++) {
+				int xy = x*n+y; 
+				int yx = y*n+x; 
+				row = xyK.row(xy); 
+			
+				for (int K = 0; K < ndf; K++)
+					xyK(xy, K) = xyK(yx, K) = row.dot(Linv.col(K)); 
+			}
+		} 
 	}  // if (xyK.size() == 0)
 
 	// compute exchange
@@ -619,7 +628,7 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 	// representation
 	if (xyK.rows() == 0) {
 		
-		Matrix Zxy = integrals.compute_eris_3index(obs, dfbs); 
+		integrals.compute_eris_3index(obs, dfbs, xyK); 
 		Matrix V = integrals.compute_eris_2index(dfbs);
 	
 		Eigen::LLT<Matrix> V_LLt(V);
@@ -628,8 +637,17 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 		Matrix V_L = L;
 		Matrix Linv = L.solve(I).transpose();
 
-		xyK = Zxy * Linv; 
-		Zxy.resize(0, 0);   
+		Vector row; 
+		for (int x = 0; x < n; x++) {
+			for (int y = 0; y<= x; y++) {
+				int xy = x*n+y; 
+				int yx = y*n+x; 
+				row = xyK.row(xy); 
+			
+				for (int K = 0; K < ndf; K++)
+					xyK(xy, K) = xyK(yx, K) = row.dot(Linv.col(K)); 
+			}
+		} 
 	
 		int i_offset = 0; 
 		for (int B = 0; B < finfo.size(); B++) {

@@ -595,7 +595,8 @@ std::vector<Matrix> RPA::df_eris(const std::vector<libint2::Shell>& obs, const s
 	// Calculate (P|Q) and (P|mn) eris
 	
 	Matrix JPQ = integrals.compute_eris_2index(auxbs);  
-	Matrix KmnP = integrals.compute_eris_3index(obs, auxbs);
+	Matrix KmnP;
+	integrals.compute_eris_3index(obs, auxbs, KmnP);
 
 	// Form inverse J-metric
 	EigenSolver es(JPQ); 
