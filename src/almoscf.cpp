@@ -31,7 +31,7 @@ void ALMOSCF::setFragments(bool unrestricted)
 	// Add the fragment Fock matrices and perform monomer calculations
 	std::vector<SharedFragment>& frags = molecule->getFragments(); 
 	nfrags = frags.size();
-	int start = 0;
+	int start = 0; int auxstart = 0;
 	int nf = 0;
 	for (int i = 0; i < frags.size(); i++) {
 		
@@ -59,8 +59,19 @@ void ALMOSCF::setFragments(bool unrestricted)
 			molecule->control->log.flush();  
 			monomer_energies.push_back(hf.getEnergy()); 
 			fragments[fragments.size()-1].clearDiis(); 
+			
+			FragmentInfo f; 
+			f.occ = frags[i]->getNel() / 2; 
+			f.nbfs = f_nbfs; 
+			f.naux = new_engine.nbasis(frags[i]->getBasis().getDFShells()); 
+			f.auxstart = auxstart; 
+			f.start = start;
+			f.radius = 16.0;
+			f.com = frags[i]->com(); 
+			finfo.push_back(f); 
 		}
 		start += f_nbfs;
+		auxstart += finfo[i].naux; 
 
 		nf++;
 	}
@@ -166,6 +177,7 @@ double ALMOSCF::makeDens(bool alpha) {
 void ALMOSCF::rcompute() {
 	
 	// Make inverse overlap metric
+	
 	Matrix& S = focker.getS();
 	Matrix& H = focker.getHCore(); 
 	Matrix P_old = P;
@@ -229,10 +241,10 @@ void ALMOSCF::rcompute() {
 	delta_d = (P - P_old).norm(); 
 	
 	// Build Fock matrix
-	if (density_fitted) {
-		EigenSolver es(sigma); 
-		T = T * es.operatorSqrt(); 
-		focker.makeFock(T, 1.0); 
+	if (density_fitted) { 
+		//focker.makeFock(T, 1.0); 
+		focker.getFockAO() = focker.getHCore();  
+		focker.getFockAO() += focker.compute_2body_fock_df_local(T, sigma, P, finfo); 
 	} else
 		focker.makeFock(P, 2.0); 
 	
@@ -378,31 +390,6 @@ void ALMOSCF::rperturb(bool order4)
 	sigma.block(0, 0, nocc, nocc) = T.transpose() * S * T; 
 	sigma.block(nocc, 0, nvirt, nocc) = V.transpose() * S * T;
 	sigma.block(nocc, nocc, nvirt, nvirt) = V.transpose() * S * V;
-	 
-	EigenSolver es(S); 
-	Matrix SC = es.operatorSqrt() * T; 
-	int i_offset = 0;
-	for (auto& f1 : fragments) {
-		int f1_nocc = f1.getMolecule()->getNel() / 2;
-		
-		int mu_offset = 0; int center = 1; 
-		for (auto& f2 : fragments) {
-			int f2_nbfs = f2.getHCore().rows(); 
-			
-			for (int i = i_offset; i < i_offset + f1_nocc; i++) {
-				double INi = 0.0; 
-				for (int mu = mu_offset; mu < mu_offset + f2_nbfs; mu++) {
-					INi += SC(mu, i) * SC(mu, i);	
-				}
-				std::cout << "Orbital " << i << " and center " << center << ": " << INi << std::endl; 
-				
-			}
-			center++; 
-			
-			mu_offset += f2_nbfs; 
-		}
-		i_offset += f1_nocc; 
-	}
 	 
 	// Cholesky decompose
 	LLT llt(sigma); 

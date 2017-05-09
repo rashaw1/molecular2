@@ -34,6 +34,50 @@
 class Atom;
 class Command; 
 
+struct Domain {
+	std::vector<int> starts, sizes, centres;
+	
+	Domain() {}
+	Domain(const Domain& other) {
+		starts = other.starts;
+		sizes = other.sizes;
+		centres = other.centres;
+	}
+	
+	void print() {
+		std::cout << "STARTS:" << std::endl; 
+		for (auto s : starts)
+			std::cout << s << ", "; 
+		std::cout << std::endl;
+		
+		std::cout << "SIZES:" << std::endl;
+		for (auto s : sizes)
+			std::cout << s << ", "; 
+		std::cout << std::endl;
+		
+		std::cout << "CENTRES:" << std::endl;
+		for (auto c : centres)
+			std::cout << c << ", ";
+		std::cout << std::endl << std::endl; 
+	}
+};
+
+struct FragmentInfo {
+	int occ, nbfs, naux, start, auxstart; 
+	double radius; 
+	Vector com; 
+	
+	FragmentInfo() : occ(0), nbfs(0), naux(0), start(0), radius(0.0) {}
+	FragmentInfo(const FragmentInfo& other) {
+		occ = other.occ;
+		nbfs = other.nbfs;
+		naux = other.naux;
+		start = other.start; 
+		radius = other.radius;
+		com = other.com; 
+	}
+};
+
 // Begin class definition
 class Fock
 {
@@ -52,6 +96,7 @@ protected:
   Matrix xyK; 
   Vector eps;
   std::vector<Matrix> focks;
+  std::vector<Domain> lmo_domains, ao_domains, fit_domains;
   Matrix dens, dens_diff;
   IntegralEngine& integrals;
   SharedMolecule molecule;
@@ -111,6 +156,7 @@ public:
   virtual void average(Vector &w);
   void simpleAverage(Matrix& D0, double weight = 0.5);
   
+  virtual void addDiis(); 
   virtual void clearDiis(); 
   
   virtual void compute_forces(const std::vector<Atom> &atoms, int nocc); 
@@ -123,7 +169,8 @@ public:
   double precision = std::numeric_limits<double>::epsilon()  // discard contributions smaller than this
   		); 
 
-  Matrix compute_2body_fock_df(const Matrix& Cocc); 
+  Matrix compute_2body_fock_df(const Matrix& Cocc);
+  Matrix compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo);  
   
   void compute_soad_guess(); 
   
@@ -173,7 +220,7 @@ public:
     virtual void makeFock();
     virtual void makeDens();
     virtual void average(Vector &w);
-	
+
 	virtual void clearDiis(); 
 };
 

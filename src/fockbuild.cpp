@@ -185,6 +185,10 @@ void Fock::makeFock(Matrix& P, double multiplier)
 	makeJK(P, multiplier);  
 	focka += jkints; 
 	if (not density_fitted) fockinc = focka; 
+	addDiis(); 
+}
+
+void Fock::addDiis() {
 	if (diis) { // Archive for averaging
 		if (iter >= MAX) {
 			focks.erase(focks.begin());
@@ -531,15 +535,13 @@ Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
   
 	const auto n = integrals.nbasis(obs); 
 	const auto ndf = integrals.nbasis(dfbs); 
+	
+	Logger& log = molecule->control->log; 
 
 	// using first time? compute 3-center ints and transform to inv sqrt
 	// representation
 	if (xyK.rows() == 0) {
-
-		const auto nshells = obs.size();
-		const auto nshells_df = dfbs.size();
-
-
+		
 		Matrix Zxy = integrals.compute_eris_3index(obs, dfbs); 
 		Matrix V = integrals.compute_eris_2index(dfbs);
 	
@@ -550,12 +552,12 @@ Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 		Matrix Linv = L.solve(I).transpose();
 
 		xyK = Zxy * Linv; 
-		Zxy.resize(0, 0); 
-	
+		Zxy.resize(0, 0);  
 	}  // if (xyK.size() == 0)
 
 	// compute exchange
-
+	double start = log.getGlobalTime(); 
+	std::cout << "Exchange: "; 
 	Matrix xiK = Matrix::Zero(n*nocc, ndf); 
 	for (int x = 0; x < n; x++) {
 		for (int i = 0; i < nocc; i++) {
@@ -574,9 +576,12 @@ Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 					G(x, y) -= xiK(x*nocc+i, K) * xiK(y*nocc+i, K); 
 		}
 	}
+	double end = log.getGlobalTime(); 
+	std::cout << end - start << " seconds" << std::endl; 
 
 	// compute Coulomb
-
+	start = end;
+	std::cout << "Coulomb: "; 
 	Vector Jtmp = Vector::Zero(ndf); 
 	for (int K = 0; K < ndf; K++) 
 		for (int x = 0; x < n; x++)
@@ -591,6 +596,184 @@ Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 			G(y, x) = G(x, y); 
 		}
 	}
+	end = log.getGlobalTime(); 
+	std::cout << end - start << " seconds" << std::endl << std::endl; 
+
+	return G; 
+}
+
+Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo) {
+
+	BasisSet& obs = molecule->getBasis().getIntShells(); 
+	BasisSet& dfbs = molecule->getBasis().getDFShells(); 
+  
+	const auto n = integrals.nbasis(obs); 
+	const auto ndf = integrals.nbasis(dfbs); 
+	
+	Logger& log = molecule->control->log; 
+
+	EigenSolver es(sigmainv); 
+	Cocc = Cocc * es.operatorSqrt(); 
+	
+	// using first time? compute 3-center ints and transform to inv sqrt
+	// representation
+	if (xyK.rows() == 0) {
+		
+		Matrix Zxy = integrals.compute_eris_3index(obs, dfbs); 
+		Matrix V = integrals.compute_eris_2index(dfbs);
+	
+		Eigen::LLT<Matrix> V_LLt(V);
+		Matrix I = Matrix::Identity(ndf, ndf);
+		auto L = V_LLt.matrixL();
+		Matrix V_L = L;
+		Matrix Linv = L.solve(I).transpose();
+
+		xyK = Zxy * Linv; 
+		Zxy.resize(0, 0);   
+	
+		int i_offset = 0; 
+		for (int B = 0; B < finfo.size(); B++) {
+			for (int i = i_offset; i < i_offset+finfo[B].occ; i++) {
+				Domain d; 
+				
+				std::vector<int> notcentres; 
+				int mu_offset = 0;
+				for (int A = 0; A < finfo.size(); A++) {
+					double sum = 0.0; 
+					for (int mu = mu_offset; mu < mu_offset + finfo[A].occ; mu++) 
+						sum += Cocc(mu, i) * Cocc(mu, i); 
+				
+					if (sum > 1e-6) { 
+						d.starts.push_back(finfo[A].start); 
+						d.sizes.push_back(finfo[A].nbfs); 
+						d.centres.push_back(A); 
+					} else 
+						notcentres.push_back(A); 
+				
+					mu_offset += finfo[A].nbfs; 
+				}
+				
+				Domain dao; 
+				dao.starts = d.starts;
+				dao.sizes = d.sizes; 
+				dao.centres = d.centres; 
+				mu_offset = 0; 
+				for (auto A : d.centres) {
+					std::vector<int> newnc; 
+					for (int b = 0; b < notcentres.size(); b++){
+						int C = notcentres[b]; 
+						double sep = (finfo[C].com - finfo[A].com).norm(); 
+						if (finfo[C].radius > sep) {
+							dao.centres.push_back(C); 
+							dao.starts.push_back(finfo[C].start);
+							dao.sizes.push_back(finfo[C].nbfs); 
+						} else 
+							newnc.push_back(C); 
+					} 
+					notcentres = newnc; 
+				}
+			
+				lmo_domains.push_back(d); 
+				ao_domains.push_back(dao); 
+			}
+			i_offset += finfo[B].occ; 
+		}
+		
+		EigenSolver es2(integrals.getOverlap()); 
+		Matrix SC = es2.operatorSqrt() * Cocc; 
+		i_offset = 0;
+		for (auto& f1 : finfo) { 
+			
+			for (int i = i_offset; i < i_offset + f1.occ; i++) {
+				Domain d;
+				
+				int mu_offset = 0; int center = 0; 
+				for (auto& f2 : finfo) { 
+					
+					double sep = (f2.com - f1.com).norm(); 
+					
+					double INi = 0.0; 
+					for (int mu = mu_offset; mu < mu_offset + f2.nbfs; mu++) {
+						INi += SC(mu, i) * SC(mu, i);	
+					}
+					
+					if (INi > 5e-2 || sep < 7.0) {
+						d.centres.push_back(center);
+						d.sizes.push_back(f2.naux); 
+						d.starts.push_back(f2.auxstart); 
+					}
+				
+					center++; 
+					mu_offset += f2.nbfs; 
+				}
+			
+				fit_domains.push_back(d); 
+			}
+			
+			i_offset += f1.occ; 
+		}
+		
+	}  // if (xyK.size() == 0) 
+	
+	// compute exchange
+	int nfrags = finfo.size(); 
+	double start = log.getGlobalTime(); 
+	std::cout << "Exchange: "; 
+	Matrix xiK = Matrix::Zero(n*nocc, ndf); 
+	for (int x = 0; x < n; x++) {
+		for (int i = 0; i < nocc; i++) {
+			for (int K = 0; K < ndf; K++) {
+				for (int y = 0; y < n; y++) 
+					xiK(x*nocc+i, K) += xyK(x*n+y, K) * Cocc(y, i); 
+			}
+		}
+	}
+
+	Matrix G = Matrix::Zero(n, n); 
+	for (int x = 0; x < n; x++) {
+		for (int y = 0; y <= x; y++) {
+			for (int i = 0; i < nocc; i++)
+				for (int K = 0; K < ndf; K++)
+					G(x, y) -= xiK(x*nocc+i, K) * xiK(y*nocc+i, K); 
+		}
+	}
+	double end = log.getGlobalTime(); 
+	std::cout << end - start << " seconds" << std::endl; 
+	
+	// compute Coulomb
+	start = log.getGlobalTime();
+	std::cout << "Coulomb: "; 
+	
+	Vector Pv(Eigen::Map<Vector>(Pt.data(), Pt.cols()*Pt.rows()));
+	Pv = xyK.transpose() * Pv; 
+	Pv = 2.0 * xyK * Pv; 
+	for (int x = 0; x < n; x++)
+		for (int y = 0; y <=x; y++) {
+			G(x, y) += Pv[x*n+y];
+			G(y, x) = G(x, y); 
+		}
+	/*Vector Jtmp = Vector::Zero(ndf); 
+	for (int K = 0; K < ndf; K++) {
+		int i_offset = 0; int mu_offset = 0;
+		for (int A = 0; A < nfrags; A++) {
+			for (int x = mu_offset; x < mu_offset + finfo[A].nbfs; x++)
+				for (int i = i_offset; i < i_offset + finfo[A].occ; i++)
+					for(int j = 0; j < nocc; j++)
+						Jtmp[K] += xiK(x*nocc+j, K) * sigmainv(j, i) * Cocc(x, i);
+			i_offset += finfo[A].occ; mu_offset += finfo[A].nbfs; 
+		}
+	} 
+	xiK.resize(0, 0);
+  
+	for (int x = 0; x < n; x++) {
+		for (int y = 0; y <= x; y++) { 
+			for (int K = 0; K < ndf; K++)  
+				G(x, y) += 2.0 * xyK(x*n+y, K) * Jtmp[K]; 
+			G(y, x) = G(x, y); 
+		}
+	}*/
+	end = log.getGlobalTime(); 
+	std::cout << end - start << " seconds" << std::endl << std::endl; 
 
 	return G; 
 }

@@ -25,6 +25,7 @@ private:
 	double dimer_energy, e_frz, e_pol, e_ct, e_int, e_disp, e_pert_2, e_pert_4, e_mon_rpa; 
 	double delta_e, delta_d;
 	std::vector<double> monomer_energies;
+	std::vector<FragmentInfo> finfo; 
 	int nfrags, MAX; 
 	Matrix P, P_alpha, P_beta, sigma, sigma_alpha, sigma_beta; 
 public:
