@@ -826,13 +826,10 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 				for (int ao2 = 0; ao2 < nao; ao2++) {
 					ao2start = ao_d.starts[ao2]; 
 					ao2size = ao_d.sizes[ao2]; 
-					
-					int numax = ao2start + ao2size;
-					numax = numax > mu ? mu+1 : numax; 
-					for (int nu = ao2start; nu < numax; nu++) {
+					 
+					for (int nu = ao2start; nu < ao2start + ao2size; nu++) {
 
 						G(mu, nu) -= uA(u, v); 
-						G(nu, mu) = G(mu, nu); 
 						
 						v++; 
 					}

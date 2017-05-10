@@ -621,8 +621,9 @@ void ALMOSCF::rscf()
 		for (auto en : monomer_energies) energy -= en; 
 		
 		if (cmd.get_option<bool>("df")) {
-			double localcorrection = r_energy_df(); 
-			molecule->control->log.print("Local exchange correction: " + std::to_string(localcorrection) + " Hartree"); 
+			double localcorrection = r_energy_df() - dimer_energy; 
+			molecule->control->log.print("\nLocal exchange correction: " + std::to_string(localcorrection) + " Hartree"); 
+			molecule->control->log.localTime(); 
 			energy += localcorrection; 
 		}
 		
@@ -858,10 +859,12 @@ double ALMOSCF::r_energy_df() {
 		occ_col_offset += f_nocc; 
 	}
  
+	sigma = T.transpose() * focker.getS() * T; 
  	EigenSolver es(sigma); 
-	T *= es.operatorSqrt(); 
+	T *= es.operatorInverseSqrt(); 
 	
 	Matrix& xyK = focker.getXYK(); 
+	Matrix& Linv = focker.getLinv(); 
 	int ndf = xyK.cols(); 
 	
 	Matrix xiK = Matrix::Zero(nbfs * nocc, ndf); 
@@ -876,24 +879,29 @@ double ALMOSCF::r_energy_df() {
 	
 	Matrix ijK = Matrix::Zero(nocc * nocc, ndf); 
 	for (int i = 0; i < nocc; i++) {
-		for (int j = 0; j <= i; j++) {
+		for (int j = 0; j < nocc; j++) {
 			for (int K = 0; K < ndf; K++) {
 				for (int x = 0; x < nbfs; x++)
-					ijK(i*nocc+j, K) += T(x, j) * xiK(x*nocc+i, K); 
-				ijK(j*nocc+i, K) = ijK(i*nocc+j, K); 
+					ijK(j*nocc+i, K) += T(x, j) * xiK(x*nocc+i, K); 
 			}
 		}
 	}
-	Matrix& Linv = focker.getLinv(); 
-	ijK *= Linv; 
 	
+	ijK *= Linv; 
+	ijK = ijK * ijK.transpose();
+	 
 	Matrix& H = focker.getHCore(); 
-	double ren = (P*H).trace() + focker.getMolecule()->getEnuc(); 
-	ren -= (ijK*ijK.transpose()).trace(); 
+	double ren = 2.0 * (P*H).trace() + focker.getMolecule()->getEnuc(); 
+	
+	for (int i = 0; i < nocc; i++) {
+		for (int j = 0; j < nocc; j++) {
+			ren -= ijK(i*nocc+j, j*nocc+i); 
+		}
+	}
 	
 	Vector Pv(Eigen::Map<Vector>(P.data(), P.cols()*P.rows()));
 	Pv = xyK.transpose() * Pv;
-	Pv = Linv * Linv.transpose() * Pv;  
+	Pv = Linv * Linv.transpose() * Pv; 
 	Pv = 2.0 * xyK *  Pv; 
 	Matrix J = Matrix::Zero(nbfs, nbfs); 
 	for (int x = 0; x < nbfs; x++)
@@ -903,6 +911,10 @@ double ALMOSCF::r_energy_df() {
 		}
 		
 	ren += (P*J).trace(); 
+	
+	/*focker.getXYK() *= focker.getLinv(); 
+	focker.makeFock(T, 1.0); 
+	double ren = (P*(focker.getHCore() + focker.getFockAO())).trace() + focker.getMolecule()->getEnuc(); */
 	
 	return ren;
 }
