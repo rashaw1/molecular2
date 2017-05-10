@@ -24,9 +24,6 @@ ALMOSCF::ALMOSCF(Command& c, SharedMolecule m, Fock& f) : molecule(m), cmd(c), f
 	MAX = cmd.get_option<int>("maxdiis");
 	diis.init(MAX, cmd.get_option<bool>("diis"));
 	focker.incremental_threshold = 0.0; 
-	finfo.mo_thresh = cmd.get_option<double>("mothresh"); 
-	finfo.fit_thresh = cmd.get_option<double>("fitthresh");
-	finfo.r_thresh = cmd.get_option<double>("rthresh"); 
 }
 
 void ALMOSCF::setFragments(bool unrestricted)
@@ -70,7 +67,6 @@ void ALMOSCF::setFragments(bool unrestricted)
 			f.auxstart = auxstart; 
 			f.start = start;
 			f.radius = frags[i]->getBasis().extent();
-			std::cout << f.radius << std::endl; 
 			f.com = frags[i]->com(); 
 			finfo.push_back(f); 
 		}
@@ -81,6 +77,10 @@ void ALMOSCF::setFragments(bool unrestricted)
 	}
 	molecule->control->log.print("Monomer calculations completed.");
 	molecule->control->log.localTime();
+	
+	finfo[0].mo_thresh = cmd.get_option<double>("mothresh"); 
+	finfo[0].fit_thresh = cmd.get_option<double>("fitthresh");
+	finfo[0].r_thresh = cmd.get_option<double>("rthresh"); 
 }
 
 double ALMOSCF::makeDens(bool alpha) {

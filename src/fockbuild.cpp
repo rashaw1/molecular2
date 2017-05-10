@@ -650,7 +650,7 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 					for (int mu = mu_offset; mu < mu_offset + finfo[A].occ; mu++) 
 						sum += Cocc(mu, i) * Cocc(mu, i); 
 				
-					if (sum > finfo.mo_thresh) { 
+					if (sum > finfo[0].mo_thresh) { 
 						d.starts.push_back(finfo[A].start); 
 						d.sizes.push_back(finfo[A].nbfs); 
 						d.centres.push_back(A); 
@@ -706,7 +706,7 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 						INi += SC(mu, i) * SC(mu, i);	
 					}
 					
-					if (INi > finfo.fit_thresh || sep < finfo.r_thresh) {
+					if (INi > finfo[0].fit_thresh || sep < finfo[0].r_thresh) {
 						d.centres.push_back(center);
 						d.sizes.push_back(f2.naux); 
 						d.starts.push_back(f2.auxstart); 
