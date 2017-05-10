@@ -101,6 +101,7 @@ public:
   int getNExps(); 
   double getExp(int i) const; 
   void setExp(int i, double value); 
+  double extent() const; 
   
   void addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std::vector <libint2::real_t>> &coeffs, double *pos, int atom, bool df = false);
   

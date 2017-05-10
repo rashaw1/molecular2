@@ -24,6 +24,9 @@ ALMOSCF::ALMOSCF(Command& c, SharedMolecule m, Fock& f) : molecule(m), cmd(c), f
 	MAX = cmd.get_option<int>("maxdiis");
 	diis.init(MAX, cmd.get_option<bool>("diis"));
 	focker.incremental_threshold = 0.0; 
+	finfo.mo_thresh = cmd.get_option<double>("mothresh"); 
+	finfo.fit_thresh = cmd.get_option<double>("fitthresh");
+	finfo.r_thresh = cmd.get_option<double>("rthresh"); 
 }
 
 void ALMOSCF::setFragments(bool unrestricted)
@@ -66,7 +69,8 @@ void ALMOSCF::setFragments(bool unrestricted)
 			f.naux = new_engine.nbasis(frags[i]->getBasis().getDFShells()); 
 			f.auxstart = auxstart; 
 			f.start = start;
-			f.radius = 16.0;
+			f.radius = frags[i]->getBasis().extent();
+			std::cout << f.radius << std::endl; 
 			f.com = frags[i]->com(); 
 			finfo.push_back(f); 
 		}
@@ -242,9 +246,14 @@ void ALMOSCF::rcompute() {
 	
 	// Build Fock matrix
 	if (density_fitted) { 
-		//focker.makeFock(T, 1.0); 
-		focker.getFockAO() = focker.getHCore();  
-		focker.getFockAO() += focker.compute_2body_fock_df_local(T, sigma, P, finfo); 
+		if (cmd.get_option<bool>("local")) {
+			focker.getFockAO() = focker.getHCore();  
+			focker.getFockAO() += focker.compute_2body_fock_df_local(T, sigma, P, finfo); 
+		} else {
+			EigenSolver es(sigma); 
+			T *= es.operatorSqrt(); 
+			focker.makeFock(T, 1.0); 
+		}
 	} else
 		focker.makeFock(P, 2.0); 
 	
@@ -620,7 +629,7 @@ void ALMOSCF::rscf()
 		double energy = dimer_energy;
 		for (auto en : monomer_energies) energy -= en; 
 		
-		if (cmd.get_option<bool>("df")) {
+		if (cmd.get_option<bool>("df") && cmd.get_option<bool>("local") && cmd.get_option<bool>("xcorrect")) {
 			double localcorrection = r_energy_df() - dimer_energy; 
 			molecule->control->log.print("\nLocal exchange correction: " + std::to_string(localcorrection) + " Hartree"); 
 			molecule->control->log.localTime(); 
@@ -911,10 +920,6 @@ double ALMOSCF::r_energy_df() {
 		}
 		
 	ren += (P*J).trace(); 
-	
-	/*focker.getXYK() *= focker.getLinv(); 
-	focker.makeFock(T, 1.0); 
-	double ren = (P*(focker.getHCore() + focker.getFockAO())).trace() + focker.getMolecule()->getEnuc(); */
 	
 	return ren;
 }

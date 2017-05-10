@@ -11,6 +11,7 @@
 #include "basis.hpp"
 #include "bf.hpp"
 #include "basisreader.hpp"
+#include "Faddeeva.hpp"
 #include "ioutil.hpp"
 #include <iostream>
 #include <array>
@@ -294,6 +295,17 @@ void Basis::setExp(int i, double value) {
 			if (found) break; 
 		}
 	}	
+}
+
+double Basis::extent() const {
+	double minex = -1.0; 
+	for(auto& s : intShells)
+		for (auto x : s.alpha)
+			minex = minex < 0 || x < minex ? x : minex; 
+	
+	double extent = 2.52 * std::pow(minex, -0.526); 
+	
+	return extent; 
 }
 
   

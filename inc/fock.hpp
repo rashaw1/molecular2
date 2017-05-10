@@ -73,7 +73,7 @@ struct Domain {
 
 struct FragmentInfo {
 	int occ, nbfs, naux, start, auxstart; 
-	double radius; 
+	double radius, mo_thresh, fit_thresh, r_thresh; 
 	Vector com; 
 	
 	FragmentInfo() : occ(0), nbfs(0), naux(0), start(0), auxstart(0), radius(0.0) {}

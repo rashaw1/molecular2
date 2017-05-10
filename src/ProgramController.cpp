@@ -419,7 +419,12 @@ void ProgramController::call_ralmo(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("mu")) c.set_option<double>("mu", 0.5); 
 	if(!c.is_option_set("iterative")) c.set_option<bool>("iterative", true);
 	if(!c.is_option_set("pairwise")) c.set_option<bool>("pairwise", true); 
+	if(!c.is_option_set("local")) c.set_option<bool>("local", true);
+	if(!c.is_option_set("xcorrect")) c.set_option<bool>("xcorrect", true); 
 	if(!c.is_option_set("rcutoff")) c.set_option<double>("rcutoff", 15.0);
+	if(!c.is_option_set("mothresh")) c.set_option<double>("mothresh", 1e-6);
+	if(!c.is_option_set("fitthresh")) c.set_option<double>("fitthresh", 0.05);
+	if(!c.is_option_set("rthresh")) c.set_option<double>("rthresh", 7.0);
 	if(!c.is_option_set("df")) c.set_option<bool>("df", false); 
 	if(!c.is_option_set("guess")) c.set_option<std::string>("guess", "soad"); 
 

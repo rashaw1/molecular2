@@ -563,9 +563,6 @@ Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 		} 
 	}  // if (xyK.size() == 0)
 
-	// compute exchange
-	double start = log.getGlobalTime(); 
-	std::cout << "Exchange: "; 
 	Matrix xiK = Matrix::Zero(n*nocc, ndf); 
 	for (int x = 0; x < n; x++) {
 		for (int i = 0; i < nocc; i++) {
@@ -584,12 +581,8 @@ Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 					G(x, y) -= xiK(x*nocc+i, K) * xiK(y*nocc+i, K); 
 		}
 	}
-	double end = log.getGlobalTime(); 
-	std::cout << end - start << " seconds" << std::endl; 
 
 	// compute Coulomb
-	start = end;
-	std::cout << "Coulomb: "; 
 	Vector Jtmp = Vector::Zero(ndf); 
 	for (int K = 0; K < ndf; K++) 
 		for (int x = 0; x < n; x++)
@@ -604,8 +597,6 @@ Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 			G(y, x) = G(x, y); 
 		}
 	}
-	end = log.getGlobalTime(); 
-	std::cout << end - start << " seconds" << std::endl << std::endl; 
 
 	return G; 
 }
@@ -659,7 +650,7 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 					for (int mu = mu_offset; mu < mu_offset + finfo[A].occ; mu++) 
 						sum += Cocc(mu, i) * Cocc(mu, i); 
 				
-					if (sum > 1e-6) { 
+					if (sum > finfo.mo_thresh) { 
 						d.starts.push_back(finfo[A].start); 
 						d.sizes.push_back(finfo[A].nbfs); 
 						d.centres.push_back(A); 
@@ -715,7 +706,7 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 						INi += SC(mu, i) * SC(mu, i);	
 					}
 					
-					if (INi > 5e-2 || sep < 7.0) {
+					if (INi > finfo.fit_thresh || sep < finfo.r_thresh) {
 						d.centres.push_back(center);
 						d.sizes.push_back(f2.naux); 
 						d.starts.push_back(f2.auxstart); 
@@ -768,7 +759,6 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 	
 	// compute exchange
 	int nfrags = finfo.size(); 
-	double start = log.getGlobalTime(); 
 
 	for (int i = 0; i < nocc; i++) {
 		auto& lmo_d = lmo_domains[i]; 
@@ -838,13 +828,8 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 			}
 		}
 	}
-
-	double end = log.getGlobalTime(); 
-	std::cout << end - start << " seconds" << std::endl; 
 	
 	// compute Coulomb
-	start = log.getGlobalTime();
-	std::cout << "Coulomb: "; 
 	
 	Vector Pv(Eigen::Map<Vector>(Pt.data(), Pt.cols()*Pt.rows()));
 	Pv = xyK.transpose() * Pv;
@@ -855,9 +840,6 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 			G(x, y) += Pv[x*n+y];
 			G(y, x) = G(x, y); 
 		}
-		
-	end = log.getGlobalTime(); 
-	std::cout << end - start << " seconds" << std::endl << std::endl; 
 
 	return G; 
 }
