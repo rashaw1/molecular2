@@ -629,12 +629,17 @@ void ALMOSCF::rscf()
 		double energy = dimer_energy;
 		for (auto en : monomer_energies) energy -= en; 
 		
-		if (cmd.get_option<bool>("df") && cmd.get_option<bool>("local") && cmd.get_option<bool>("xcorrect")) {
-			double localcorrection = r_energy_df() - dimer_energy; 
-			molecule->control->log.print("\nLocal exchange correction: " + std::to_string(localcorrection) + " Hartree"); 
-			molecule->control->log.localTime(); 
-			energy += localcorrection; 
+		if (cmd.get_option<bool>("df")) {
+		
+			if(cmd.get_option<bool>("local") && cmd.get_option<bool>("xcorrect")) {
+				double localcorrection = r_energy_df() - dimer_energy; 
+				molecule->control->log.print("\nLocal exchange correction: " + std::to_string(localcorrection) + " Hartree"); 
+				molecule->control->log.localTime(); 
+				energy += localcorrection; 
+			}
+			focker.getXYK().resize(0,0);
 		}
+
 		
 		molecule->control->log.result("ALMO Interaction Energy", energy * Logger::TOKCAL, "kcal / mol"); 
 		
@@ -869,7 +874,7 @@ double ALMOSCF::r_energy_df() {
 	}
  
 	sigma = T.transpose() * focker.getS() * T; 
- 	EigenSolver es(sigma); 
+	EigenSolver es(sigma); 
 	T *= es.operatorInverseSqrt(); 
 	
 	Matrix& xyK = focker.getXYK(); 
@@ -914,10 +919,10 @@ double ALMOSCF::r_energy_df() {
 	Pv = 2.0 * xyK *  Pv; 
 	Matrix J = Matrix::Zero(nbfs, nbfs); 
 	for (int x = 0; x < nbfs; x++)
-		for (int y = 0; y <=x; y++) {
-			J(x, y) += Pv[x*nbfs+y];
-			J(y, x) = J(x, y); 
-		}
+	for (int y = 0; y <=x; y++) {
+		J(x, y) += Pv[x*nbfs+y];
+		J(y, x) = J(x, y); 
+	}
 		
 	ren += (P*J).trace(); 
 	

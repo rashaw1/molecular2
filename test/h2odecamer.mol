@@ -47,10 +47,10 @@ molecule = {
 		   28, 30, 0, 1
 	 }
 	 basis = {
-	       default, avdz
+	       default, cc-pvdz
 	 } 
 	 dfbasis = {
-	       default, vdzmp2fit
+	       default, vtzri
 	 }
 }
 ralmo (
