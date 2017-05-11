@@ -177,7 +177,7 @@ iVector Basis::getLnums(int q) const
   return l;
 }
 
-void Basis::addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std::vector <libint2::real_t>> &coeffs, double *pos, int atom, bool df) {
+void Basis::addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std::vector <libint2::real_t>> &coeffs, double *pos, int atom, int type) {
 	using libint2::Shell;
 	
 	maxl = l > maxl ? l : maxl; 
@@ -189,16 +189,28 @@ void Basis::addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std:
 		for (auto c : contr) newC.coeff.push_back(c);
 		contr_arr.push_back(newC);
 	}
-	if (!df) raw_contractions.push_back(contr_arr); 
 	
 	std::array<libint2::real_t, 3> O = { {pos[0], pos[1], pos[2]} };
 
-	if (df) {
-		dfShells.push_back(Shell(exps, contr_arr, O)); 
-		dfShellAtomList.push_back(atom); 	
-	} else {
-		intShells.push_back(Shell(exps, contr_arr, O));
-		shellAtomList.push_back(atom);
+	switch(type) {
+		
+		case 1: {
+			jkShells.push_back(Shell(exps, contr_arr, O)); 
+			jkShellAtomList.push_back(atom); 
+			break;
+		}
+		
+		case 2: {
+			riShells.push_back(Shell(exps, contr_arr, O));
+			riShellAtomList.push_back(atom); 
+			break;
+		}
+		
+		default: {
+			intShells.push_back(Shell(exps, contr_arr, O));
+			shellAtomList.push_back(atom);
+			raw_contractions.push_back(contr_arr);
+		}
 	}
 }
 
@@ -221,9 +233,11 @@ Basis& Basis::operator=(const Basis& other)
   ecps = other.ecps;
   
   intShells = other.intShells; 
-  dfShells = other.dfShells; 
+  jkShells = other.jkShells; 
+  riShells = other.riShells;
   shellAtomList = other.shellAtomList; 
-  dfShellAtomList = other.dfShellAtomList; 
+  jkShellAtomList = other.jkShellAtomList; 
+  riShellAtomList = other.riShellAtomList;
   
   // Copy across bfs
   int nbfs = charges.size();

@@ -66,9 +66,11 @@ private:
   int maxl, nexps;
   bool ecps; 
   std::vector<libint2::Shell> intShells;
-  std::vector<libint2::Shell> dfShells; 
+  std::vector<libint2::Shell> jkShells;
+  std::vector<libint2::Shell> riShells;  
   std::vector<int> shellAtomList;
-  std::vector<int> dfShellAtomList;
+  std::vector<int> jkShellAtomList;
+  std::vector<int> riShellAtomList;
   
 public:
   // Constructors and destructor
@@ -93,9 +95,11 @@ public:
   int getShellSize(int q) const;
   iVector getShells(int q) const;
   int getShellAtom(int i) const { return shellAtomList[i]; }
-  int getDFShellAtom(int i) const { return dfShellAtomList[i]; }
+  int getJKShellAtom(int i) const { return jkShellAtomList[i]; }
+  int getRIShellAtom(int i) const { return riShellAtomList[i]; }
   std::vector<libint2::Shell>& getIntShells() { return intShells; }
-  std::vector<libint2::Shell>& getDFShells() { return dfShells; }
+  std::vector<libint2::Shell>& getJKShells() { return jkShells; }
+  std::vector<libint2::Shell>& getRIShells() { return riShells; }
   iVector getLnums(int q) const;
   
   int getNExps(); 
@@ -103,7 +107,7 @@ public:
   void setExp(int i, double value); 
   double extent() const; 
   
-  void addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std::vector <libint2::real_t>> &coeffs, double *pos, int atom, bool df = false);
+  void addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std::vector <libint2::real_t>> &coeffs, double *pos, int atom, int type = 0);
   
   // Overloaded operators
   Basis& operator=(const Basis& other);

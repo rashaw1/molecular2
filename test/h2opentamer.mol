@@ -29,9 +29,12 @@ molecule = {
 	 basis = {
 	       default, avdz
 	 } 
-	 dfbasis = {
+	 jkbasis = {
 	       default, vdzmp2fit
 	 }
+	 ribasis = {
+	 	 default, vtzri
+         }
 }
 ralmo (
       df, true

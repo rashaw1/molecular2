@@ -480,7 +480,7 @@ void MP2::dfmp2(bool print) {
 	
 	IntegralEngine& integrals = focker.getIntegrals(); 
 	std::vector<libint2::Shell>& obs = focker.getMolecule()->getBasis().getIntShells();
-	std::vector<libint2::Shell>& auxbs = focker.getMolecule()->getBasis().getDFShells();
+	std::vector<libint2::Shell>& auxbs = focker.getMolecule()->getBasis().getRIShells();
 	
 	// Calculate (P|Q) and (P|mn) eris
 	

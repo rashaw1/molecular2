@@ -126,25 +126,22 @@ void Molecule::init(Construct& c)
 	std::string token; 
 	
 	for (auto& sc : c.subconstructs) {
-		if (sc.name == "basis") {
+		if (sc.name == "basis" || sc.name == "jkbasis" || sc.name == "ribasis") {
 			// Parse basis
 			if (sc.content.size() > 0) {
-				basis_found = true; 
-				parseBasis(sc, bnames); 
+				if (sc.name == "basis") {
+					basis_found = true; 
+					parseBasis(sc, bnames); 
+				} else if (sc.name == "jkbasis") 
+					parseBasis(sc, jkbnames);
+				else if (sc.name == "ribasis")
+					parseBasis(sc, ribnames); 
 				
 			} else {
 				Error e("INIT", "Basis specification is empty!"); 
 				control->log.error(e); 
 			}
-			
-		} else if (sc.name == "dfbasis") { 
-			// Parse basis
-			if (sc.content.size() > 0)
-					parseBasis(sc, dfbnames); 
-			else {
-				Error e("INIT", "DF Basis specification is empty!"); 
-				control->log.error(e); 
-			}
+				
 		} else if (sc.name == "geometry") {
 			// Parse geometry
 			natoms = sc.content.size(); 
@@ -253,7 +250,7 @@ void Molecule::init(Construct& c)
 		if (fragmented) {
 			for(auto& f : frags) 
 				if (f.size() > 3)
-					fragments.push_back(std::make_shared<Fragment>(control, &atoms[f[0]], f[1] - f[0], bfset, bnames, dfbnames, has_ecps, f[2], f[3]));
+					fragments.push_back(std::make_shared<Fragment>(control, &atoms[f[0]], f[1] - f[0], bfset, bnames, jkbnames, ribnames, has_ecps, f[2], f[3]));
 		}
 	}
 
@@ -310,7 +307,8 @@ Molecule::Molecule(const Molecule& other) : control(other.control)
 	bfset = other.bfset;
 	ecpset = other.ecpset;
 	bnames = other.bnames;
-	dfbnames = other.dfbnames; 
+	jkbnames = other.jkbnames; 
+	ribnames = other.ribnames; 
 	enuc = other.enuc;
 }
 
@@ -343,20 +341,23 @@ Molecule& Molecule::operator=(const Molecule& other) {
 	bfset = other.bfset;
 	ecpset = other.ecpset;
 	bnames = other.bnames;
-	dfbnames = other.dfbnames; 
+	jkbnames = other.jkbnames;
+	ribnames = other.ribnames;  
 	enuc = other.enuc;
 	return *this; 
 }
 
-Fragment::Fragment(SharedPC control, Atom* as, int nat, const Basis& _bfset, std::map<int, std::string> _bnames, std::map<int, std::string> _dfbnames, bool _has_ecps, int q, int mult) : Molecule(control, q)  {
+Fragment::Fragment(SharedPC control, Atom* as, int nat, const Basis& _bfset, std::map<int, std::string> _bnames, std::map<int, std::string> _jkbnames, std::map<int, std::string> _ribnames, bool _has_ecps, int q, int mult) : Molecule(control, q)  {
 	bnames = _bnames; 
-	dfbnames = _dfbnames; 
+	jkbnames = _jkbnames; 
+	ribnames = _ribnames; 
 	init(as, nat, q, mult, _has_ecps, _bfset); 
 }
 
 Fragment::Fragment(const Fragment& other) : Molecule(other.control, other.charge) {
 	bnames = other.bnames; 
-	dfbnames = other.dfbnames; 
+	jkbnames = other.jkbnames; 
+	ribnames = other.ribnames; 
 	init(other.atoms, other.natoms, other.charge, other.multiplicity, other.has_ecps, other.bfset);
 }
 Fragment::~Fragment() { }
@@ -364,7 +365,8 @@ Fragment::~Fragment() { }
 Fragment& Fragment::operator=(const Fragment& other) {
 	control = other.control;
 	bnames = other.bnames;
-	dfbnames = other.dfbnames; 
+	jkbnames = other.jkbnames; 
+	ribnames = other.ribnames; 
 	init(other.atoms, other.natoms, other.charge, other.multiplicity, other.has_ecps, other.bfset);
 	return *this;
 }
@@ -669,17 +671,20 @@ Vector Molecule::rConsts(int units)
 
 void Molecule::buildShellBasis() {
 	BasisReader b(bnames);
-	BasisReader b2(dfbnames); 
+	BasisReader b2(jkbnames);
+	BasisReader b3(ribnames);  
 	
 	for (int i = 0; i < natoms; i++) {
 		Atom &a = atoms[i];
 		double pos[3] = { a.getX(), a.getY(), a.getZ() };
-		b.readShellBasis(bfset, a.getCharge(), pos, i, false);
+		b.readShellBasis(bfset, a.getCharge(), pos, i, 0);
 		
-		if (dfbnames.size() == bnames.size()) 
-			b2.readShellBasis(bfset, a.getCharge(), pos, i, true);
+		if (jkbnames.size() != 0) 
+			b2.readShellBasis(bfset, a.getCharge(), pos, i, 1);
+		
+		if (ribnames.size() != 0)
+			b3.readShellBasis(bfset, a.getCharge(), pos, i, 2);
 	}
-	
 	
 }
 
@@ -701,7 +706,8 @@ void Molecule::buildECPBasis() {
 
 void Molecule::updateBasisPositions() {
 	std::vector<libint2::Shell>& shells = bfset.getIntShells();
-	std::vector<libint2::Shell>& dfshells = bfset.getDFShells();
+	std::vector<libint2::Shell>& jkshells = bfset.getJKShells();
+	std::vector<libint2::Shell>& rishells = bfset.getRIShells(); 
 	
 	for (int i = 0; i < natoms; i++) {
 		auto x = atoms[i].getX(); auto y = atoms[i].getY(); auto z = atoms[i].getZ();
@@ -713,11 +719,19 @@ void Molecule::updateBasisPositions() {
 			}
 		}
 		
-		for (int j = 0; j < dfshells.size(); j++) {
-			if (bfset.getDFShellAtom(j) == i) {
-				dfshells[j].O[0] = x;
-				dfshells[j].O[1] = y;
-				dfshells[j].O[2] = z;
+		for (int j = 0; j < jkshells.size(); j++) {
+			if (bfset.getJKShellAtom(j) == i) {
+				jkshells[j].O[0] = x;
+				jkshells[j].O[1] = y;
+				jkshells[j].O[2] = z;
+			}
+		}
+		
+		for (int j = 0; j < rishells.size(); j++) {
+			if (bfset.getRIShellAtom(j) == i) {
+				rishells[j].O[0] = x;
+				rishells[j].O[1] = y;
+				rishells[j].O[2] = z;
 			}
 		}
 		

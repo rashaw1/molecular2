@@ -63,7 +63,7 @@ void ALMOSCF::setFragments(bool unrestricted)
 			FragmentInfo f; 
 			f.occ = frags[i]->getNel() / 2; 
 			f.nbfs = f_nbfs; 
-			f.naux = new_engine.nbasis(frags[i]->getBasis().getDFShells()); 
+			f.naux = new_engine.nbasis(frags[i]->getBasis().getJKShells()); 
 			f.auxstart = auxstart; 
 			f.start = start;
 			f.radius = frags[i]->getBasis().extent();
@@ -692,7 +692,7 @@ void ALMOSCF::rscf()
 					 
 					com1 = f1.getMolecule()->com(); 
 					std::vector<libint2::Shell>& f1obs = f1.getMolecule()->getBasis().getIntShells();
-					std::vector<libint2::Shell>& f1auxbs = f1.getMolecule()->getBasis().getDFShells();
+					std::vector<libint2::Shell>& f1auxbs = f1.getMolecule()->getBasis().getRIShells();
 					
 					int nu_offset = mu_offset + f1_nbfs;
 					for (int n2 = n1+1; n2 < nfrags; n2++) {
@@ -702,7 +702,7 @@ void ALMOSCF::rscf()
 						f2_nvirt = f2_nbfs - f2_nocc; 
 						
 						std::vector<libint2::Shell>& f2obs = f2.getMolecule()->getBasis().getIntShells();
-						std::vector<libint2::Shell>& f2auxbs = f2.getMolecule()->getBasis().getDFShells();
+						std::vector<libint2::Shell>& f2auxbs = f2.getMolecule()->getBasis().getRIShells();
 						com2 = f2.getMolecule()->com(); 
 						
 						sep = (com1 - com2).norm(); 
@@ -769,7 +769,7 @@ void ALMOSCF::rscf()
 				int nocc = focker.getMolecule()->getNel() / 2;
 				int nvirt = nbfs - nocc;
 			
-				fInfo info(focker.getMolecule()->getBasis().getIntShells(), focker.getMolecule()->getBasis().getDFShells()); 
+				fInfo info(focker.getMolecule()->getBasis().getIntShells(), focker.getMolecule()->getBasis().getRIShells()); 
 				info.T = Eigen::MatrixXd::Zero(nbfs, nocc); 
 				info.V = Eigen::MatrixXd::Zero(nbfs, nvirt);
 				int row_offset = 0; int occ_col_offset = 0; int virt_col_offset = 0;

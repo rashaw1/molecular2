@@ -531,7 +531,7 @@ bool D_is_shelldiagonal, double precision)
 Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 
 	BasisSet& obs = molecule->getBasis().getIntShells(); 
-	BasisSet& dfbs = molecule->getBasis().getDFShells(); 
+	BasisSet& dfbs = molecule->getBasis().getJKShells(); 
   
 	const auto n = integrals.nbasis(obs); 
 	const auto ndf = integrals.nbasis(dfbs); 
@@ -604,7 +604,7 @@ Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo) {
 
 	BasisSet& obs = molecule->getBasis().getIntShells(); 
-	BasisSet& dfbs = molecule->getBasis().getDFShells(); 
+	BasisSet& dfbs = molecule->getBasis().getJKShells(); 
   
 	const auto n = integrals.nbasis(obs); 
 	const auto ndf = integrals.nbasis(dfbs); 
