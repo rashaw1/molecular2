@@ -625,18 +625,6 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 		Matrix I = Matrix::Identity(ndf, ndf);
 		auto L = V_LLt.matrixL();
 		Linv = L.solve(I).transpose();
-
-		/*Vector row; 
-		for (int x = 0; x < n; x++) {
-			for (int y = 0; y<= x; y++) {
-				int xy = x*n+y; 
-				int yx = y*n+x; 
-				row = xyK.row(xy); 
-			
-				for (int K = 0; K < ndf; K++)
-					xyK(xy, K) = xyK(yx, K) = row.dot(Linv.col(K)); 
-			}
-		} */
 	
 		int i_offset = 0; 
 		for (int B = 0; B < finfo.size(); B++) {

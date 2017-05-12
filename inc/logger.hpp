@@ -72,6 +72,7 @@
 class BF;
 class PBF;
 class Error;
+class Fock; 
 
 // Begin class declaration
 class Logger
@@ -129,6 +130,7 @@ public:
   void orbitals(const Vector& eps, int nel, bool one = false);
   void coefficient_matrix(const Vector& eps, int nel, const Matrix& coeffs, bool one = false); 
   void frequencies(const Vector& freqs, const Matrix& modes, bool printmodes); 
+  void printDomains(Fock& f); 
   
   void initIterationOpt(); 
   void optg_dump(int iter, Vector& grad, Vector& step, SharedMolecule m, Matrix& hessian,

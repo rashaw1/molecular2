@@ -610,7 +610,6 @@ void ALMOSCF::rscf()
 	
 	setFragments();
 	
-	molecule->control->log.initIteration(); 
 	delta_d = 1.0; delta_e = 1.0; 
 	bool converged = false;
 	int iter = 0;
@@ -620,6 +619,11 @@ void ALMOSCF::rscf()
 	
 	while (!converged && iter < MAXITER) {
 		rcompute(); 
+		if (iter == 0) {
+				if (cmd.get_option<bool>("dprint"))
+					molecule->control->log.printDomains(focker); 
+				molecule->control->log.initIteration(); 
+		}
 		molecule->control->log.iteration(iter++, dimer_energy, delta_e, delta_d);
 		converged = (fabs(delta_e) < E_CONVERGE) && (fabs(delta_d) < D_CONVERGE);
 	}

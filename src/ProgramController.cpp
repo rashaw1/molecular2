@@ -427,6 +427,7 @@ void ProgramController::call_ralmo(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("rthresh")) c.set_option<double>("rthresh", 7.0);
 	if(!c.is_option_set("df")) c.set_option<bool>("df", false); 
 	if(!c.is_option_set("guess")) c.set_option<std::string>("guess", "soad"); 
+	if(!c.is_option_set("dprint")) c.set_option<bool>("dprint", false);
 
 	focker = std::make_shared<Fock>(c, *ints, m); 
 	ALMOSCF almo(c, m, *focker); 

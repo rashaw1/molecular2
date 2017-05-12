@@ -15,13 +15,20 @@ molecule = {
 		   4, 6, 0, 1
 	 }
 	 basis = {
-	       default, avdz
+	       default, cc-pvdz
 	 } 
-	 dfbasis = {
-	 	 default, vdzmp2fit
+	 jkbasis = {
+	 	 default, vdzjkfit
 	 }
+	 ribasis = {
+	 	 default, vdzmp2fit
+  	 }
 }
-rhf(
-	df, true
+ralmo (
+      df, true
+      rpa, true
+      sosex, true
+      longrange, false
+      xcorrect, false
+      perturb, 2
 )
-dfmp2()

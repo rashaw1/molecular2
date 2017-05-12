@@ -151,6 +151,9 @@ public:
   Matrix getK() const { return kints; }
   Matrix getForces() const { return forces; }
   Matrix getHessian() const { return hessian; }
+  std::vector<Domain>& getLMODomains() { return lmo_domains; }
+  std::vector<Domain>& getAODomains() { return ao_domains; }
+  std::vector<Domain>& getFitDomains() { return fit_domains; }
   virtual Matrix getS() const { return integrals.getOverlap(); }
   virtual Matrix getDens() const { return dens; }
   void setDIIS(bool d) { diis = d; } 

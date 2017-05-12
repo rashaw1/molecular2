@@ -18,6 +18,7 @@
 #include "ProgramController.hpp"
 #include "molecule.hpp"
 #include "bf.hpp"
+#include "fock.hpp"
 #include "pbf.hpp"
 #include "error.hpp"
 #include "ioutil.hpp"
@@ -918,6 +919,37 @@ void Logger::mo_map(Vector& coeffs, SharedMolecule m, int fineness, std::string&
 		error(e1); 
 	}
 	
+}
+
+// Print orbital domains in local DFJK
+void Logger::printDomains(Fock& f) {
+	std::vector<Domain>& lmos = f.getLMODomains();
+	std::vector<Domain>& aos = f.getAODomains(); 
+	std::vector<Domain>& fits = f.getFitDomains(); 
+	
+	int nmos = lmos.size();
+	assert(aos.size() == nmos && fits.size() == nmos); 
+	
+	outfile << "LOCAL DFJK DOMAINS" << std::endl << std::endl; 
+	
+	for (int i = 0; i < nmos; i++) {
+		
+		outfile << "ORBITAL " << i+1 << std::endl; 
+		outfile << "LMO Domain (" << std::accumulate(lmos[i].sizes.begin(), lmos[i].sizes.end(), 0) << " functions): "; 
+		for (auto d : lmos[i].centres)
+			outfile << d+1 << ", ";
+		outfile << std::endl; 
+		
+		outfile << "AO Domain (" << std::accumulate(aos[i].sizes.begin(), aos[i].sizes.end(), 0) << " functions): ";
+		for (auto d : aos[i].centres)
+			outfile << d+1 << ", ";
+		outfile << std::endl;
+		
+		outfile << "DF Domain (" << std::accumulate(fits[i].sizes.begin(), fits[i].sizes.end(), 0) << " functions): ";
+		for (auto d : fits[i].centres)
+			outfile << d+1 << ", ";
+		outfile << std::endl << std::endl;
+	}
 }
 
 
