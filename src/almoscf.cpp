@@ -889,8 +889,11 @@ double ALMOSCF::r_energy_df() {
 	for (int x = 0; x < nbfs; x++) {
 		for (int i = 0; i < nocc; i++) {
 			for (int K = 0; K < ndf; K++) {
-				for (int y = 0; y < nbfs; y++)
-					xiK(x*nocc+i, K) += T(y, i) * xyK(x*nbfs+y, K); 
+				for (int y = 0; y < nbfs; y++) {
+					int X = std::max(x, y);
+					int Y = std::min(x, y); 
+					xiK(x*nocc+i, K) += T(y, i) * xyK((X*(X+1))/2 + Y, K); 
+				}
 			}
 		}
 	}
@@ -916,18 +919,21 @@ double ALMOSCF::r_energy_df() {
 			ren -= ijK(i*nocc+j, j*nocc+i); 
 		}
 	}
-	
-	Vector Pv(Eigen::Map<Vector>(P.data(), P.cols()*P.rows()));
+		
+	Vector Pv((nbfs*(nbfs+1))/2);
+	for (int x = 0; x < nbfs; x++)
+		for (int y = 0; y <= x; y++)
+			Pv[(x*(x+1))/2 + y] = x == y ? 0.5 * P(x ,y) : P(x, y); 
 	Pv = xyK.transpose() * Pv;
-	Pv = Linv * Linv.transpose() * Pv; 
-	Pv = 2.0 * xyK *  Pv; 
+	Pv = Linv * Linv.transpose() * Pv;  
+	Pv = 4.0 * xyK *  Pv; 
 	Matrix J = Matrix::Zero(nbfs, nbfs); 
 	for (int x = 0; x < nbfs; x++)
-	for (int y = 0; y <=x; y++) {
-		J(x, y) += Pv[x*nbfs+y];
-		J(y, x) = J(x, y); 
-	}
-		
+		for (int y = 0; y <=x; y++) {
+			J(x, y) += Pv[(x*(x+1))/2+y];
+			J(y, x) = J(x, y); 
+		}
+	
 	ren += (P*J).trace(); 
 	
 	return ren;

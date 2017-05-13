@@ -553,12 +553,11 @@ Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 		Vector row; 
 		for (int x = 0; x < n; x++) {
 			for (int y = 0; y<= x; y++) {
-				int xy = x*n+y; 
-				int yx = y*n+x; 
+				int xy = (x*(x+1))/2+y; 
 				row = xyK.row(xy); 
 			
 				for (int K = 0; K < ndf; K++)
-					xyK(xy, K) = xyK(yx, K) = row.dot(Linv.col(K)); 
+					xyK(xy, K) = row.dot(Linv.col(K)); 
 			}
 		} 
 	}  // if (xyK.size() == 0)
@@ -567,8 +566,11 @@ Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 	for (int x = 0; x < n; x++) {
 		for (int i = 0; i < nocc; i++) {
 			for (int K = 0; K < ndf; K++) {
-				for (int y = 0; y < n; y++) 
-					xiK(x*nocc+i, K) += xyK(x*n+y, K) * Cocc(y, i); 
+				for (int y = 0; y < n; y++) {
+					int X = std::max(x, y);
+					int Y = std::min(x, y);
+					xiK(x*nocc+i, K) += xyK((X*(X+1))/2+Y, K) * Cocc(y, i); 
+				}
 			}
 		}
 	}
@@ -593,7 +595,7 @@ Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 	for (int x = 0; x < n; x++) {
 		for (int y = 0; y <= x; y++) { 
 			for (int K = 0; K < ndf; K++)  
-				G(x, y) += 2.0 * xyK(x*n+y, K) * Jtmp[K]; 
+				G(x, y) += 2.0 * xyK((x*(x+1))/2+y, K) * Jtmp[K]; 
 			G(y, x) = G(x, y); 
 		}
 	}
@@ -776,9 +778,12 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 						for (int mo = 0; mo < nmo; mo++) {
 							mostart = lmo_d.starts[mo];
 							mosize = lmo_d.sizes[mo]; 
-							
-							for (int nu = mostart; nu < mostart + mosize; nu++)  
-								uA(ul, Al) += xyK(u*n+nu, A) * Cocc(nu, i); 
+
+							for (int nu = mostart; nu < mostart + mosize; nu++) {
+								int U = std::max(u, nu); 
+								int NU = std::min(u, nu); 
+								uA(ul, Al) += xyK((U*(U+1))/2+NU, A) * Cocc(nu, i);
+							} 
 							
 						}
 						ul++; 
@@ -819,13 +824,16 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 	
 	// compute Coulomb
 	
-	Vector Pv(Eigen::Map<Vector>(Pt.data(), Pt.cols()*Pt.rows()));
+	Vector Pv((n*(n+1))/2);
+	for (int x = 0; x < n; x++)
+		for (int y = 0; y <= x; y++)
+			Pv[(x*(x+1))/2 + y] = x == y ? 0.5 * Pt(x ,y) : Pt(x, y); 
 	Pv = xyK.transpose() * Pv;
 	Pv = Linv * Linv.transpose() * Pv;  
-	Pv = 2.0 * xyK *  Pv; 
+	Pv = 4.0 * xyK *  Pv; 
 	for (int x = 0; x < n; x++)
 		for (int y = 0; y <=x; y++) {
-			G(x, y) += Pv[x*n+y];
+			G(x, y) += Pv[(x*(x+1))/2+y];
 			G(y, x) = G(x, y); 
 		}
 

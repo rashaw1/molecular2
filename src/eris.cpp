@@ -95,8 +95,9 @@ void IntegralEngine::compute_eris_3index(const std::vector<libint2::Shell>& obs,
 	using libint2::BraKet; 
 
 	const auto n_obs = nbasis(obs);
-	const auto n_abs = nbasis(auxbs); 
-	eris = Matrix::Zero(n_obs*n_obs, n_abs);
+	const auto n_abs = nbasis(auxbs);
+	int ndim = (n_obs * (n_obs + 1)) / 2;  
+	eris = Matrix::Zero(ndim, n_abs);
 
 	Engine engine(Operator::coulomb, 
 	std::max(max_nprim(obs), max_nprim(auxbs)),
@@ -139,14 +140,12 @@ void IntegralEngine::compute_eris_3index(const std::vector<libint2::Shell>& obs,
 					for(auto f2=0; f2!=n2; ++f2) {
               
 						const auto bf2 = f2 + bf2_first;
-             
+             		   	int ix = (bf2 * (bf2 + 1)) / 2; 
+			 
 						for(auto f3=0; f3!=n3; ++f3, ++f123) {
                 
-							const auto bf3 = f3 + bf3_first;
-             
-							eris(bf2*n_obs+bf3, bf1)= buf_123[f123];
-							eris(bf3*n_obs+bf2, bf1) = buf_123[f123]; 
-		  
+							const auto bf3 = f3 + bf3_first; 
+							if (bf2 >= bf3) eris(ix+bf3, bf1)= buf_123[f123];
 							
 						}
 					}

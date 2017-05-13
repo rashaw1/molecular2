@@ -617,8 +617,11 @@ std::vector<Matrix> RPA::df_eris(const std::vector<libint2::Shell>& obs, const s
 			for (int P = 0; P < nabs; P++) {
 				
 				ix = i*nobs+nu; 
-				for (int mu = 0; mu < nobs; mu++)
-					BmnP(ix, P) +=  T(mu, i) * KmnP(mu*nobs+nu, P); 
+				for (int mu = 0; mu < nobs; mu++) {
+					int X = std::max(mu, nu); 
+					int Y = std::min(mu, nu); 
+					BmnP(ix, P) +=  T(mu, i) * KmnP((X*(X+1))/2 + Y, P); 
+				}
 				
 			} 
 		}

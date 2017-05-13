@@ -526,8 +526,11 @@ void MP2::dfmp2(bool print) {
 			for (int P = 0; P < nabs; P++) {
 				
 				ix = i*nobs+nu; 
-				for (int mu = 0; mu < nobs; mu++)
-					BmnP(ix, P) += cp_occ(mu, i) * KmnP(mu*nobs+nu, P); 
+				for (int mu = 0; mu < nobs; mu++) {
+					int X = std::max(mu, nu);
+					int Y = std::min(mu, nu); 
+					BmnP(ix, P) += cp_occ(mu, i) * KmnP((X*(X+1))/2+Y, P); 
+				}
 				
 			} 
 		}
