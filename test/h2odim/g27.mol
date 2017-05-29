@@ -17,9 +17,12 @@ molecule = {
 	 basis = {
 	       default, avdz
 	 } 
-	 dfbasis = {
-	 	 default, vdzmp2fit
-	 }
+         jkbasis = {
+                 default, vdzjkfit
+         }
+         ribasis = {
+                 default, vdzmp2fit
+         }
 }
 ralmo(
 	perturb, 2

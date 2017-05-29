@@ -436,7 +436,8 @@ void RPA::fcompute(fInfo& info, bool print) {
 							double vjaib = 0.0;
 							for (int Q = 0; Q < KiaP.cols(); Q++)
 								vjaib += KiaP(j*nvirt+a, Q) * KiaP(i*nvirt+b, Q); 
-							bvals[ix2] -= vjaib; 
+							bvals[ix2] -= vjaib;
+							avals[ix2] -= vjaib; 
 						}
 						if (i==j) avals[ix2] += F(a+nocc, b+nocc); 
 						if (a==b) avals[ix2] -= F(i, j); 
@@ -471,16 +472,16 @@ void RPA::fcompute(fInfo& info, bool print) {
 	A["iajb"] = T["iajb"]; 
 	CTF::Tensor<> newT(4, iajb_dims, NSNS, dw);
 	CTF::Function<> fctr(&divide_r);
-	T["iajb"] = -K["iajb"]; 
+	T["iajb"] = -B["iajb"]; 
 	double delta = 1.0;
 	int iter = 0; 
 	double tnorm = T.norm2(); 
 	while (delta > 1e-4 && iter < 15) {
 
 		newT["iajb"] = -Ap["iajb"]; 
-		newT["iajb"] -= T["iakc"] * K["kcjb"]; 
+		newT["iajb"] -= T["iakc"] * B["kcjb"]; 
 		newT["iajb"] = newT["iakc"] * T["kcjb"]; 
-		newT["iajb"] -= K["iajb"];
+		newT["iajb"] -= B["iajb"];
 		newT["iajb"] -= T["iakc"] * Ap["kcjb"]; 
 
 		newT.contract(1.0, newT, "iajb", A, "iajb", 0.0, "iajb", fctr);
@@ -584,6 +585,8 @@ void RPA::fcompute(fInfo& info, bool print) {
 	}
 	delete tix; delete bix; delete tvals; delete bvals; 
 	
+	info.edisp *= 0.5;
+	info.edispexch *= 0.5;
 	energy = info.edisp + info.edispexch;
 		
 	if (print) log.localTime(); 

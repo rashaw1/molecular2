@@ -8,6 +8,7 @@
 #include <libint2.hpp>
 #include "logger.hpp"
 #include "ProgramController.hpp"
+#include "eigen_util.hpp"
 
 typedef std::vector<libint2::Shell> BasisSet; 
  

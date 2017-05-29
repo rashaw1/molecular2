@@ -8,7 +8,7 @@ molecule = {
 		  h, 0.71815, 0.0, 0.0
 	 }
 	 basis = {
-	       default, cc-pvdz
+	       default, avqz
 	 }
 }	 
 !rhf(
@@ -19,9 +19,9 @@ molecule = {
 !mp2()
 !uhf()
 !mp2()
-optg(
-	freq,true
-)
+!optg(
+!	freq,true
+!)
 !optx()
 !optg()
 !optx(
@@ -29,6 +29,7 @@ optg(
 !	mapfile, h2after.map
 !	fineness, 75
 !)
-ccsd(
-	converge, 1e-6
-)
+!ccsd(
+!	converge, 1e-6
+!)
+rhf()
