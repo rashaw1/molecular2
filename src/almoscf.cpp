@@ -455,6 +455,70 @@ void ALMOSCF::rperturb(bool order4)
 	
 }
 
+// iterative charge transfer
+void ALMOSCF::rinf() {
+	
+	int nbfs = focker.getHCore().rows(); 
+	int nocc = focker.getMolecule()->getNel() / 2;
+	int nvirt = nbfs - nocc;
+	
+	Matrix T = Eigen::MatrixXd::Zero(nbfs, nocc); 
+	Matrix V = Eigen::MatrixXd::Zero(nbfs, nvirt);
+	int row_offset = 0; int occ_col_offset = 0; int virt_col_offset = 0;
+	for (auto& f : fragments) {
+		Matrix& f_cp = f.getCP(); 
+		int f_nocc = f.getMolecule()->getNel() / 2;
+		int f_nbfs = f.getHCore().rows(); 
+		int f_nvirt = f_nbfs - f_nocc; 
+		
+		T.block(row_offset, occ_col_offset, f_nbfs, f_nocc) = f_cp.block(0, 0, f_nbfs, f_nocc); 
+		V.block(row_offset, virt_col_offset, f_nbfs, f_nvirt) = f_cp.block(0, f_nocc, f_nbfs, f_nvirt);
+		
+		row_offset += f_nbfs; 
+		occ_col_offset += f_nocc; 
+		virt_col_offset += f_nvirt; 
+	}
+	
+	Matrix Q = Matrix::Identity(nbfs, nbfs) - P * focker.getS(); 
+	V = Q * V; 
+	
+	Matrix Foo = T.transpose() * focker.getFockAO() * T;
+	Matrix Fvv = V.transpose() * focker.getFockAO() * V;
+	Matrix Fov = T.transpose() * focker.getFockAO() * V; 
+	Matrix Xvo = Matrix::Zero(nvirt, nocc); 
+	for (int a = 0; a < nvirt; a++)
+		for (int i = 0; i < nocc; i++)
+			Xvo(a, i) = Fov(i, a) / (Foo(i, i) - Fvv(a, a)); 
+	
+	double diff = Xvo.norm();
+	int iter = 0; 
+	Matrix oldX = Xvo;  
+	while ( diff > 1e-4 && iter < 10 ) {
+		Xvo = Fov.transpose(); 
+		Xvo -= oldX * Fov * oldX; 
+		
+		for (int a = 0; a < nvirt; a++) {
+			for (int i = 0; i < nocc; i++) {
+				for (int j = 0; j < nocc; j++)
+					if (j != i) Xvo(a, i) -= oldX(a, j) * Foo(j, i); 
+				
+				for (int b = 0; b < nvirt; b++)
+					if (b != a) Xvo(a, i) += Fvv(a, b) * oldX(b, i); 
+				
+				Xvo(a, i) /= (Foo(i, i) - Fvv(a, a)); 
+			}
+		}
+		
+		diff = (Xvo - oldX).norm(); 
+		oldX = Xvo; 
+		iter++; 
+	}
+	
+	
+	
+	std::cout << 2.0 * (Fov * Xvo).trace() * Logger::TOKCAL << std::endl; 
+}
+
 // Calculate the perturbative correction
 void ALMOSCF::uperturb(bool order4)
 {
@@ -650,7 +714,8 @@ void ALMOSCF::rscf()
 		int perturbation = cmd.get_option<int>("perturb"); 
 		if (perturbation > 0) {
 			bool fourth = perturbation == 2; 
-			rperturb(fourth); 
+			rinf(); 
+			rperturb(fourth);
 			e_pert_2 *= 2.0;
 			molecule->control->log.result("E(2)", e_pert_2 * Logger::TOKCAL, "kcal /mol"); 
 			

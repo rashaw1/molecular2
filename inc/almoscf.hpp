@@ -33,6 +33,7 @@ public:
 	ALMOSCF(Command& c, SharedMolecule m, Fock& f);
 	// Routines
 	void rperturb(bool order4 = false);
+	void rinf(); 
 	void uperturb(bool order4 = false);
 	void setFragments(bool unrestricted = false);
 	double getDimerEnergy() const { return dimer_energy; } 
