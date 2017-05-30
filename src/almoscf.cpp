@@ -732,6 +732,7 @@ void ALMOSCF::rscf()
 
 		
 		molecule->control->log.result("ALMO Interaction Energy", energy * Logger::TOKCAL, "kcal / mol"); 
+		molecule->control->log.flush();
 		
 		int perturbation = cmd.get_option<int>("perturb"); 
 		
@@ -753,6 +754,7 @@ void ALMOSCF::rscf()
 				molecule->control->log.result("E(Inf)", e_pert_2 * Logger::TOKCAL, "kcal / mol"); 
 			}
 			molecule->control->log.result("Total ALMO+CT interaction energy", (energy + e_pert_2 + e_pert_4) * Logger::TOKCAL, "kcal / mol");
+			molecule->control->log.flush(); 
 		}
 		
 		if (cmd.get_option<bool>("rpa")) {

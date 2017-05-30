@@ -110,7 +110,7 @@ void IntegralEngine::compute_eris_3index(const std::vector<libint2::Shell>& obs,
 	auto shell2bf_abs = map_shell_to_basis_function(auxbs);
 
 	const auto& buf = engine.results();
-
+	
 	// loop over shell quartets
 	for (auto s1=0; s1 != auxbs.size(); ++s1) {
     
