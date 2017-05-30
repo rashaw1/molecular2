@@ -271,7 +271,9 @@ double divide_r(double a, double b){
 void RPA::fcompute(fInfo& info, bool print) {
 	
 	Logger& log = focker.getMolecule()->control->log; 
-	bool sosex = cmd.get_option<bool>("sosex"); 
+	int xcorder = cmd.get_option<int>("rpax");
+	bool sosex = xcorder > 0; 
+	bool rpax =  xcorder > 1; 
 	int nfrags = info.nocc.size();
 	
 	// Form MO overlap matrix
@@ -390,7 +392,12 @@ void RPA::fcompute(fInfo& info, bool print) {
 						ix2 = i + a*nocc + j*dim + b*nvnono; 
 						avals[ix2] = bvals[ix2] = kvals[ix2] = 2.0 * viajb[ix2]; 
 						if (sosex) {
-							bvals[ix2] -= viajb[j + a*nocc + i*dim + b*nvnono]; 
+							double xc = viajb[j + a*nocc + i*dim + b*nvnono]; 
+							bvals[ix2] -= xc; 
+							if (rpax) {
+								avals[ix2] -= xc;
+								kvals[ix2] -= xc; 
+							}
 						}
 						if (i==j) avals[ix2] += F(a+nocc, b+nocc); 
 						if (a==b) avals[ix2] -= F(i, j); 
@@ -437,7 +444,10 @@ void RPA::fcompute(fInfo& info, bool print) {
 							for (int Q = 0; Q < KiaP.cols(); Q++)
 								vjaib += KiaP(j*nvirt+a, Q) * KiaP(i*nvirt+b, Q); 
 							bvals[ix2] -= vjaib;
-							avals[ix2] -= vjaib; 
+							if (rpax) {
+								avals[ix2] -= vjaib; 
+								kvals[ix2] -= vjaib; 
+							}
 						}
 						if (i==j) avals[ix2] += F(a+nocc, b+nocc); 
 						if (a==b) avals[ix2] -= F(i, j); 
@@ -472,16 +482,16 @@ void RPA::fcompute(fInfo& info, bool print) {
 	A["iajb"] = T["iajb"]; 
 	CTF::Tensor<> newT(4, iajb_dims, NSNS, dw);
 	CTF::Function<> fctr(&divide_r);
-	T["iajb"] = -B["iajb"]; 
+	T["iajb"] = -K["iajb"]; 
 	double delta = 1.0;
 	int iter = 0; 
 	double tnorm = T.norm2(); 
 	while (delta > 1e-4 && iter < 15) {
 
 		newT["iajb"] = -Ap["iajb"]; 
-		newT["iajb"] -= T["iakc"] * B["kcjb"]; 
+		newT["iajb"] -= T["iakc"] * K["kcjb"]; 
 		newT["iajb"] = newT["iakc"] * T["kcjb"]; 
-		newT["iajb"] -= B["iajb"];
+		newT["iajb"] -= K["iajb"];
 		newT["iajb"] -= T["iakc"] * Ap["kcjb"]; 
 
 		newT.contract(1.0, newT, "iajb", A, "iajb", 0.0, "iajb", fctr);
@@ -585,8 +595,13 @@ void RPA::fcompute(fInfo& info, bool print) {
 	}
 	delete tix; delete bix; delete tvals; delete bvals; 
 	
-	info.edisp *= 0.5;
-	info.edispexch *= 0.5;
+	if (rpax) {
+		info.edisp *= 0.5;
+		info.edispexch *= 0.5;
+		info.eionic *= 0.5;
+		info.ebsse *= 0.5;
+		info.eintra *= 0.5;
+	} 
 	energy = info.edisp + info.edispexch;
 		
 	if (print) log.localTime(); 

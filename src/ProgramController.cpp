@@ -411,10 +411,10 @@ void ProgramController::call_ralmo(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("enconverge")) c.set_option<double>("enconverge", 1e-7); 
 	if(!c.is_option_set("densconverge")) c.set_option<double>("densconverge", 1e-4);  
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
-	if(!c.is_option_set("perturb")) c.set_option<int>("perturb", 0);
+	if(!c.is_option_set("perturb")) c.set_option<int>("perturb", 1);
 	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12);
 	if(!c.is_option_set("rpa")) c.set_option<bool>("rpa", false);  
-	if(!c.is_option_set("sosex")) c.set_option<bool>("sosex", false); 
+	if(!c.is_option_set("rpax")) c.set_option<int>("rpax", 2); 
 	if(!c.is_option_set("longrange")) c.set_option<bool>("longrange", false); 
 	if(!c.is_option_set("mu")) c.set_option<double>("mu", 0.5); 
 	if(!c.is_option_set("iterative")) c.set_option<bool>("iterative", true);

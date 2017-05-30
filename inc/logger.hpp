@@ -126,7 +126,9 @@ public:
   void initIteration();
   void initIterationCC();
   void initALMOTable(); 
-  void ALMORow(int f1, int f2, double sep, double edisp, double edispexch); 
+  void initCTTable(); 
+  void ALMORow(int f1, int f2, double sep, double edisp, double edispexch, double eionic, double ebsse, double eintra); 
+  void CTRow(int f1, int f2, double en); 
   void orbitals(const Vector& eps, int nel, bool one = false);
   void coefficient_matrix(const Vector& eps, int nel, const Matrix& coeffs, bool one = false); 
   void frequencies(const Vector& freqs, const Matrix& modes, bool printmodes); 

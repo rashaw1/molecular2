@@ -151,4 +151,5 @@ ralmo (
       longrange, false
       sosex, true
       xcorrect, false
+      rcutoff, 10.0
 )

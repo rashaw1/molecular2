@@ -35,6 +35,7 @@ public:
 	void rperturb(bool order4 = false);
 	void rinf(); 
 	void uperturb(bool order4 = false);
+	void uinf(); 
 	void setFragments(bool unrestricted = false);
 	double getDimerEnergy() const { return dimer_energy; } 
 	std::vector<double>& getMonomerEnergies() { return monomer_energies; }

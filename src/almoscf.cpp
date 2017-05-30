@@ -514,9 +514,31 @@ void ALMOSCF::rinf() {
 		iter++; 
 	}
 	
+	molecule->control->log.title("Pairwise charge transfer"); 
+	molecule->control->log.initCTTable(); 
+	int ioffset = 0; int aoffset = 0; 
+	for (int f1 = 0; f1 < fragments.size(); f1++) {
+		int f1_nocc = fragments[f1].getMolecule()->getNel()/2;
+		int f1_nvirt = fragments[f1].getHCore().rows() - f1_nocc; 
+		
+		int joffset = 0; int boffset = 0;
+		for (int f2 = 0; f2 < fragments.size(); f2++) {
+			int f2_nocc = fragments[f2].getMolecule()->getNel()/2;
+			int f2_nvirt = fragments[f2].getHCore().rows() - f1_nocc; 
+			
+			double ef1f2 = (Fov.block(ioffset, boffset, f1_nocc, f2_nvirt) * Xvo.block(boffset, ioffset, f2_nvirt, f1_nocc)).trace(); 
+			molecule->control->log.CTRow(f1+1, f2+1, 2.0*ef1f2); 
+			
+			joffset += f2_nocc;
+			boffset += f2_nvirt; 
+		}
+		
+		ioffset += f1_nocc;
+		aoffset += f1_nvirt; 
+	}
+			
 	
-	
-	std::cout << 2.0 * (Fov * Xvo).trace() * Logger::TOKCAL << std::endl; 
+	e_pert_2 = 2.0 * (Fov * Xvo).trace(); 
 }
 
 // Calculate the perturbative correction
@@ -684,9 +706,9 @@ void ALMOSCF::rscf()
 	while (!converged && iter < MAXITER) {
 		rcompute(); 
 		if (iter == 0) {
-				if (cmd.get_option<bool>("dprint"))
-					molecule->control->log.printDomains(focker); 
-				molecule->control->log.initIteration(); 
+			if (cmd.get_option<bool>("dprint"))
+				molecule->control->log.printDomains(focker); 
+			molecule->control->log.initIteration(); 
 		}
 		molecule->control->log.iteration(iter++, dimer_energy, delta_e, delta_d);
 		converged = (fabs(delta_e) < E_CONVERGE) && (fabs(delta_d) < D_CONVERGE);
@@ -712,21 +734,27 @@ void ALMOSCF::rscf()
 		molecule->control->log.result("ALMO Interaction Energy", energy * Logger::TOKCAL, "kcal / mol"); 
 		
 		int perturbation = cmd.get_option<int>("perturb"); 
+		
 		if (perturbation > 0) {
-			bool fourth = perturbation == 2; 
-			rinf(); 
-			rperturb(fourth);
-			e_pert_2 *= 2.0;
-			molecule->control->log.result("E(2)", e_pert_2 * Logger::TOKCAL, "kcal /mol"); 
+			if (perturbation < 3) {
+				bool fourth = perturbation == 2; 
+				rperturb(fourth);
+				e_pert_2 *= 2.0;
+				molecule->control->log.result("E(2)", e_pert_2 * Logger::TOKCAL, "kcal /mol"); 
 			
-			if (fourth) {
-				e_pert_4 *= 2.0;
-				molecule->control->log.result("E(4)", e_pert_4 * Logger::TOKCAL, "kcal / mol"); 
+				if (fourth) {
+					e_pert_4 *= 2.0;
+					molecule->control->log.result("E(4)", e_pert_4 * Logger::TOKCAL, "kcal / mol"); 
+				} else {
+					e_pert_4 = 0.0;
+				}
 			} else {
-				e_pert_4 = 0.0;
+				rinf(); 
+				molecule->control->log.result("E(Inf)", e_pert_2 * Logger::TOKCAL, "kcal / mol"); 
 			}
 			molecule->control->log.result("Total ALMO+CT interaction energy", (energy + e_pert_2 + e_pert_4) * Logger::TOKCAL, "kcal / mol");
 		}
+		
 		if (cmd.get_option<bool>("rpa")) {
 			/*focker.transform();
 			focker.diagonalise(); 
@@ -751,7 +779,7 @@ void ALMOSCF::rscf()
 				
 				int mu_offset = 0; 
 				int f1_nocc, f2_nocc, f1_nbfs, f2_nbfs, f1_nvirt, f2_nvirt; 
-				double sep, edisp, edispexch;
+				double sep, edisp, edispexch, eionic, ebsse, eintra;
 				Vector com1, com2;  
 				for (int n1 = 0; n1 < nfrags; n1++) {
 					auto& f1 = fragments[n1]; 
@@ -775,7 +803,7 @@ void ALMOSCF::rscf()
 						com2 = f2.getMolecule()->com(); 
 						
 						sep = (com1 - com2).norm(); 
-						edisp = edispexch = 0.0; 
+						edisp = edispexch = eionic = ebsse = eintra = 0.0; 
 						
 						if (sep < rcut) {
 							
@@ -820,11 +848,14 @@ void ALMOSCF::rscf()
 							
 							edisp = info.edisp;
 							edispexch = info.edispexch; 
+							eionic = info.eionic; 
+							ebsse = info.ebsse;
+							eintra = info.eintra; 
 							e_disp += edisp + edispexch; 
 							
 						}
 						
-						molecule->control->log.ALMORow(n1, n2, sep, edisp, edispexch); 
+						molecule->control->log.ALMORow(n1, n2, sep, edisp, edispexch, eionic, ebsse, eintra); 
 						
 						nu_offset += f2_nbfs; 
 					}
@@ -994,10 +1025,10 @@ double ALMOSCF::r_energy_df() {
 	Pv = 4.0 * xyK *  Pv; 
 	Matrix J = Matrix::Zero(nbfs, nbfs); 
 	for (int x = 0; x < nbfs; x++)
-		for (int y = 0; y <=x; y++) {
-			J(x, y) += Pv[(x*(x+1))/2+y];
-			J(y, x) = J(x, y); 
-		}
+	for (int y = 0; y <=x; y++) {
+		J(x, y) += Pv[(x*(x+1))/2+y];
+		J(y, x) = J(x, y); 
+	}
 	
 	ren += (P*J).trace(); 
 	

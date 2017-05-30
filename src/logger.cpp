@@ -525,10 +525,29 @@ void Logger::initALMOTable()
 	outfile << std::setw(12) << "Frag. A";
 	outfile << std::setw(12) << "Frag. B";
 	outfile << std::setw(20) << "RCOM (Bohr)"; 
-	outfile << std::setw(24) << "Disp. (kcal/mol)"; 
-	outfile << std::setw(24) << "Disp. exch.";
+	outfile << std::setw(20) << "Disp. (kcal/mol)"; 
+	outfile << std::setw(20) << "Disp. exch.";
+	outfile << std::setw(20) << "Ionic";
+	outfile << std::setw(20) << "BSSE";
+	outfile << std::setw(20) << "Intra.";
 	outfile << std::setw(20) << "Time elapsed\n";
-	outfile << std::string(115, '-') << "\n";
+	outfile << std::string(167, '-') << "\n";
+}
+
+void Logger::initCTTable()
+{
+	outfile << "\n";
+	outfile << std::setw(12) << "From frag.";
+	outfile << std::setw(12) << "to frag.";
+	outfile << std::setw(30) << "Charge transfer (kcal / mol)\n"; 
+	outfile << std::string(60, '-') << "\n";
+}
+
+void Logger::CTRow(int f1, int f2, double en) {
+	outfile << std::setw(12) << f1;
+	outfile << std::setw(12) << f2;
+	outfile << std::setw(30) << std::setprecision(12) << en * TOKCAL;
+	outfile << "\n"; 
 }
 
 // Print a single iteration
@@ -544,13 +563,16 @@ void Logger::iteration(int iter, double energy, double delta, double dd)
 	flush();
 }
 
-void Logger::ALMORow(int f1, int f2, double sep, double edisp, double edispexch)
+void Logger::ALMORow(int f1, int f2, double sep, double edisp, double edispexch, double eionic, double ebsse, double eintra)
 {
 	outfile << std::setw(12) << f1+1;
 	outfile << std::setw(12) << f2+1;
 	outfile << std::setw(20) << std::setprecision(3) << sep;
-	outfile << std::setw(24) << std::setprecision(8) << edisp * TOKCAL; 
-	outfile << std::setw(24) << edispexch * TOKCAL; 
+	outfile << std::setw(20) << std::setprecision(8) << edisp * TOKCAL; 
+	outfile << std::setw(20) << edispexch * TOKCAL; 
+	outfile << std::setw(20) << eionic * TOKCAL; 
+	outfile << std::setw(20) << ebsse * TOKCAL; 
+	outfile << std::setw(20) << eintra * TOKCAL; 
 	outfile << std::setw(20) << std::setprecision(6) << getLocalTime();
 	outfile << "\n";
   
