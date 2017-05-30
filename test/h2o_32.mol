@@ -146,10 +146,10 @@ H,       99.216500000,   103.453000000,   101.693000000
 }
 ralmo (
       df, true
-      perturb, 2
+      perturb, 1
       rpa, true
       longrange, false
-      sosex, true
+      rpax, true
       xcorrect, false
-      rcutoff, 10.0
+      rcutoff, 12.0
 )

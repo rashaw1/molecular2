@@ -145,8 +145,8 @@ void IntegralEngine::compute_eris_3index(const std::vector<libint2::Shell>& obs,
 						for(auto f3=0; f3!=n3; ++f3, ++f123) {
                 
 							const auto bf3 = f3 + bf3_first; 
-							if (bf2 >= bf3) eris(ix+bf3, bf1)= buf_123[f123];
-							
+							if (bf2 >= bf3)
+								eris(ix+bf3, bf1)= buf_123[f123];							
 						}
 					}
 				}
