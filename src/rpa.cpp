@@ -325,7 +325,8 @@ void RPA::fcompute(fInfo& info, bool print) {
 		i_offset += f1_nocc; 
 	}
 	P = P.selfadjointView<Eigen::Lower>();
-
+	
+	std::cout << "Projected stuff"<< std::endl << std::flush; 
 	sigma = Matrix::Identity(N, N) - P * info.S; 
 	info.V = sigma * info.V; 
 	
@@ -339,6 +340,7 @@ void RPA::fcompute(fInfo& info, bool print) {
 	CTF::Tensor<> Ap(4, iajb_dims, NSNS, dw);
 	CTF::Tensor<> B(4, iajb_dims, NSNS, dw); 
 	CTF::Tensor<> K(4, iajb_dims, NSNS, dw);  
+	std::cout << "Assigned stuff"<< std::endl << std::flush; 
 	/*Matrix A = Matrix::Zero(dim, dim); 
 	Matrix B = Matrix::Zero(dim, dim);
 	Matrix K = Matrix::Zero(dim, dim); */
@@ -348,6 +350,7 @@ void RPA::fcompute(fInfo& info, bool print) {
 	Ap.read_local(&apsz, &apix, &apvals);
 	B.read_local(&bsz, &bix, &bvals);
 	K.read_local(&ksz, &kix, &kvals); 
+	std::cout << "Read stuff"<< std::endl << std::flush; 
 	
 	Matrix F = Matrix::Zero(N, N); 
 	F.block(0, 0, nocc, nocc) = info.T.transpose() * info.F * info.T; 
@@ -474,8 +477,10 @@ void RPA::fcompute(fInfo& info, bool print) {
 	Ap.write(apsz, apix, apvals); 
 	B.write(bsz, bix, bvals);
 	K.write(ksz, kix, kvals);
+	std::cout << "Wrote stuff"<< std::endl << std::flush; 
 	delete avals; delete apvals; delete kvals;
 	delete aix; delete apix; delete kix; 
+	std::cout << "Deleted stuff"<< std::endl << std::flush; 
 		
 	CTF::Tensor<> T(4, iajb_dims, NSNS, dw);
 	T["iajb"] = A["iaia"] + A["jbjb"]; 
