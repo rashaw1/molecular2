@@ -326,7 +326,6 @@ void RPA::fcompute(fInfo& info, bool print) {
 	}
 	P = P.selfadjointView<Eigen::Lower>();
 	
-	std::cout << "Projected stuff"<< std::endl << std::flush; 
 	sigma = Matrix::Identity(N, N) - P * info.S; 
 	info.V = sigma * info.V; 
 	
@@ -336,21 +335,17 @@ void RPA::fcompute(fInfo& info, bool print) {
 	int NSNS[4] = {NS, NS, NS, NS}; 
 	int iajb_dims[4] = {nocc, nvirt, nocc, nvirt}; 
 	
-	CTF::Tensor<> A(4, iajb_dims, NSNS, dw);
-	CTF::Tensor<> Ap(4, iajb_dims, NSNS, dw);
+	CTF::Tensor<> A(4, iajb_dims, NSNS, dw); 
+	CTF::Tensor<> Ap(4, iajb_dims, NSNS, dw); 
 	CTF::Tensor<> B(4, iajb_dims, NSNS, dw); 
-	CTF::Tensor<> K(4, iajb_dims, NSNS, dw);  
-	std::cout << "Assigned stuff"<< std::endl << std::flush; 
-	/*Matrix A = Matrix::Zero(dim, dim); 
-	Matrix B = Matrix::Zero(dim, dim);
-	Matrix K = Matrix::Zero(dim, dim); */
+	CTF::Tensor<> K(4, iajb_dims, NSNS, dw);   
+
 	double *avals, *apvals, *bvals, *kvals; 
-	int64_t asz, apsz, bsz, ksz, *aix, *apix, *bix, *kix; 
-	A.read_local(&asz, &aix, &avals);
-	Ap.read_local(&apsz, &apix, &apvals);
-	B.read_local(&bsz, &bix, &bvals);
-	K.read_local(&ksz, &kix, &kvals); 
-	std::cout << "Read stuff"<< std::endl << std::flush; 
+	int64_t asz, apsz, bsz, ksz; 
+	avals = A.get_raw_data(&asz); 
+	apvals = Ap.get_raw_data(&apsz); 
+	bvals = B.get_raw_data(&bsz); 
+	kvals = K.get_raw_data(&ksz); 
 	
 	Matrix F = Matrix::Zero(N, N); 
 	F.block(0, 0, nocc, nocc) = info.T.transpose() * info.F * info.T; 
@@ -361,7 +356,7 @@ void RPA::fcompute(fInfo& info, bool print) {
 	// Compute and transform eris
 	auto &shells = info.shells;
 	bool density_fitted = cmd.get_option<bool>("df"); 
-	int ix1, ix2, ix3; 
+	int ix1, ix2, ix3; 	
 	
 	if (print) log.print("Transforming integrals"); 
 	if(!density_fitted) {
@@ -378,9 +373,8 @@ void RPA::fcompute(fInfo& info, bool print) {
 			log.print("\nForming excitation matrices"); 
 		}
 		
-		int64_t sz1, sz2, *i1, *i2;
-		double *viajb;
-		V[0].read_local(&sz1, &i1, &viajb);
+		int64_t sz1, sz2; 
+		double *viajb = V[0].get_raw_data(&sz1);
 	
 		int axis = nocc*(nocc+1);
 		axis /= 2;  
@@ -415,18 +409,17 @@ void RPA::fcompute(fInfo& info, bool print) {
 				}
 			}
 		}
-		delete i1;
-		delete viajb;
 	} else {
-		std::vector<Matrix> dferis = df_eris(shells, info.df_shells, info.T, info.V); 
-		Matrix& KiaP = dferis[0];
-		// Matrix& BiaP = dferis[1]; 
+		Matrix L; 
+		df_eris(shells, info.df_shells, info.T, info.V, L); 
+		Matrix K = L * L.transpose(); 
+		L.resize(0, 0); 
 		
 		if (print) {
 			log.localTime();  
 			log.print("\nForming excitation matrices"); 
 		} 
-		 
+		
 		for (int i = 0; i < nocc; i++) {
 			for (int a = 0; a < nvirt; a++) {
 				ix1 = i*nvirt+a;
@@ -436,16 +429,12 @@ void RPA::fcompute(fInfo& info, bool print) {
 						ix2 = j*nvirt + b;
 						if (ix2 > ix1) continue;
 					
-						double viajb = 0.0; 
-						for (int Q = 0; Q < KiaP.cols(); Q++)
-							viajb += KiaP(ix1, Q) * KiaP(ix2, Q); 
+						double viajb = K(ix1, ix2); 
 						
 						ix2 = i + a*nocc + j*dim + b*nvnono; 
 						avals[ix2] = bvals[ix2] = kvals[ix2] = 2.0 * viajb; 
 						if (sosex) {
-							double vjaib = 0.0;
-							for (int Q = 0; Q < KiaP.cols(); Q++)
-								vjaib += KiaP(j*nvirt+a, Q) * KiaP(i*nvirt+b, Q); 
+							double vjaib = K(j*nvirt+a, i*nvirt+b); 
 							bvals[ix2] -= vjaib;
 							if (rpax) {
 								avals[ix2] -= vjaib; 
@@ -471,41 +460,32 @@ void RPA::fcompute(fInfo& info, bool print) {
 	}
 	if (print) log.localTime(); 
 	
-	if (print) log.print("\nSolving Riccatti equations");
-		
-	A.write(asz, aix, avals);
-	Ap.write(apsz, apix, apvals); 
-	B.write(bsz, bix, bvals);
-	K.write(ksz, kix, kvals);
-	std::cout << "Wrote stuff"<< std::endl << std::flush; 
-	delete avals; delete apvals; delete kvals;
-	delete aix; delete apix; delete kix; 
-	std::cout << "Deleted stuff"<< std::endl << std::flush; 
-		
+	if (print) log.print("\nSolving Riccatti equations"); 
+	
 	CTF::Tensor<> T(4, iajb_dims, NSNS, dw);
 	T["iajb"] = A["iaia"] + A["jbjb"]; 
 	A["iajb"] = T["iajb"]; 
 	CTF::Tensor<> newT(4, iajb_dims, NSNS, dw);
 	CTF::Function<> fctr(&divide_r);
-	T["iajb"] = -K["iajb"]; 
+	T["iajb"] = -K["iajb"];
+	 
 	double delta = 1.0;
 	int iter = 0; 
 	double tnorm = T.norm2(); 
-	while (delta > 1e-4 && iter < 15) {
-
+	while (delta > 1e-4 && iter < 30) {
 		newT["iajb"] = -Ap["iajb"]; 
-		newT["iajb"] -= T["iakc"] * K["kcjb"]; 
+		newT["iajb"] -= 0.5 * T["iakc"] * K["kcjb"]; 
 		newT["iajb"] = newT["iakc"] * T["kcjb"]; 
+		newT["iajb"] += newT["jbia"];
 		newT["iajb"] -= K["iajb"];
-		newT["iajb"] -= T["iakc"] * Ap["kcjb"]; 
 
 		newT.contract(1.0, newT, "iajb", A, "iajb", 0.0, "iajb", fctr);
-		
+
 		delta = -tnorm;
 		tnorm = newT.norm2();
 		delta += tnorm; 
 		delta = fabs(delta); 
-		 
+		
 		iter++; 
 		T["iajb"] = newT["iajb"]; 
 	}
@@ -527,8 +507,7 @@ void RPA::fcompute(fInfo& info, bool print) {
 		cum_virt.push_back(currvirt); 
 	}
 		
-	int64_t *tix; double *tvals; 
-	T.read_local(&asz, &tix, &tvals); 
+	double *tvals = T.get_raw_data(&asz); 
 	
 	int d1, d2, d3, d4, d; 
 	int ifrag, jfrag, afrag, bfrag; 
@@ -598,7 +577,6 @@ void RPA::fcompute(fInfo& info, bool print) {
 		}
 
 	}
-	delete tix; delete bix; delete tvals; delete bvals; 
 	
 	if (rpax) {
 		info.edisp *= 0.5;
@@ -612,7 +590,7 @@ void RPA::fcompute(fInfo& info, bool print) {
 	if (print) log.localTime(); 
 }
 
-std::vector<Matrix> RPA::df_eris(const std::vector<libint2::Shell>& obs, const std::vector<libint2::Shell>& auxbs, Matrix& T, Matrix& V) {
+void RPA::df_eris(const std::vector<libint2::Shell>& obs, const std::vector<libint2::Shell>& auxbs, Matrix& T, Matrix& V, Matrix& BmnP) {
 	IntegralEngine& integrals = focker.getIntegrals(); 
 	
 	// Calculate (P|Q) and (P|mn) eris
@@ -633,7 +611,7 @@ std::vector<Matrix> RPA::df_eris(const std::vector<libint2::Shell>& obs, const s
 	int offN = offset + N; 
 	int offnocc = offset + nocc; 
 	
-	Matrix BmnP = Matrix::Zero(nocc*nobs, nabs); 
+	BmnP = Matrix::Zero(nocc*nobs, nabs); 
 	int ix; 
 	for (int i = 0; i < nocc; i++) {
 		for (int nu = 0; nu < nobs; nu++) {
@@ -664,8 +642,4 @@ std::vector<Matrix> RPA::df_eris(const std::vector<libint2::Shell>& obs, const s
 	}
 	
 	BmnP.noalias() =  KmnP * JPQ; 
-	
-	std::vector<Matrix> dferis = { BmnP }; 
-	
-	return dferis; 
 }

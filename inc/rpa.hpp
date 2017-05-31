@@ -36,7 +36,7 @@ public:
 	RPA(Command& c, Fock& f, int _N, int _nocc);
 	
 	void eris(const std::vector<libint2::Shell>&, std::vector<CTF::Tensor<> >&, Matrix& T, Matrix& V, bool longrange = false); 
-	std::vector<Matrix> df_eris(const std::vector<libint2::Shell>& obs, const std::vector<libint2::Shell>& auxbs, Matrix& T, Matrix& V); 
+	void df_eris(const std::vector<libint2::Shell>& obs, const std::vector<libint2::Shell>& auxbs, Matrix& T, Matrix& V, Matrix& BmnP); 
 	
 	void compute(bool print = true); 
 	void fcompute(fInfo& info, bool print = false); 
