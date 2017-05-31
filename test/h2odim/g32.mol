@@ -18,10 +18,10 @@ molecule = {
 	       default, avdz
 	 } 
          jkbasis = {
-                 default, vdzjkfit
+                 default, avdzjkfit
          }
          ribasis = {
-                 default, vdzmp2fit
+                 default, avdzmp2fit
          }
 }
 ralmo(
@@ -29,6 +29,6 @@ ralmo(
 	rpa, true
 	longrange, false
 	mu, 0.5
-	sosex, true
+	rpax, 2
 	df, true
 )

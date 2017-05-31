@@ -13,7 +13,7 @@ molecule = {
 }
 rhf()
 rpa(
-	sosex, true
+	rpax, 2
 	iterative, true
 )
 

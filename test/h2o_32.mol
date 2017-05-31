@@ -149,7 +149,7 @@ ralmo (
       perturb, 1
       rpa, true
       longrange, false
-      rpax, true
+      rpax, 2
       xcorrect, false
       rcutoff, 12.0
 )
