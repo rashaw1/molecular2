@@ -49,5 +49,6 @@ ralmo (
       longrange, false
       xcorrect, false
       perturb, 1
-      local, false
+      local, true
+      enconverge, 5e-5
 )

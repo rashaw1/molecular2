@@ -756,6 +756,7 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 	// compute exchange
 	int nfrags = finfo.size(); 
 
+	double start = molecule->control->log.getGlobalTime(); 
 	for (int i = 0; i < nocc; i++) {
 		auto& lmo_d = lmo_domains[i]; 
 		auto& ao_d = ao_domains[i];
@@ -766,6 +767,7 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 		int nfit = fit_d.centres.size(); 
 		
 		Matrix uA = Matrix::Zero(ao_d.totalsize, fit_d.totalsize); 
+		Matrix vA = Matrix::Zero(lmo_d.totalsize, fit_d.totalsize); 
 		
 		int Al = 0; 
 		int fitstart, aostart, mostart, fitsize, aosize, mosize; 
@@ -792,13 +794,16 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 							} 
 							
 						}
+						
 						ul++; 
 						
 					}
 				}
+		
 				Al++; 
 			}
 		}
+		
 		
 		uA *= lmo_d.G; 
 		uA = uA * uA.transpose(); 
@@ -827,9 +832,12 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 			}
 		}
 	}
-	
+	double end = molecule->control->log.getGlobalTime(); 
+	std::cout << "Exchange: " << end - start << " seconds,";
+	 
 	// compute Coulomb
 	
+	start = molecule->control->log.getGlobalTime(); 
 	Vector Pv((n*(n+1))/2);
 	for (int x = 0; x < n; x++)
 		for (int y = 0; y <= x; y++)
@@ -842,6 +850,8 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 			G(x, y) += Pv[(x*(x+1))/2+y];
 			G(y, x) = G(x, y); 
 		}
-
+	end = molecule->control->log.getGlobalTime(); 	
+	std::cout << "Coulomb: " << end - start << " seconds" << std::endl << std::flush; 
+	
 	return G; 
 }
