@@ -64,6 +64,7 @@ void ALMOSCF::setFragments(bool unrestricted)
 			f.occ = frags[i]->getNel() / 2; 
 			f.nbfs = f_nbfs; 
 			f.naux = new_engine.nbasis(frags[i]->getBasis().getJKShells()); 
+			f.ndfshells = frags[i]->getBasis().getJKShells().size(); 
 			f.auxstart = auxstart; 
 			f.start = start;
 			f.radius = frags[i]->getBasis().extent();

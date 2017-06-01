@@ -72,7 +72,7 @@ struct Domain {
 };
 
 struct FragmentInfo {
-	int occ, nbfs, naux, start, auxstart; 
+	int occ, nbfs, naux, start, auxstart, ndfshells; 
 	double radius, mo_thresh, fit_thresh, r_thresh; 
 	Vector com; 
 	
@@ -108,6 +108,7 @@ protected:
   Vector eps;
   std::vector<Matrix> focks;
   std::vector<Domain> lmo_domains, ao_domains, fit_domains;
+  std::vector<std::vector<int> > Kblocks; 
   Matrix dens, dens_diff;
   IntegralEngine& integrals;
   SharedMolecule molecule;
@@ -186,7 +187,9 @@ public:
   		); 
 
   Matrix compute_2body_fock_df(const Matrix& Cocc);
-  Matrix compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo);  
+  Matrix compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo); 
+  Matrix compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo);
+  void build_domains(Matrix& Cocc, Matrix& V, std::vector<FragmentInfo>& finfo);  
   
   void compute_soad_guess(); 
   

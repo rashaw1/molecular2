@@ -9,6 +9,7 @@
 #include "logger.hpp"
 #include "ProgramController.hpp"
 #include "eigen_util.hpp"
+#include <string>
 
 typedef std::vector<libint2::Shell> BasisSet; 
  
@@ -604,6 +605,140 @@ Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 	return G; 
 }
 
+void Fock::build_domains(Matrix& Cocc, Matrix& V, std::vector<FragmentInfo>& finfo) {
+	int i_offset = 0; 
+	for (int B = 0; B < finfo.size(); B++) {
+		for (int i = i_offset; i < i_offset+finfo[B].occ; i++) {
+			Domain d; 
+			
+			std::vector<int> notcentres; 
+			int mu_offset = 0;
+			for (int A = 0; A < finfo.size(); A++) {
+				bool add = false; 
+				if (A == B) add = true; 
+				else {	
+					double sum = 0.0; 
+					for (int mu = mu_offset; mu < mu_offset + finfo[A].occ; mu++) 
+						sum += Cocc(mu, i) * Cocc(mu, i); 
+					add = sum > finfo[0].mo_thresh; 
+				}
+			
+				if (add) { 
+					d.starts.push_back(finfo[A].start); 
+					d.sizes.push_back(finfo[A].nbfs); 
+					d.centres.push_back(A); 
+				} else 
+					notcentres.push_back(A); 
+			
+				mu_offset += finfo[A].nbfs; 
+			}
+			
+			Domain dao; 
+			dao.starts = d.starts;
+			dao.sizes = d.sizes; 
+			dao.centres = d.centres; 
+			mu_offset = 0; 
+			for (auto A : d.centres) {
+				std::vector<int> newnc; 
+				for (int b = 0; b < notcentres.size(); b++){
+					int C = notcentres[b]; 
+					double sep = (finfo[C].com - finfo[A].com).norm(); 
+					if (finfo[C].radius > sep) {
+						dao.centres.push_back(C); 
+						dao.starts.push_back(finfo[C].start);
+						dao.sizes.push_back(finfo[C].nbfs); 
+					} else 
+						newnc.push_back(C); 
+				} 
+				notcentres = newnc; 
+			}
+		
+			d.sumsizes();
+			dao.sumsizes(); 
+			lmo_domains.push_back(d); 
+			ao_domains.push_back(dao); 
+		}
+		i_offset += finfo[B].occ; 
+	}
+	
+	Kblocks.resize(finfo.size()); 
+	
+	EigenSolver es2(integrals.getOverlap()); 
+	Matrix SC = es2.operatorSqrt() * Cocc; 
+	i_offset = 0;
+	for (auto& f1 : finfo) { 
+		 
+		for (int i = i_offset; i < i_offset + f1.occ; i++) {
+			Domain d;
+			
+			int mu_offset = 0; int center = 0; 
+			for (auto& f2 : finfo) { 
+				
+				double sep = (f2.com - f1.com).norm(); 
+				
+				double INi = 0.0; 
+				for (int mu = mu_offset; mu < mu_offset + f2.nbfs; mu++) {
+					INi += SC(mu, i) * SC(mu, i);	
+				}
+				
+				if (INi > finfo[0].fit_thresh || sep < finfo[0].r_thresh) {
+					d.centres.push_back(center);
+					d.sizes.push_back(f2.naux); 
+					d.starts.push_back(f2.auxstart); 
+					
+					Kblocks[center].push_back(i); 
+				}
+			
+				center++; 
+				mu_offset += f2.nbfs; 
+			}
+			
+			d.sumsizes();
+			fit_domains.push_back(d); 
+		}
+		
+		i_offset += f1.occ; 
+	}
+	
+	for (auto& klist : Kblocks) {
+		std::sort(klist.begin(), klist.end());
+		klist.erase(std::unique(klist.begin(), klist.end()), klist.end());
+		for (auto val : klist)
+			std::cout << val << ", ";
+		std::cout << std::endl;
+	}
+	
+	for (int i = 0; i < nocc; i++) {
+		
+		auto& lmo_d = lmo_domains[i]; 
+		auto& fit_d = fit_domains[i];
+		int fitsize = fit_d.centres.size();  
+		
+		Matrix GAB = Matrix::Zero(fit_d.totalsize, fit_d.totalsize); 
+		int A = 0; 
+		for (int a = 0; a < fitsize; a++) {
+			for (int Ax = fit_d.starts[a]; Ax < fit_d.starts[a] + fit_d.sizes[a]; Ax++) {
+				
+				int B = 0; 
+				for (int b = 0; b < fitsize; b++) {
+					for (int Bx = fit_d.starts[b]; Bx < fit_d.starts[b] + fit_d.sizes[b]; Bx++) {
+						GAB(A, B) = V(Ax, Bx); 
+						B++; 
+					}
+				}
+				
+				A++; 
+			}
+		}
+		
+		Eigen::LLT<Matrix> G_LLt(GAB);
+		Matrix I = Matrix::Identity(fit_d.totalsize, fit_d.totalsize);
+		auto GL = G_LLt.matrixL();
+		lmo_d.G = GL.solve(I).transpose();
+		
+	}
+}
+
 Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo) {
 
 	BasisSet& obs = molecule->getBasis().getIntShells(); 
@@ -629,126 +764,8 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 		auto L = V_LLt.matrixL();
 		Linv = L.solve(I).transpose();
 		Linv2 = Linv * Linv.transpose(); 
-	
-		int i_offset = 0; 
-		for (int B = 0; B < finfo.size(); B++) {
-			for (int i = i_offset; i < i_offset+finfo[B].occ; i++) {
-				Domain d; 
-				
-				std::vector<int> notcentres; 
-				int mu_offset = 0;
-				for (int A = 0; A < finfo.size(); A++) {
-					bool add = false; 
-					if (A == B) add = true; 
-					else {	
-						double sum = 0.0; 
-						for (int mu = mu_offset; mu < mu_offset + finfo[A].occ; mu++) 
-							sum += Cocc(mu, i) * Cocc(mu, i); 
-						add = sum > finfo[0].mo_thresh; 
-					}
-				
-					if (add) { 
-						d.starts.push_back(finfo[A].start); 
-						d.sizes.push_back(finfo[A].nbfs); 
-						d.centres.push_back(A); 
-					} else 
-						notcentres.push_back(A); 
-				
-					mu_offset += finfo[A].nbfs; 
-				}
-				
-				Domain dao; 
-				dao.starts = d.starts;
-				dao.sizes = d.sizes; 
-				dao.centres = d.centres; 
-				mu_offset = 0; 
-				for (auto A : d.centres) {
-					std::vector<int> newnc; 
-					for (int b = 0; b < notcentres.size(); b++){
-						int C = notcentres[b]; 
-						double sep = (finfo[C].com - finfo[A].com).norm(); 
-						if (finfo[C].radius > sep) {
-							dao.centres.push_back(C); 
-							dao.starts.push_back(finfo[C].start);
-							dao.sizes.push_back(finfo[C].nbfs); 
-						} else 
-							newnc.push_back(C); 
-					} 
-					notcentres = newnc; 
-				}
-			
-				d.sumsizes();
-				dao.sumsizes(); 
-				lmo_domains.push_back(d); 
-				ao_domains.push_back(dao); 
-			}
-			i_offset += finfo[B].occ; 
-		}
 		
-		EigenSolver es2(integrals.getOverlap()); 
-		Matrix SC = es2.operatorSqrt() * Cocc; 
-		i_offset = 0;
-		for (auto& f1 : finfo) { 
-			
-			for (int i = i_offset; i < i_offset + f1.occ; i++) {
-				Domain d;
-				
-				int mu_offset = 0; int center = 0; 
-				for (auto& f2 : finfo) { 
-					
-					double sep = (f2.com - f1.com).norm(); 
-					
-					double INi = 0.0; 
-					for (int mu = mu_offset; mu < mu_offset + f2.nbfs; mu++) {
-						INi += SC(mu, i) * SC(mu, i);	
-					}
-					
-					if (INi > finfo[0].fit_thresh || sep < finfo[0].r_thresh) {
-						d.centres.push_back(center);
-						d.sizes.push_back(f2.naux); 
-						d.starts.push_back(f2.auxstart); 
-					}
-				
-					center++; 
-					mu_offset += f2.nbfs; 
-				}
-				
-				d.sumsizes();
-				fit_domains.push_back(d); 
-			}
-			
-			i_offset += f1.occ; 
-		}
-		
-		for (int i = 0; i < nocc; i++) {
-			
-			auto& lmo_d = lmo_domains[i]; 
-			auto& fit_d = fit_domains[i];
-			int fitsize = fit_d.centres.size();  
-			
-			Matrix GAB = Matrix::Zero(fit_d.totalsize, fit_d.totalsize); 
-			int A = 0; 
-			for (int a = 0; a < fitsize; a++) {
-				for (int Ax = fit_d.starts[a]; Ax < fit_d.starts[a] + fit_d.sizes[a]; Ax++) {
-					
-					int B = 0; 
-					for (int b = 0; b < fitsize; b++) {
-						for (int Bx = fit_d.starts[b]; Bx < fit_d.starts[b] + fit_d.sizes[b]; Bx++) {
-							GAB(A, B) = V(Ax, Bx); 
-							B++; 
-						}
-					}
-					
-					A++; 
-				}
-			}
-			
-			Eigen::LLT<Matrix> G_LLt(GAB);
-			Matrix I = Matrix::Identity(fit_d.totalsize, fit_d.totalsize);
-			auto GL = G_LLt.matrixL();
-			lmo_d.G = GL.solve(I).transpose();
-			
-		}
+		build_domains(Cocc, V, finfo); 
 		
 	}  // if (xyK.size() == 0) 
 	
@@ -768,7 +785,6 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 		int nfit = fit_d.centres.size(); 
 		
 		Matrix uA = Matrix::Zero(ao_d.totalsize, fit_d.totalsize); 
-		Matrix vA = Matrix::Zero(lmo_d.totalsize, fit_d.totalsize); 
 		
 		int Al = 0; 
 		int fitstart, aostart, mostart, fitsize, aosize, mosize; 
@@ -848,10 +864,184 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 	Pv = Linv2 * Pv;  
 	Pv = 4.0 * xyK *  Pv; 
 	for (int x = 0; x < n; x++)
-		for (int y = 0; y <=x; y++) {
-			G(x, y) += Pv[(x*(x+1))/2+y];
-			G(y, x) = G(x, y); 
+	for (int y = 0; y <=x; y++) {
+		G(x, y) += Pv[(x*(x+1))/2+y];
+		G(y, x) = G(x, y); 
+	}
+	end = molecule->control->log.getGlobalTime(); 	
+	std::cout << "Coulomb: " << end - start << " seconds" << std::endl << std::flush; 
+	
+	std::cout << std::endl << std::flush; 
+	
+	return G; 
+}
+
+Matrix Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo) {
+
+	BasisSet& obs = molecule->getBasis().getIntShells(); 
+	BasisSet& dfbs = molecule->getBasis().getJKShells(); 
+  
+	const auto n = integrals.nbasis(obs); 
+	const auto ndf = integrals.nbasis(dfbs); 
+	
+	Logger& log = molecule->control->log; 
+
+	EigenSolver es(sigmainv); 
+	Cocc = Cocc * es.operatorSqrt(); 
+	
+	// using first time? compute 3-center ints and transform to inv sqrt
+	// representation
+	if (xyK.rows() == 0) {
+		
+		Matrix V = integrals.compute_eris_2index(dfbs);
+	
+		Eigen::LLT<Matrix> V_LLt(V);
+		Matrix I = Matrix::Identity(ndf, ndf);
+		auto L = V_LLt.matrixL();
+		Linv = L.solve(I).transpose();
+		Linv2 = Linv * Linv.transpose(); 
+		
+		build_domains(Cocc, V, finfo); 
+		
+		int aux = 0; 
+		int fn = 0; 
+		for (auto& f : finfo) {
+			BasisSet dfset;
+			std::copy(dfbs.begin() + aux, dfbs.begin() + aux + f.ndfshells, std::back_inserter(dfset)); 
+			
+			Matrix xyf; 
+			integrals.compute_eris_3index(obs, dfset, xyf);
+			std::string filename = "V"+ std::to_string(fn) + ".ints"; 
+			eigenutil::write_binary(filename.c_str(), xyf); 
+			
+			fn++;
+			aux += f.ndfshells; 
 		}
+		
+		xyK = Matrix::Zero(1, 1); 
+		
+	}  // if (xyK.size() == 0) 
+	
+	Matrix G = Matrix::Zero(n, n); 
+	
+	// compute exchange
+	int nfrags = finfo.size(); 
+	
+	// Ravel the density matrix
+	Vector Pv((n*(n+1))/2);
+	for (int x = 0; x < n; x++)
+		for (int y = 0; y <= x; y++)
+			Pv[(x*(x+1))/2 + y] = x == y ? 0.5 * Pt(x ,y) : Pt(x, y); 
+
+	double start = molecule->control->log.getGlobalTime(); 
+	int fn = 0; int aux = 0; 
+	Vector Pk = Vector::Zero(ndf); 
+	for (auto& f : finfo) {
+		// Read in integrals
+		Matrix xyf; 
+		std::string filename = "V" + fn + ".ints"; 
+		read_binary(filename.c_str(), xyf); 
+		
+		// Make first part of Coulomb contribution
+		Vector Pkf = xyf.transpose() * Pv; 
+		Pk += Linv2.block(0, aux, ndf, f.naux) * Pkf; 
+		 
+		for (int i : Kblocks[fn]) {
+			auto& lmo_d = lmo_domains[i]; 
+			auto& ao_d = ao_domains[i]; 
+		
+			int nmo = lmo_d.centres.size();
+			int nao = ao_d.centres.size();
+		
+			Matrix uA = Matrix::Zero(ao_d.totalsize, f.naux); 
+		
+			int aostart, mostart, aosize, mosize; 
+				
+			for (int Al = 0; Al < f.naux; Al++) {
+				
+				int ul = 0;
+				for (int ao = 0; ao < nao; ao++) {
+					aostart = ao_d.starts[ao]; 
+					aosize = ao_d.sizes[ao]; 
+					
+					for (int u = aostart; u < aostart + aosize; u++) {
+						for (int mo = 0; mo < nmo; mo++) {
+							mostart = lmo_d.starts[mo];
+							mosize = lmo_d.sizes[mo]; 
+
+							for (int nu = mostart; nu < mostart + mosize; nu++) {
+								int U = std::max(u, nu); 
+								int NU = std::min(u, nu); 
+								uA(ul, Al) += xyf((U*(U+1))/2+NU, Al) * Cocc(nu, i);
+							} 
+							
+						}
+						
+						ul++; 
+						
+					}
+				}
+			}
+			
+			int bstart = 0; 
+			for (int ic = 0; ic < fit_d.centres.size(); ic++) {
+				if (fit_d.centres[ic] == fn) break; 
+				bstart += fit_d.sizes[ic]; 
+			}
+			uA *= lmo_d.G.block(bstart, 0, f.naux, ndf);  
+			uA = uA * uA.transpose(); 
+		
+			int ao1start, ao2start, ao1size, ao2size; 
+			int u = 0; 
+			for (int ao1 = 0; ao1 < nao; ao1++) {
+				ao1start = ao_d.starts[ao1];
+				ao1size = ao_d.sizes[ao1]; 
+			
+				for (int mu = ao1start; mu < ao1start + ao1size; mu++) {
+				
+					int v = 0; 
+					for (int ao2 = 0; ao2 < nao; ao2++) {
+						ao2start = ao_d.starts[ao2]; 
+						ao2size = ao_d.sizes[ao2]; 
+					 
+						for (int nu = ao2start; nu < ao2start + ao2size; nu++) {
+
+							G(mu, nu) -= uA(u, v); 
+						
+							v++; 
+						}
+					}
+					u++; 
+				}
+			}
+		}
+		
+		fn++; 
+		aux ++ f.naux; 
+	}
+	 
+	// compute Coulomb
+	
+	start = molecule->control->log.getGlobalTime(); 
+
+	fn = 0; aux = 0; 
+	Pv = Vector::Zero((n*(n+1))/2); 
+	for (auto& f : finfo) {		
+		// Read in integrals
+		Matrix xyf; 
+		std::string filename = "V" + fn + ".ints"; 
+		read_binary(filename.c_str(), xyf); 
+		
+		Pv += 4.0 * xyf * Pk.segment(aux, f.naux); 
+		
+		fn++; 
+		aux += f.naux; 
+	} 
+	for (int x = 0; x < n; x++)
+	for (int y = 0; y <=x; y++) {
+		G(x, y) += Pv[(x*(x+1))/2+y];
+		G(y, x) = G(x, y); 
+	}
 	end = molecule->control->log.getGlobalTime(); 	
 	std::cout << "Coulomb: " << end - start << " seconds" << std::endl << std::flush; 
 	
