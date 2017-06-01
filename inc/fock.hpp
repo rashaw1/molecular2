@@ -104,7 +104,7 @@ protected:
   Matrix forces;
   Matrix hessian;
   Matrix xyK; 
-  Matrix Linv; 
+  Matrix Linv, Linv2; 
   Vector eps;
   std::vector<Matrix> focks;
   std::vector<Domain> lmo_domains, ao_domains, fit_domains;

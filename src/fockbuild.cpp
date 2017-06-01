@@ -628,6 +628,7 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 		Matrix I = Matrix::Identity(ndf, ndf);
 		auto L = V_LLt.matrixL();
 		Linv = L.solve(I).transpose();
+		Linv2 = Linv * Linv.transpose(); 
 	
 		int i_offset = 0; 
 		for (int B = 0; B < finfo.size(); B++) {
@@ -842,8 +843,9 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 	for (int x = 0; x < n; x++)
 		for (int y = 0; y <= x; y++)
 			Pv[(x*(x+1))/2 + y] = x == y ? 0.5 * Pt(x ,y) : Pt(x, y); 
+
 	Pv = xyK.transpose() * Pv;
-	Pv = Linv * Linv.transpose() * Pv;  
+	Pv = Linv2 * Pv;  
 	Pv = 4.0 * xyK *  Pv; 
 	for (int x = 0; x < n; x++)
 		for (int y = 0; y <=x; y++) {
@@ -852,6 +854,8 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 		}
 	end = molecule->control->log.getGlobalTime(); 	
 	std::cout << "Coulomb: " << end - start << " seconds" << std::endl << std::flush; 
+	
+	std::cout << std::endl << std::flush; 
 	
 	return G; 
 }
