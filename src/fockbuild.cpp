@@ -637,11 +637,16 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 				std::vector<int> notcentres; 
 				int mu_offset = 0;
 				for (int A = 0; A < finfo.size(); A++) {
-					double sum = 0.0; 
-					for (int mu = mu_offset; mu < mu_offset + finfo[A].occ; mu++) 
-						sum += Cocc(mu, i) * Cocc(mu, i); 
+					bool add = false; 
+					if (A == B) add = true; 
+					else {	
+						double sum = 0.0; 
+						for (int mu = mu_offset; mu < mu_offset + finfo[A].occ; mu++) 
+							sum += Cocc(mu, i) * Cocc(mu, i); 
+						add = sum > finfo[0].mo_thresh; 
+					}
 				
-					if (sum > finfo[0].mo_thresh) { 
+					if (add) { 
 						d.starts.push_back(finfo[A].start); 
 						d.sizes.push_back(finfo[A].nbfs); 
 						d.centres.push_back(A); 
