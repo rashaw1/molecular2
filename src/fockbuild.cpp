@@ -757,11 +757,16 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 		integrals.compute_eris_3index(obs, dfbs, xyK); 
 		Matrix V = integrals.compute_eris_2index(dfbs);
 	
-		Eigen::LLT<Matrix> V_LLt(V);
 		Matrix I = Matrix::Identity(ndf, ndf);
-		auto L = V_LLt.matrixL();
+		//LLT V_LLt(V); 
+		auto V_LLt = V.selfadjointView<Eigen::Upper>().llt(); 
+		auto L = V_LLt.matrixL(); 
 		Linv = L.solve(I).transpose();
-		Linv2 = Linv * Linv.transpose(); 
+		SparseMatrix sLinv = Linv.sparseView(); 
+		
+		double start = log.getGlobalTime();
+		Linv2 = sLinv * sLinv.transpose(); 
+		double end = log.getGlobalTime();
 		
 		build_domains(Cocc, V, finfo); 
 		
@@ -772,7 +777,7 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 	// compute exchange
 	int nfrags = finfo.size(); 
 
-	double start = molecule->control->log.getGlobalTime(); 
+	double start = log.getGlobalTime(); 
 	for (int i = 0; i < nocc; i++) {
 		auto& lmo_d = lmo_domains[i]; 
 		auto& ao_d = ao_domains[i];
@@ -847,12 +852,12 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 			}
 		}
 	}
-	double end = molecule->control->log.getGlobalTime(); 
+	double end = log.getGlobalTime(); 
 	std::cout << "Exchange: " << end - start << " seconds,";
 	 
 	// compute Coulomb
 	
-	start = molecule->control->log.getGlobalTime(); 
+	start = log.getGlobalTime(); 
 	Vector Pv((n*(n+1))/2);
 	for (int x = 0; x < n; x++)
 		for (int y = 0; y <= x; y++)
@@ -866,7 +871,7 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 		G(x, y) += Pv[(x*(x+1))/2+y];
 		G(y, x) = G(x, y); 
 	}
-	end = molecule->control->log.getGlobalTime(); 	
+	end = log.getGlobalTime(); 	
 	std::cout << "Coulomb: " << end - start << " seconds" << std::endl << std::flush; 
 	
 	std::cout << std::endl << std::flush; 

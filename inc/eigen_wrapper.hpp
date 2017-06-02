@@ -5,6 +5,7 @@
 #include "tensor4.hpp"
 
 using Matrix = Eigen::MatrixXd; 
+using SparseMatrix = Eigen::SparseMatrix<double>; 
 using Vector = Eigen::VectorXd; 
 using iVector = Eigen::VectorXi; 
 using EigenSolver = Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd>; 

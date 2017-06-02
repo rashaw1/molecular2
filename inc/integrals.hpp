@@ -136,6 +136,7 @@ public:
 
 	S8EvenTensor4 compute_eris(const std::vector<libint2::Shell>& shells);
 	void compute_eris_3index(const std::vector<libint2::Shell>& obs, const std::vector<libint2::Shell>& auxbs, Matrix& eris);
+	void compute_eris_3index(const std::vector<libint2::Shell>& obs, const std::vector<libint2::Shell>& auxbs, SparseMatrix& eris);
 	Matrix compute_eris_2index(const std::vector<libint2::Shell>& auxbs);
   
 	template<libint2::Operator obtype>

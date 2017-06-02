@@ -154,6 +154,81 @@ void IntegralEngine::compute_eris_3index(const std::vector<libint2::Shell>& obs,
 		}
 	}						
 } 
+
+void IntegralEngine::compute_eris_3index(const std::vector<libint2::Shell>& obs, const std::vector<libint2::Shell>& auxbs, SparseMatrix& eris)
+{
+	
+	using libint2::Shell;
+	using libint2::Engine;
+	using libint2::Operator;
+	using libint2::BraKet; 
+
+	const auto n_obs = nbasis(obs);
+	const auto n_abs = nbasis(auxbs);
+	int ndim = (n_obs * (n_obs + 1)) / 2;  
+
+	Engine engine(Operator::coulomb, 
+	std::max(max_nprim(obs), max_nprim(auxbs)),
+	std::max(max_l(obs), max_l(auxbs)), 0, 
+	std::numeric_limits<libint2::real_t>::epsilon(), 
+	libint2::operator_traits<Operator::coulomb>::default_params(),
+	BraKet::xs_xx);
+
+	auto shell2bf_obs = map_shell_to_basis_function(obs);
+	auto shell2bf_abs = map_shell_to_basis_function(auxbs);
+	
+	using T = Eigen::Triplet<double>; 
+	std::vector<T> tripletList; 
+	eris.resize(ndim, n_abs);
+
+	const auto& buf = engine.results();
+	
+	// loop over shell quartets
+	for (auto s1=0; s1 != auxbs.size(); ++s1) {
+    
+		auto bf1_first = shell2bf_abs[s1];
+		auto n1 = auxbs[s1].size();
+
+		for (auto s2=0; s2 != obs.size(); ++s2) {
+      
+			auto bf2_first = shell2bf_obs[s2];
+			auto n2 = obs[s2].size();
+      
+			for (auto s3=0; s3 <= s2; ++s3) {
+	
+				auto bf3_first = shell2bf_obs[s3];
+				auto n3 = obs[s3].size();
+
+				engine.compute(auxbs[s1], obs[s2], obs[s3]);
+
+				const auto* buf_123 = buf[0];
+				if (buf_123 == nullptr)
+					continue;
+
+				for(auto f1=0, f123=0; f1!=n1; ++f1) {
+            
+					const auto bf1 = f1 + bf1_first;
+            
+					for(auto f2=0; f2!=n2; ++f2) {
+              
+						const auto bf2 = f2 + bf2_first;
+             		   	int ix = (bf2 * (bf2 + 1)) / 2; 
+			 
+						for(auto f3=0; f3!=n3; ++f3, ++f123) {
+                
+							const auto bf3 = f3 + bf3_first; 
+							if (bf2 >= bf3)
+								tripletList.push_back(T(ix+bf3, bf1, buf_123[f123]));							
+						}
+					}
+				}
+			}
+		}
+	}						
+	
+	eris.setFromTriplets(tripletList.begin(), tripletList.end()); 
+	eris.makeCompressed();
+} 
 						
 Matrix IntegralEngine::compute_eris_2index(const std::vector<libint2::Shell>& auxbs) {
 	using libint2::Shell;
