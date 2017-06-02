@@ -10,6 +10,7 @@
 #include "ProgramController.hpp"
 #include "eigen_util.hpp"
 #include <string>
+#include <future>
 
 typedef std::vector<libint2::Shell> BasisSet; 
  
@@ -926,6 +927,10 @@ Matrix Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmai
 	
 	Matrix G = Matrix::Zero(n, n); 
 	
+	std::vector<Matrix> xyf(fit_domains[0].centres.size()); 
+	for (int f = 0; f < xyf.size(); f++)
+		read_intfile(fit_domains[0].centres[f], xyf[f]); 
+	
 	// compute exchange
 	int nfrags = finfo.size(); 
 	double start = molecule->control->log.getGlobalTime(); 
@@ -940,9 +945,14 @@ Matrix Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmai
 		int nfit = fit_d.centres.size(); 
 		
 		// Read in integrals
-		std::vector<Matrix> xyf(nfit); 
-		for (int f = 0; f < nfit; f++)
-			read_intfile(fit_d.centres[f], xyf[f]); 
+		std::vector<std::future<void>> futures; 
+		std::vector<Matrix> xyf_next;
+		if (i < nocc-1) { 
+			int nextnfit = fit_domains[i+1].centres.size();
+			xyf_next.resize(nextnfit); 
+			for (int f = 0; f < nextnfit; f++)
+				futures.push_back(std::async(read_intfile, fit_domains[i+1].centres[f], std::ref(xyf_next[f])));
+		} 
 		
 		Matrix uA = Matrix::Zero(ao_d.totalsize, fit_d.totalsize); 
 		
@@ -1008,6 +1018,12 @@ Matrix Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmai
 				u++; 
 			}
 		}
+		
+		if (i < nocc-1) { 
+			for (auto& future : futures) 
+				future.get(); 
+			xyf = xyf_next; 
+		}
 	}
 	double end = molecule->control->log.getGlobalTime(); 
 	std::cout << "Exchange: " << end - start << " seconds,";
@@ -1022,23 +1038,32 @@ Matrix Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmai
 	
 	Vector Pk(ndf);
 	int aux = 0;  
-	for (int f = 0; f < nfrags; f++) {
-		Matrix xyf; 
-		read_intfile(f, xyf);
-		Pk.segment(aux, finfo[f].naux) = xyf.transpose() * Pv;  
+	Matrix xyfrag; 
+	read_intfile(0, xyfrag); 
+	for (int f = 0; f < nfrags-1; f++) {
+		Matrix xyf_next;
+		std::future<void> future(std::async(read_intfile, f+1, std::ref(xyf_next))); 
+		Pk.segment(aux, finfo[f].naux) = xyfrag.transpose() * Pv;  
 		aux += finfo[f].naux; 
+		future.get();
+		xyfrag = xyf_next; 
 	}
+	Pk.segment(aux, finfo[nfrags-1].naux) = xyfrag.transpose() * Pv; 
 	
 	Pk = Linv2 * Pk;  
 	
 	aux = 0;
 	Pv = Vector::Zero((n*(n+1))/2);
-	for (int f = 0; f < nfrags; f++) {
-		Matrix xyf; 
-		read_intfile(f, xyf);
-		Pv += 4.0 * xyf * Pk.segment(aux, finfo[f].naux);  
+	read_intfile(0, xyfrag); 
+	for (int f = 0; f < nfrags-1; f++) {
+		Matrix xyf_next; 
+		std::future<void> future(std::async(read_intfile, f+1, std::ref(xyf_next))); 
+		Pv += 4.0 * xyfrag * Pk.segment(aux, finfo[f].naux);  
 		aux += finfo[f].naux; 
+		future.get();
+		xyfrag = xyf_next; 
 	}
+	Pv += 4.0 * xyfrag * Pk.segment(aux, finfo[nfrags-1].naux); 
 	
 	for (int x = 0; x < n; x++)
 	for (int y = 0; y <=x; y++) {
