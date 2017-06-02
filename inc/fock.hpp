@@ -76,14 +76,18 @@ struct FragmentInfo {
 	double radius, mo_thresh, fit_thresh, r_thresh; 
 	Vector com; 
 	
-	FragmentInfo() : occ(0), nbfs(0), naux(0), start(0), auxstart(0), radius(0.0) {}
+	FragmentInfo() : occ(0), nbfs(0), naux(0), start(0), auxstart(0), ndfshells(0), radius(0.0), mo_thresh(1e-6), fit_thresh(0.05), r_thresh(15.0) {}
 	FragmentInfo(const FragmentInfo& other) {
 		occ = other.occ;
 		nbfs = other.nbfs;
 		naux = other.naux;
 		start = other.start;
-		auxstart = other.auxstart; 
+		auxstart = other.auxstart;
+		ndfshells = other.ndfshells; 
 		radius = other.radius;
+		mo_thresh = other.mo_thresh;
+		fit_thresh = other.fit_thresh;
+		r_thresh = other.r_thresh; 
 		com = other.com; 
 	}
 };

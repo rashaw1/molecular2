@@ -249,7 +249,7 @@ void ALMOSCF::rcompute() {
 	if (density_fitted) { 
 		if (cmd.get_option<bool>("local")) {
 			focker.getFockAO() = focker.getHCore();  
-			focker.getFockAO() += focker.compute_2body_fock_df_local(T, sigma, P, finfo); 
+			focker.getFockAO() += focker.compute_2body_fock_df_local_file(T, sigma, P, finfo); 
 		} else {
 			EigenSolver es(sigma); 
 			T *= es.operatorSqrt(); 

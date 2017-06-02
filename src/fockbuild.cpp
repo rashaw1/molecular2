@@ -703,9 +703,6 @@ void Fock::build_domains(Matrix& Cocc, Matrix& V, std::vector<FragmentInfo>& fin
 	for (auto& klist : Kblocks) {
 		std::sort(klist.begin(), klist.end());
 		klist.erase(std::unique(klist.begin(), klist.end()), klist.end());
-		for (auto val : klist)
-			std::cout << val << ", ";
-		std::cout << std::endl;
 	}
 	
 	for (int i = 0; i < nocc; i++) {
@@ -876,6 +873,11 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 	return G; 
 }
 
+void read_intfile(int K, Matrix& xyf) {
+	std::string filename = "V" + std::to_string(K) + ".ints";
+	eigenutil::read_binary(filename.c_str(), xyf); 
+}
+
 Matrix Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo) {
 
 	BasisSet& obs = molecule->getBasis().getIntShells(); 
@@ -926,38 +928,31 @@ Matrix Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmai
 	
 	// compute exchange
 	int nfrags = finfo.size(); 
-	
-	// Ravel the density matrix
-	Vector Pv((n*(n+1))/2);
-	for (int x = 0; x < n; x++)
-		for (int y = 0; y <= x; y++)
-			Pv[(x*(x+1))/2 + y] = x == y ? 0.5 * Pt(x ,y) : Pt(x, y); 
-
 	double start = molecule->control->log.getGlobalTime(); 
-	int fn = 0; int aux = 0; 
-	Vector Pk = Vector::Zero(ndf); 
-	for (auto& f : finfo) {
+	for (int i = 0; i < nocc; i++) {
+	
+		auto& lmo_d = lmo_domains[i]; 
+		auto& ao_d = ao_domains[i];
+		auto& fit_d = fit_domains[i]; 
+		
+		int nmo = lmo_d.centres.size();
+		int nao = ao_d.centres.size();
+		int nfit = fit_d.centres.size(); 
+		
 		// Read in integrals
-		Matrix xyf; 
-		std::string filename = "V" + fn + ".ints"; 
-		read_binary(filename.c_str(), xyf); 
+		std::vector<Matrix> xyf(nfit); 
+		for (int f = 0; f < nfit; f++)
+			read_intfile(fit_d.centres[f], xyf[f]); 
 		
-		// Make first part of Coulomb contribution
-		Vector Pkf = xyf.transpose() * Pv; 
-		Pk += Linv2.block(0, aux, ndf, f.naux) * Pkf; 
-		 
-		for (int i : Kblocks[fn]) {
-			auto& lmo_d = lmo_domains[i]; 
-			auto& ao_d = ao_domains[i]; 
+		Matrix uA = Matrix::Zero(ao_d.totalsize, fit_d.totalsize); 
 		
-			int nmo = lmo_d.centres.size();
-			int nao = ao_d.centres.size();
-		
-			Matrix uA = Matrix::Zero(ao_d.totalsize, f.naux); 
-		
-			int aostart, mostart, aosize, mosize; 
-				
-			for (int Al = 0; Al < f.naux; Al++) {
+		int Al = 0; 
+		int fitstart, aostart, mostart, fitsize, aosize, mosize; 
+		for (int fit = 0; fit < nfit; fit++) {
+			fitstart = fit_d.starts[fit]; 
+			fitsize = fit_d.sizes[fit];
+						
+			for (int A = fitstart; A < fitstart + fitsize; A++) {
 				
 				int ul = 0;
 				for (int ao = 0; ao < nao; ao++) {
@@ -972,7 +967,7 @@ Matrix Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmai
 							for (int nu = mostart; nu < mostart + mosize; nu++) {
 								int U = std::max(u, nu); 
 								int NU = std::min(u, nu); 
-								uA(ul, Al) += xyf((U*(U+1))/2+NU, Al) * Cocc(nu, i);
+								uA(ul, Al) += xyf[fit]((U*(U+1))/2+NU, A-fitstart) * Cocc(nu, i);
 							} 
 							
 						}
@@ -981,62 +976,70 @@ Matrix Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmai
 						
 					}
 				}
-			}
-			
-			int bstart = 0; 
-			for (int ic = 0; ic < fit_d.centres.size(); ic++) {
-				if (fit_d.centres[ic] == fn) break; 
-				bstart += fit_d.sizes[ic]; 
-			}
-			uA *= lmo_d.G.block(bstart, 0, f.naux, ndf);  
-			uA = uA * uA.transpose(); 
 		
-			int ao1start, ao2start, ao1size, ao2size; 
-			int u = 0; 
-			for (int ao1 = 0; ao1 < nao; ao1++) {
-				ao1start = ao_d.starts[ao1];
-				ao1size = ao_d.sizes[ao1]; 
-			
-				for (int mu = ao1start; mu < ao1start + ao1size; mu++) {
-				
-					int v = 0; 
-					for (int ao2 = 0; ao2 < nao; ao2++) {
-						ao2start = ao_d.starts[ao2]; 
-						ao2size = ao_d.sizes[ao2]; 
-					 
-						for (int nu = ao2start; nu < ao2start + ao2size; nu++) {
-
-							G(mu, nu) -= uA(u, v); 
-						
-							v++; 
-						}
-					}
-					u++; 
-				}
+				Al++; 
 			}
 		}
 		
-		fn++; 
-		aux ++ f.naux; 
+		
+		uA *= lmo_d.G; 
+		uA = uA * uA.transpose(); 
+		
+		int ao1start, ao2start, ao1size, ao2size; 
+		int u = 0; 
+		for (int ao1 = 0; ao1 < nao; ao1++) {
+			ao1start = ao_d.starts[ao1];
+			ao1size = ao_d.sizes[ao1]; 
+			
+			for (int mu = ao1start; mu < ao1start + ao1size; mu++) {
+				
+				int v = 0; 
+				for (int ao2 = 0; ao2 < nao; ao2++) {
+					ao2start = ao_d.starts[ao2]; 
+					ao2size = ao_d.sizes[ao2]; 
+					 
+					for (int nu = ao2start; nu < ao2start + ao2size; nu++) {
+
+						G(mu, nu) -= uA(u, v); 
+						
+						v++; 
+					}
+				}
+				u++; 
+			}
+		}
 	}
+	double end = molecule->control->log.getGlobalTime(); 
+	std::cout << "Exchange: " << end - start << " seconds,";
 	 
 	// compute Coulomb
 	
 	start = molecule->control->log.getGlobalTime(); 
-
-	fn = 0; aux = 0; 
-	Pv = Vector::Zero((n*(n+1))/2); 
-	for (auto& f : finfo) {		
-		// Read in integrals
+	Vector Pv((n*(n+1))/2);
+	for (int x = 0; x < n; x++)
+		for (int y = 0; y <= x; y++)
+			Pv[(x*(x+1))/2 + y] = x == y ? 0.5 * Pt(x ,y) : Pt(x, y); 
+	
+	Vector Pk(ndf);
+	int aux = 0;  
+	for (int f = 0; f < nfrags; f++) {
 		Matrix xyf; 
-		std::string filename = "V" + fn + ".ints"; 
-		read_binary(filename.c_str(), xyf); 
-		
-		Pv += 4.0 * xyf * Pk.segment(aux, f.naux); 
-		
-		fn++; 
-		aux += f.naux; 
-	} 
+		read_intfile(f, xyf);
+		Pk.segment(aux, finfo[f].naux) = xyf.transpose() * Pv;  
+		aux += finfo[f].naux; 
+	}
+	
+	Pk = Linv2 * Pk;  
+	
+	aux = 0;
+	Pv = Vector::Zero((n*(n+1))/2);
+	for (int f = 0; f < nfrags; f++) {
+		Matrix xyf; 
+		read_intfile(f, xyf);
+		Pv += 4.0 * xyf * Pk.segment(aux, finfo[f].naux);  
+		aux += finfo[f].naux; 
+	}
+	
 	for (int x = 0; x < n; x++)
 	for (int y = 0; y <=x; y++) {
 		G(x, y) += Pv[(x*(x+1))/2+y];

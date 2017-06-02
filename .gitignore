@@ -33,6 +33,7 @@ molecular.x
 
 #temp files
 *~
+*.ints
 
 #mac osx thing
 .DS_Store
