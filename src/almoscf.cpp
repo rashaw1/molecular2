@@ -729,7 +729,7 @@ void ALMOSCF::rscf()
 				molecule->control->log.localTime(); 
 				energy += localcorrection; 
 			}
-			focker.getBlockedXYK().resize(0,0);
+			focker.getBlockedXYK().resize(0);
 		}
 
 		
