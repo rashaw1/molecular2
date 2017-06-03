@@ -64,6 +64,7 @@ void ALMOSCF::setFragments(bool unrestricted)
 			f.occ = frags[i]->getNel() / 2; 
 			f.nbfs = f_nbfs; 
 			f.naux = new_engine.nbasis(frags[i]->getBasis().getJKShells()); 
+			f.nshells = frags[i]->getBasis().getIntShells().size(); 
 			f.ndfshells = frags[i]->getBasis().getJKShells().size(); 
 			f.auxstart = auxstart; 
 			f.start = start;
@@ -728,7 +729,7 @@ void ALMOSCF::rscf()
 				molecule->control->log.localTime(); 
 				energy += localcorrection; 
 			}
-			focker.getXYK().resize(0,0);
+			focker.getBlockedXYK().resize(0,0);
 		}
 
 		

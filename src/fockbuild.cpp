@@ -754,7 +754,7 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 	// representation
 	if (xyK.rows() == 0) {
 		
-		integrals.compute_eris_3index(obs, dfbs, xyK); 
+		build_blocked_eris(finfo, Pt);   
 		Matrix V = integrals.compute_eris_2index(dfbs);
 	
 		Matrix I = Matrix::Identity(ndf, ndf);
@@ -769,6 +769,8 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 		double end = log.getGlobalTime();
 		
 		build_domains(Cocc, V, finfo); 
+		
+		xyK.resize(1, 1); 
 		
 	}  // if (xyK.size() == 0) 
 	
@@ -790,7 +792,7 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 		Matrix uA = Matrix::Zero(ao_d.totalsize, fit_d.totalsize); 
 		
 		int Al = 0; 
-		int fitstart, aostart, mostart, fitsize, aosize, mosize; 
+		int fitstart, aostart, mostart, fitsize, aosize, mosize, f1, f2; 
 		for (int fit = 0; fit < nfit; fit++) {
 			fitstart = fit_d.starts[fit]; 
 			fitsize = fit_d.sizes[fit]; 
@@ -801,18 +803,23 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 				for (int ao = 0; ao < nao; ao++) {
 					aostart = ao_d.starts[ao]; 
 					aosize = ao_d.sizes[ao]; 
+					f1 = ao_d.centres[ao];
 					
-					for (int u = aostart; u < aostart + aosize; u++) {
+					for (int u = 0; u < aosize; u++) {
 						for (int mo = 0; mo < nmo; mo++) {
 							mostart = lmo_d.starts[mo];
 							mosize = lmo_d.sizes[mo]; 
-
-							for (int nu = mostart; nu < mostart + mosize; nu++) {
-								int U = std::max(u, nu); 
-								int NU = std::min(u, nu); 
-								uA(ul, Al) += xyK((U*(U+1))/2+NU, A) * Cocc(nu, i);
-							} 
-							
+							f2 = lmo_d.centres[mo]; 
+						
+							if (!blocked_xyK.isZero(f1, f2)) {
+								Matrix& xyf = blocked_xyK(f1, f2); 
+								
+								for (int nu = 0; nu < mosize; nu++) {
+									int U = f1 < f2 ? nu * aosize : u * mosize;
+									int NU = f1 < f2 ? u : nu; 
+									uA(ul, Al) += xyf(U + NU, A) * Cocc(nu+mostart, i);
+								} 
+							}
 						}
 						
 						ul++; 
@@ -823,7 +830,6 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 				Al++; 
 			}
 		}
-		
 		
 		uA *= lmo_d.G; 
 		uA = uA * uA.transpose(); 
@@ -851,6 +857,7 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 				u++; 
 			}
 		}
+	
 	}
 	double end = log.getGlobalTime(); 
 	std::cout << "Exchange: " << end - start << " seconds,";
@@ -858,19 +865,67 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 	// compute Coulomb
 	
 	start = log.getGlobalTime(); 
-	Vector Pv((n*(n+1))/2);
-	for (int x = 0; x < n; x++)
-		for (int y = 0; y <= x; y++)
-			Pv[(x*(x+1))/2 + y] = x == y ? 0.5 * Pt(x ,y) : Pt(x, y); 
-
-	Pv = xyK.transpose() * Pv;
-	Pv = Linv2 * Pv;  
-	Pv = 4.0 * xyK *  Pv; 
-	for (int x = 0; x < n; x++)
-	for (int y = 0; y <=x; y++) {
-		G(x, y) += Pv[(x*(x+1))/2+y];
-		G(y, x) = G(x, y); 
+	
+	Vector Pk = Vector::Zero(ndf); 
+	int nao1, nao2, f1start, f2start; 
+	for (int f1 = 0; f1 < nfrags; f1++) {
+		nao1 = finfo[f1].nbfs; 
+		f1start = finfo[f1].start; 
+		
+		for (int f2 = 0; f2 <= f1; f2++) {
+			nao2 = finfo[f2].nbfs; 
+			f2start = finfo[f2].start; 
+			
+			if (!blocked_xyK.isZero(f1, f2)) {
+				Matrix& xyf = blocked_xyK(f1, f2); 
+				
+				Matrix Ptf = Pt.block(f1start, f2start, nao1, nao2); 
+				Vector Pvf(nao1 * nao2); 
+				for (int x = 0; x < nao1; x++) {
+					for (int y = 0; y < nao2; y++)
+						Pvf[x*nao2+y] = Ptf(x, y); 
+				}
+			
+				if (f1==f2) 
+					Pk += 0.5 * xyf.transpose() * Pvf; 
+				else 
+					Pk += xyf.transpose() * Pvf; 
+			}
+		}
 	}
+	
+	Pk = Linv2 * Pk;
+	//Vector Pv = 4.0 * xyK * Pk; 
+	
+	for (int f1 = 0; f1 < nfrags; f1++) {
+		nao1 = finfo[f1].nbfs; 
+		f1start = finfo[f1].start; 
+		
+		for (int f2 = 0; f2 <= f1; f2++) {
+			nao2 = finfo[f2].nbfs; 
+			f2start = finfo[f2].start; 
+			
+			if (!blocked_xyK.isZero(f1, f2)) {
+				Matrix& xyf = blocked_xyK(f1, f2); 
+				
+				Vector Pvf = 4.0 * xyf * Pk;
+				if (f1 == f2) {
+					Pvf *= 0.5; 
+					for (int x = 0; x < nao1; x++)
+						Pvf[x*nao2+x] *= 2.0; 
+				}
+				
+				for (int x = 0; x < nao1; x++) { 
+					for (int y = 0; y < nao2; y++) {
+						
+						G(x+f1start, y+f2start) += Pvf[x * nao2 + y]; 
+						G(y+f2start, x+f1start) = G(x+f1start, y+f2start); 
+					}
+				}
+			}
+		}
+	}
+ 
 	end = log.getGlobalTime(); 	
 	std::cout << "Coulomb: " << end - start << " seconds" << std::endl << std::flush; 
 	
@@ -878,6 +933,56 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 	
 	return G; 
 }
+
+void Fock::build_blocked_eris(std::vector<FragmentInfo>& finfo, Matrix& Pt) {
+	
+	BasisSet& obs = molecule->getBasis().getIntShells(); 
+	BasisSet& dfbs = molecule->getBasis().getJKShells(); 
+	Matrix &psc = integrals.getPrescreen(); 
+	
+	int nfrags = finfo.size(); 
+	double THRESHOLD = molecule->control->get_option<double>("thrint");
+	blocked_xyK.resize(nfrags);  
+	
+	int nobs1 = 0; int nabs1 = 0;  
+	for (int f1 = 0; f1 < finfo.size(); f1++) {
+		auto& info1 = finfo[f1];
+		
+		int nobs2 = 0; int nabs2 = 0;
+		for (int f2 = 0; f2 <= f1; f2++) {
+			auto& info2 = finfo[f2]; 
+			double infnorm = psc.block(nobs1, nobs2, info1.nshells, info2.nshells).lpNorm<Eigen::Infinity>();
+			double ptnorm = Pt.block(info1.start, info2.start, info1.nbfs, info2.nbfs).lpNorm<Eigen::Infinity>(); 
+			
+			if (infnorm*ptnorm > THRESHOLD) {
+				blocked_xyK.setNonZero(f1, f2); 
+				BasisSet obs1, obs2;
+				std::copy(obs.begin()+nobs1, obs.begin()+nobs1+info1.nshells, std::back_inserter(obs1)); 
+				std::copy(obs.begin()+nobs2, obs.begin()+nobs2+info2.nshells, std::back_inserter(obs2)); 
+								
+				integrals.compute_eris_3index(obs1, obs2, dfbs, blocked_xyK(f1, f2)); 
+			} 
+			
+			nobs2 += info2.nshells;
+			nabs2 += info2.ndfshells; 
+		}
+		
+		nobs1 += info1.nshells;
+		nabs1 += info1.ndfshells; 
+	}
+	
+	int nzero = 0; int ntotal = 0; 
+	for (int f1 = 0; f1 < finfo.size(); f1++) {
+		for (int f2 = 0; f2 <= f1; f2++) {
+			if (blocked_xyK.isZero(f1, f2)) nzero++; 
+			ntotal++; 
+		}
+	}
+	std::cout << nzero << " " << ntotal << std::endl; 
+	
+	
+}
+
 
 void read_intfile(int K, Matrix& xyf) {
 	std::string filename = "V" + std::to_string(K) + ".ints";

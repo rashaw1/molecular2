@@ -72,17 +72,18 @@ struct Domain {
 };
 
 struct FragmentInfo {
-	int occ, nbfs, naux, start, auxstart, ndfshells; 
+	int occ, nbfs, naux, start, auxstart, nshells, ndfshells; 
 	double radius, mo_thresh, fit_thresh, r_thresh; 
 	Vector com; 
 	
-	FragmentInfo() : occ(0), nbfs(0), naux(0), start(0), auxstart(0), ndfshells(0), radius(0.0), mo_thresh(1e-6), fit_thresh(0.05), r_thresh(15.0) {}
+	FragmentInfo() : occ(0), nbfs(0), naux(0), start(0), auxstart(0), nshells(0), ndfshells(0), radius(0.0), mo_thresh(1e-6), fit_thresh(0.05), r_thresh(15.0) {}
 	FragmentInfo(const FragmentInfo& other) {
 		occ = other.occ;
 		nbfs = other.nbfs;
 		naux = other.naux;
 		start = other.start;
 		auxstart = other.auxstart;
+		nshells = other.nshells; 
 		ndfshells = other.ndfshells; 
 		radius = other.radius;
 		mo_thresh = other.mo_thresh;
@@ -107,7 +108,8 @@ protected:
   Matrix CP;
   Matrix forces;
   Matrix hessian;
-  Matrix xyK; 
+  Matrix xyK;
+  DFBlocks blocked_xyK;  
   Matrix Linv, Linv2; 
   Vector eps;
   std::vector<Matrix> focks;
@@ -140,6 +142,7 @@ public:
   Matrix& getJ() { return jints; } 
   Matrix& getK() { return kints; }
   Matrix& getXYK() { return xyK; }
+  DFBlocks& getBlockedXYK() { return blocked_xyK; }
   Matrix& getLinv() { return Linv; }
   Matrix& getDens() { return dens; }
   Matrix& getForces() { return forces; }
@@ -194,6 +197,7 @@ public:
   Matrix compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo); 
   Matrix compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo);
   void build_domains(Matrix& Cocc, Matrix& V, std::vector<FragmentInfo>& finfo);  
+  void build_blocked_eris(std::vector<FragmentInfo>& finfo, Matrix& Pt); 
   
   void compute_soad_guess(); 
   

@@ -68,6 +68,29 @@ using shellpair_list_t = std::unordered_map<size_t, std::vector<size_t>>;
 class Atom;
 class Tensor6;
 
+#define PAIR_INDEX(x, y) (x < y ? (y*(y+1))/2 + x : (x*(x+1))/2 + y)
+
+class DFBlocks {
+private:
+	std::vector<Matrix> eris;
+	std::vector<bool> zeroList; 
+	
+	int nfrags, npairs; 
+
+public:
+	DFBlocks() : nfrags(-1), npairs(-1) { } 
+	DFBlocks(int nfrags); 
+	 
+	Matrix& operator()(int f1, int f2);
+	bool isZero(int f1, int f2) const;
+	void setZero(int f1, int f2); 
+	void setNonZero(int f1, int f2);  
+	
+	int getNFrags() const { return nfrags; }
+	
+	void resize(int nfrags); 
+}; 
+
 //Begin class declaration
 class IntegralEngine
 {
@@ -137,6 +160,8 @@ public:
 	S8EvenTensor4 compute_eris(const std::vector<libint2::Shell>& shells);
 	void compute_eris_3index(const std::vector<libint2::Shell>& obs, const std::vector<libint2::Shell>& auxbs, Matrix& eris);
 	void compute_eris_3index(const std::vector<libint2::Shell>& obs, const std::vector<libint2::Shell>& auxbs, SparseMatrix& eris);
+	void compute_eris_3index(const std::vector<libint2::Shell>& obs1, const std::vector<libint2::Shell>& obs2,
+		 const std::vector<libint2::Shell>& auxbs, Matrix& eris);
 	Matrix compute_eris_2index(const std::vector<libint2::Shell>& auxbs);
   
 	template<libint2::Operator obtype>
