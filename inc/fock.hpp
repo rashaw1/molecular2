@@ -110,7 +110,8 @@ protected:
   Matrix hessian;
   Matrix xyK;
   DFBlocks blocked_xyK;  
-  Matrix Linv, Linv2; 
+  Matrix Linv;
+  SparseMatrix Linv2; 
   Vector eps;
   std::vector<Matrix> focks;
   std::vector<Domain> lmo_domains, ao_domains, fit_domains;

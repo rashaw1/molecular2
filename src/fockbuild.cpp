@@ -1012,7 +1012,8 @@ Matrix Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmai
 		Matrix I = Matrix::Identity(ndf, ndf);
 		auto L = V_LLt.matrixL();
 		Linv = L.solve(I).transpose();
-		Linv2 = Linv * Linv.transpose(); 
+		SparseMatrix sLinv = Linv.sparseView(); 
+		Linv2 = sLinv * sLinv.transpose(); 
 		
 		build_domains(Cocc, V, finfo); 
 		
