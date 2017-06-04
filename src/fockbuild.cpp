@@ -754,21 +754,31 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 	// representation
 	if (xyK.rows() == 0) {
 		  
+		double start = log.getGlobalTime(); 
 		Matrix V = integrals.compute_eris_2index(dfbs);
+		double end = log.getGlobalTime();
+		std::cout << "ERI2: " << end - start << " seconds, "; 
+		
+		start = log.getGlobalTime();
 		build_blocked_eris(finfo, V, Pt); 
+		end = log.getGlobalTime();
+		std::cout << "ERI3: " << end - start << " seconds, ";
 	
+		start = log.getGlobalTime(); 
 		Matrix I = Matrix::Identity(ndf, ndf);
 		//LLT V_LLt(V); 
 		auto V_LLt = V.selfadjointView<Eigen::Upper>().llt(); 
 		auto L = V_LLt.matrixL(); 
 		Linv = L.solve(I).transpose();
-		SparseMatrix sLinv = Linv.sparseView(); 
-		
-		double start = log.getGlobalTime();
+		SparseMatrix sLinv = Linv.sparseView(); 		
 		Linv2 = sLinv * sLinv.transpose(); 
-		double end = log.getGlobalTime();
+		end = log.getGlobalTime(); 
+		std::cout << "LLT: " << end -start << " seconds, ";
 		
-		build_domains(Cocc, V, finfo); 
+		start = log.getGlobalTime();
+		build_domains(Cocc, V, finfo);
+		end = log.getGlobalTime();
+		std::cout << "Domains: " << end -start << " seconds." << std::endl;  
 		
 		xyK.resize(1, 1); 
 		
