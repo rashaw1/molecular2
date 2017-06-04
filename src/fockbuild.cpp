@@ -753,9 +753,9 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 	// using first time? compute 3-center ints and transform to inv sqrt
 	// representation
 	if (xyK.rows() == 0) {
-		
-		build_blocked_eris(finfo, Pt);   
+		  
 		Matrix V = integrals.compute_eris_2index(dfbs);
+		build_blocked_eris(finfo, V, Pt); 
 	
 		Matrix I = Matrix::Identity(ndf, ndf);
 		//LLT V_LLt(V); 
@@ -792,10 +792,11 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 		Matrix uA = Matrix::Zero(ao_d.totalsize, fit_d.totalsize); 
 		
 		int Al = 0; 
-		int fitstart, aostart, mostart, fitsize, aosize, mosize, f1, f2; 
+		int fitstart, aostart, mostart, fitsize, aosize, mosize, f1, f2, fk; 
 		for (int fit = 0; fit < nfit; fit++) {
 			fitstart = fit_d.starts[fit]; 
 			fitsize = fit_d.sizes[fit]; 
+			fk = fit_d.centres[fit]; 
 			
 			for (int A = fitstart; A < fitstart + fitsize; A++) {
 				
@@ -811,13 +812,13 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 							mosize = lmo_d.sizes[mo]; 
 							f2 = lmo_d.centres[mo]; 
 						
-							if (!blocked_xyK.isZero(f1, f2)) {
-								Matrix& xyf = blocked_xyK(f1, f2); 
+							if (!blocked_xyK.isZero(f1, f2, fk)) {
+								Matrix& xyf = blocked_xyK(f1, f2, fk); 
 								
 								for (int nu = 0; nu < mosize; nu++) {
 									int U = f1 < f2 ? nu * aosize : u * mosize;
 									int NU = f1 < f2 ? u : nu; 
-									uA(ul, Al) += xyf(U + NU, A) * Cocc(nu+mostart, i);
+									uA(ul, Al) += xyf(U + NU, A-fitstart) * Cocc(nu+mostart, i);
 								} 
 							}
 						}
@@ -867,35 +868,39 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 	start = log.getGlobalTime(); 
 	
 	Vector Pk = Vector::Zero(ndf); 
-	int nao1, nao2, f1start, f2start; 
+	int nao1, nao2, naux, f1start, f2start, fkstart; 
 	for (int f1 = 0; f1 < nfrags; f1++) {
 		nao1 = finfo[f1].nbfs; 
 		f1start = finfo[f1].start; 
 		
 		for (int f2 = 0; f2 <= f1; f2++) {
 			nao2 = finfo[f2].nbfs; 
-			f2start = finfo[f2].start; 
+			f2start = finfo[f2].start;
 			
-			if (!blocked_xyK.isZero(f1, f2)) {
-				Matrix& xyf = blocked_xyK(f1, f2); 
+			for (int fk = 0; fk < nfrags; fk++) { 
+				fkstart = finfo[fk].auxstart; 
+				naux = finfo[fk].naux; 
 				
-				Matrix Ptf = Pt.block(f1start, f2start, nao1, nao2); 
-				Vector Pvf(nao1 * nao2); 
-				for (int x = 0; x < nao1; x++) {
-					for (int y = 0; y < nao2; y++)
-						Pvf[x*nao2+y] = Ptf(x, y); 
-				}
+				if (!blocked_xyK.isZero(f1, f2, fk)) {
+					Matrix& xyf = blocked_xyK(f1, f2, fk); 
+				
+					Matrix Ptf = Pt.block(f1start, f2start, nao1, nao2); 
+					Vector Pvf(nao1 * nao2); 
+					for (int x = 0; x < nao1; x++) {
+						for (int y = 0; y < nao2; y++)
+							Pvf[x*nao2+y] = Ptf(x, y); 
+					}
 			
-				if (f1==f2) 
-					Pk += 0.5 * xyf.transpose() * Pvf; 
-				else 
-					Pk += xyf.transpose() * Pvf; 
+					if (f1==f2) 
+						Pk.segment(fkstart, naux) += 0.5 * xyf.transpose() * Pvf; 
+					else 
+						Pk.segment(fkstart, naux) += xyf.transpose() * Pvf; 
+				}
 			}
 		}
 	}
 	
 	Pk = Linv2 * Pk;
-	//Vector Pv = 4.0 * xyK * Pk; 
 	
 	for (int f1 = 0; f1 < nfrags; f1++) {
 		nao1 = finfo[f1].nbfs; 
@@ -905,21 +910,26 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 			nao2 = finfo[f2].nbfs; 
 			f2start = finfo[f2].start; 
 			
-			if (!blocked_xyK.isZero(f1, f2)) {
-				Matrix& xyf = blocked_xyK(f1, f2); 
+			for (int fk = 0; fk < nfrags; fk++) {
+				fkstart = finfo[fk].auxstart;
+				naux = finfo[fk].naux; 
 				
-				Vector Pvf = 4.0 * xyf * Pk;
-				if (f1 == f2) {
-					Pvf *= 0.5; 
-					for (int x = 0; x < nao1; x++)
-						Pvf[x*nao2+x] *= 2.0; 
-				}
+				if (!blocked_xyK.isZero(f1, f2, fk)) {
+					Matrix& xyf = blocked_xyK(f1, f2, fk); 
 				
-				for (int x = 0; x < nao1; x++) { 
-					for (int y = 0; y < nao2; y++) {
+					Vector Pvf = 4.0 * xyf * Pk.segment(fkstart, naux);
+					if (f1 == f2) {
+						Pvf *= 0.5; 
+						for (int x = 0; x < nao1; x++)
+							Pvf[x*nao2+x] *= 2.0; 
+					}
+				
+					for (int x = 0; x < nao1; x++) { 
+						for (int y = 0; y < nao2; y++) {
 						
-						G(x+f1start, y+f2start) += Pvf[x * nao2 + y]; 
-						G(y+f2start, x+f1start) = G(x+f1start, y+f2start); 
+							G(x+f1start, y+f2start) += Pvf[x * nao2 + y]; 
+							G(y+f2start, x+f1start) = G(x+f1start, y+f2start); 
+						}
 					}
 				}
 			}
@@ -934,7 +944,7 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 	return G; 
 }
 
-void Fock::build_blocked_eris(std::vector<FragmentInfo>& finfo, Matrix& Pt) {
+void Fock::build_blocked_eris(std::vector<FragmentInfo>& finfo, Matrix& JPQ, Matrix& Pt) {
 	
 	BasisSet& obs = molecule->getBasis().getIntShells(); 
 	BasisSet& dfbs = molecule->getBasis().getJKShells(); 
@@ -944,42 +954,57 @@ void Fock::build_blocked_eris(std::vector<FragmentInfo>& finfo, Matrix& Pt) {
 	double THRESHOLD = molecule->control->get_option<double>("thrint");
 	blocked_xyK.resize(nfrags);  
 	
-	int nobs1 = 0; int nabs1 = 0;  
+	int nobs1 = 0;  
 	for (int f1 = 0; f1 < finfo.size(); f1++) {
 		auto& info1 = finfo[f1];
 		
-		int nobs2 = 0; int nabs2 = 0;
+		int nobs2 = 0; 
 		for (int f2 = 0; f2 <= f1; f2++) {
 			auto& info2 = finfo[f2]; 
 			double infnorm = psc.block(nobs1, nobs2, info1.nshells, info2.nshells).lpNorm<Eigen::Infinity>();
-			double ptnorm = Pt.block(info1.start, info2.start, info1.nbfs, info2.nbfs).lpNorm<Eigen::Infinity>(); 
+			double ptnorm = Pt.block(info1.start, info2.start, info1.nbfs, info2.nbfs).lpNorm<Eigen::Infinity>();  
 			
-			if (infnorm*ptnorm > THRESHOLD) {
-				blocked_xyK.setNonZero(f1, f2); 
-				BasisSet obs1, obs2;
-				std::copy(obs.begin()+nobs1, obs.begin()+nobs1+info1.nshells, std::back_inserter(obs1)); 
-				std::copy(obs.begin()+nobs2, obs.begin()+nobs2+info2.nshells, std::back_inserter(obs2)); 
+			int nabsk = 0; int ndf = 0;
+			for (int fk = 0; fk < finfo.size(); fk++) {
+				auto& infok = finfo[fk]; 
+				double infjpq = std::sqrt(JPQ.block(ndf, ndf, infok.naux, infok.naux).lpNorm<Eigen::Infinity>()); 
+				double rxyz = (info1.com - infok.com).norm() + (info2.com - infok.com).norm();
+				rxyz *= 0.5;  
+				
+				double estimate = rxyz < 1.0 ? 1.0 : 2.0 * infnorm * ptnorm * infjpq / rxyz;
+				//estimate = rxyz > RTHRESH ? estimate / rxyz : estimate * infjpq; 
+				
+				if (estimate > THRESHOLD) {
+					blocked_xyK.setNonZero(f1, f2, fk); 
+					
+					BasisSet obs1, obs2, dfset;
+					std::copy(obs.begin()+nobs1, obs.begin()+nobs1+info1.nshells, std::back_inserter(obs1)); 
+					std::copy(obs.begin()+nobs2, obs.begin()+nobs2+info2.nshells, std::back_inserter(obs2));
+					std::copy(dfbs.begin() + nabsk, dfbs.begin()+nabsk+infok.ndfshells, std::back_inserter(dfset)); 
 								
-				integrals.compute_eris_3index(obs1, obs2, dfbs, blocked_xyK(f1, f2)); 
-			} 
+					integrals.compute_eris_3index(obs1, obs2, dfset, blocked_xyK(f1, f2, fk)); 
+ 				} 
+				
+				nabsk += infok.ndfshells; 
+				ndf += infok.naux; 
+			}
 			
 			nobs2 += info2.nshells;
-			nabs2 += info2.ndfshells; 
 		}
 		
 		nobs1 += info1.nshells;
-		nabs1 += info1.ndfshells; 
 	}
 	
 	int nzero = 0; int ntotal = 0; 
 	for (int f1 = 0; f1 < finfo.size(); f1++) {
 		for (int f2 = 0; f2 <= f1; f2++) {
-			if (blocked_xyK.isZero(f1, f2)) nzero++; 
-			ntotal++; 
+			for (int fk = 0; fk < finfo.size(); fk++) {
+				if (blocked_xyK.isZero(f1, f2, fk)) nzero++; 
+				ntotal++; 
+			}
 		}
 	}
 	std::cout << nzero << " " << ntotal << std::endl; 
-	
 	
 }
 

@@ -363,29 +363,30 @@ void DFBlocks::resize(int _nfrags) {
 	
 	nfrags = _nfrags; 
 	npairs = (nfrags*(nfrags+1))/2; 
+	ntriples = npairs*nfrags; 
 	eris.clear(); 
 	zeroList.clear();
 	
-	eris.resize(npairs);
-	for (int n = 0; n < npairs; n++)
+	eris.resize(ntriples);
+	for (int n = 0; n < ntriples; n++)
 		zeroList.push_back(true); 
 	
 }
 
-Matrix& DFBlocks::operator()(int f1, int f2) {
-	return eris[PAIR_INDEX(f1, f2)]; 
+Matrix& DFBlocks::operator()(int f1, int f2, int fk) {
+	return eris[TRIPLE_INDEX(f1, f2, fk, npairs)]; 
 } 
 
-bool DFBlocks::isZero(int f1, int f2) const {
-	return zeroList[PAIR_INDEX(f1, f2)]; 
+bool DFBlocks::isZero(int f1, int f2, int fk) const {
+	return zeroList[TRIPLE_INDEX(f1, f2, fk, npairs)]; 
 }
 
-void DFBlocks::setZero(int f1, int f2) {
-	zeroList[PAIR_INDEX(f1, f2)] = true; 
+void DFBlocks::setZero(int f1, int f2, int fk) {
+	zeroList[TRIPLE_INDEX(f1, f2, fk, npairs)] = true; 
 }
 
-void DFBlocks::setNonZero(int f1, int f2) {
-	zeroList[PAIR_INDEX(f1, f2)] = false; 
+void DFBlocks::setNonZero(int f1, int f2, int fk) {
+	zeroList[TRIPLE_INDEX(f1, f2, fk, npairs)] = false; 
 }
 
 

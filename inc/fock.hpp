@@ -198,7 +198,7 @@ public:
   Matrix compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo); 
   Matrix compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo);
   void build_domains(Matrix& Cocc, Matrix& V, std::vector<FragmentInfo>& finfo);  
-  void build_blocked_eris(std::vector<FragmentInfo>& finfo, Matrix& Pt); 
+  void build_blocked_eris(std::vector<FragmentInfo>& finfo, Matrix& JPQ, Matrix& Pt); 
   
   void compute_soad_guess(); 
   

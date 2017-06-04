@@ -69,22 +69,23 @@ class Atom;
 class Tensor6;
 
 #define PAIR_INDEX(x, y) (x < y ? (y*(y+1))/2 + x : (x*(x+1))/2 + y)
+#define TRIPLE_INDEX(x, y, k, n) (x < y ? (k*n + (y*(y+1))/2 + x) : (k*n + (x*(x+1))/2 + y))
 
 class DFBlocks {
 private:
 	std::vector<Matrix> eris;
 	std::vector<bool> zeroList; 
 	
-	int nfrags, npairs; 
+	int nfrags, npairs, ntriples; 
 
 public:
-	DFBlocks() : nfrags(-1), npairs(-1) { } 
+	DFBlocks() : nfrags(-1), npairs(-1), ntriples(-1) { } 
 	DFBlocks(int nfrags); 
 	 
-	Matrix& operator()(int f1, int f2);
-	bool isZero(int f1, int f2) const;
-	void setZero(int f1, int f2); 
-	void setNonZero(int f1, int f2);  
+	Matrix& operator()(int f1, int f2, int fk);
+	bool isZero(int f1, int f2, int fk) const;
+	void setZero(int f1, int f2, int fk); 
+	void setNonZero(int f1, int f2, int fk);  
 	
 	int getNFrags() const { return nfrags; }
 	
