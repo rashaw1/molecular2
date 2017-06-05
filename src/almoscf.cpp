@@ -220,7 +220,13 @@ void ALMOSCF::rcompute() {
 		i_offset += f1_nocc; 
 	}
 	sigma = sigma.selfadjointView<Eigen::Lower>();
-	sigma = sigma.inverse(); 
+	
+	// Invert sigma
+	LLT llt(sigma); 
+	Matrix I = Matrix::Identity(nocc, nocc);
+	auto L = llt.matrixL(); 
+	auto Linv = L.solve(I).transpose(); 
+	sigma.noalias() = Linv * Linv.transpose(); 
 	
 	i_offset = 0; mu_offset = 0;
 	for (int i = 0; i < fragments.size(); i++) {
@@ -402,6 +408,7 @@ void ALMOSCF::rperturb(bool order4)
 	sigma.block(nocc, 0, nvirt, nocc) = V.transpose() * S * T;
 	sigma.block(nocc, nocc, nvirt, nvirt) = V.transpose() * S * V;
 	
+	SparseMatrix sparse_sigma = sigma.sparseView(); 
 	// Cholesky decompose
 	LLT llt(sigma); 
 	Matrix C0 = llt.matrixL();
@@ -518,7 +525,9 @@ void ALMOSCF::rinf() {
 	
 	molecule->control->log.title("Pairwise charge transfer"); 
 	molecule->control->log.initCTTable(); 
+	double rcut = cmd.get_option<double>("rcutoff");
 	int ioffset = 0; int aoffset = 0; 
+	e_pert_2 = 0.0; 
 	for (int f1 = 0; f1 < fragments.size(); f1++) {
 		int f1_nocc = fragments[f1].getMolecule()->getNel()/2;
 		int f1_nvirt = fragments[f1].getHCore().rows() - f1_nocc; 
@@ -528,8 +537,13 @@ void ALMOSCF::rinf() {
 			int f2_nocc = fragments[f2].getMolecule()->getNel()/2;
 			int f2_nvirt = fragments[f2].getHCore().rows() - f1_nocc; 
 			
-			double ef1f2 = (Fov.block(ioffset, boffset, f1_nocc, f2_nvirt) * Xvo.block(boffset, ioffset, f2_nvirt, f1_nocc)).trace(); 
-			molecule->control->log.CTRow(f1+1, f2+1, 2.0*ef1f2); 
+			if ((finfo[f1].com - finfo[f2].com).norm() < rcut) {
+			
+				double ef1f2 = (Fov.block(ioffset, boffset, f1_nocc, f2_nvirt) * Xvo.block(boffset, ioffset, f2_nvirt, f1_nocc)).trace(); 
+				molecule->control->log.CTRow(f1+1, f2+1, 2.0*ef1f2);
+				e_pert_2 += ef1f2;  
+			
+			}
 			
 			joffset += f2_nocc;
 			boffset += f2_nvirt; 
@@ -540,7 +554,7 @@ void ALMOSCF::rinf() {
 	}
 			
 	
-	e_pert_2 = 2.0 * (Fov * Xvo).trace(); 
+	e_pert_2 *= 2.0; 
 }
 
 // Calculate the perturbative correction
@@ -755,6 +769,7 @@ void ALMOSCF::rscf()
 				rinf(); 
 				molecule->control->log.result("E(Inf)", e_pert_2 * Logger::TOKCAL, "kcal / mol"); 
 			}
+			molecule->control->log.localTime(); 
 			molecule->control->log.result("Total ALMO+CT interaction energy", (energy + e_pert_2 + e_pert_4) * Logger::TOKCAL, "kcal / mol");
 			molecule->control->log.flush(); 
 		}
@@ -982,7 +997,7 @@ double ALMOSCF::r_energy_df() {
 	T *= es.operatorInverseSqrt(); 
 	
 	Matrix& xyK = focker.getXYK(); 
-	Matrix& Linv = focker.getLinv(); 
+	SparseMatrix& Linv = focker.getLinv(); 
 	int ndf = xyK.cols(); 
 	
 	Matrix xiK = Matrix::Zero(nbfs * nocc, ndf); 
@@ -1025,7 +1040,7 @@ double ALMOSCF::r_energy_df() {
 		for (int y = 0; y <= x; y++)
 			Pv[(x*(x+1))/2 + y] = x == y ? 0.5 * P(x ,y) : P(x, y); 
 	Pv = xyK.transpose() * Pv;
-	Pv = Linv * Linv.transpose() * Pv;  
+	Pv = focker.getLinv2() * Pv;  
 	Pv = 4.0 * xyK *  Pv; 
 	Matrix J = Matrix::Zero(nbfs, nbfs); 
 	for (int x = 0; x < nbfs; x++)

@@ -1,6 +1,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 #include <Eigen/Cholesky>
+#include <Eigen/SparseCholesky>
 #include <Eigen/Eigenvalues>
 #include "tensor4.hpp"
 
@@ -12,6 +13,8 @@ using EigenSolver = Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd>;
 using GeneralizedEigenSolver = Eigen::GeneralizedSelfAdjointEigenSolver<Eigen::MatrixXd>;
 using LLT = Eigen::LLT<Eigen::MatrixXd>; 
 using FullLU = Eigen::FullPivLU<Eigen::MatrixXd>;
+using SparseLLT = Eigen::SimplicialLLT<Eigen::SparseMatrix<double>>;
+using SparseLU = Eigen::SparseLU<Eigen::SparseMatrix<double>>; 
 
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> EMatrix;
 typedef Eigen::DiagonalMatrix<double, Eigen::Dynamic, Eigen::Dynamic> DiagonalMatrix;

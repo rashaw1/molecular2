@@ -110,8 +110,7 @@ protected:
   Matrix hessian;
   Matrix xyK;
   DFBlocks blocked_xyK;  
-  Matrix Linv;
-  SparseMatrix Linv2; 
+  SparseMatrix Linv, Linv2; 
   Vector eps;
   std::vector<Matrix> focks;
   std::vector<Domain> lmo_domains, ao_domains, fit_domains;
@@ -144,7 +143,8 @@ public:
   Matrix& getK() { return kints; }
   Matrix& getXYK() { return xyK; }
   DFBlocks& getBlockedXYK() { return blocked_xyK; }
-  Matrix& getLinv() { return Linv; }
+  SparseMatrix& getLinv() { return Linv; }
+  SparseMatrix& getLinv2() { return Linv2; }
   Matrix& getDens() { return dens; }
   Matrix& getForces() { return forces; }
   Matrix& getHessian() { return hessian; }

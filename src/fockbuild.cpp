@@ -546,12 +546,13 @@ Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 	if (xyK.rows() == 0) {
 		
 		integrals.compute_eris_3index(obs, dfbs, xyK); 
-		Matrix V = integrals.compute_eris_2index(dfbs);
-	
-		Eigen::LLT<Matrix> V_LLt(V);
+
+		Matrix V = integrals.compute_eris_2index(dfbs); 
+		LLT V_LLt(V);
 		Matrix I = Matrix::Identity(ndf, ndf);
 		auto L = V_LLt.matrixL();
-		Linv = L.solve(I).transpose();
+		Matrix denseLinv = L.solve(I).transpose(); 
+		Linv = denseLinv.sparseView(1e-12); 
 
 		Vector row; 
 		for (int x = 0; x < n; x++) {
@@ -560,7 +561,7 @@ Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 				row = xyK.row(xy); 
 			
 				for (int K = 0; K < ndf; K++)
-					xyK(xy, K) = row.dot(Linv.col(K)); 
+					xyK(xy, K) = row.dot(denseLinv.col(K)); 
 			}
 		} 
 	}  // if (xyK.size() == 0)
@@ -765,13 +766,13 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 		std::cout << "ERI3: " << end - start << " seconds, ";
 	
 		start = log.getGlobalTime(); 
-		Matrix I = Matrix::Identity(ndf, ndf);
-		//LLT V_LLt(V); 
-		auto V_LLt = V.selfadjointView<Eigen::Upper>().llt(); 
-		auto L = V_LLt.matrixL(); 
-		Linv = L.solve(I).transpose();
-		SparseMatrix sLinv = Linv.sparseView(); 		
-		Linv2 = sLinv * sLinv.transpose(); 
+		auto llt = V.selfadjointView<Eigen::Lower>().llt();
+		auto& L = llt.matrixL(); 
+		Matrix I(ndf, ndf);
+		I.setIdentity(); 
+		Linv = L.solve(I).transpose().sparseView(1e-12);
+		start = end; 
+		Linv2 = Linv * Linv.transpose();
 		end = log.getGlobalTime(); 
 		std::cout << "LLT: " << end -start << " seconds, ";
 		
@@ -1043,12 +1044,11 @@ Matrix Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmai
 		
 		Matrix V = integrals.compute_eris_2index(dfbs);
 	
-		Eigen::LLT<Matrix> V_LLt(V);
-		Matrix I = Matrix::Identity(ndf, ndf);
-		auto L = V_LLt.matrixL();
-		Linv = L.solve(I).transpose();
-		SparseMatrix sLinv = Linv.sparseView(); 
-		Linv2 = sLinv * sLinv.transpose(); 
+		auto L = V.selfadjointView<Eigen::Lower>().llt().matrixL(); 
+		Matrix I(ndf, ndf);
+		I.setIdentity(); 
+		Linv = L.solve(I).transpose().sparseView(1e-12);
+		Linv2 = Linv * Linv.transpose();   
 		
 		build_domains(Cocc, V, finfo); 
 		
