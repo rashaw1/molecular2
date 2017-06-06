@@ -25,10 +25,11 @@ molecule = {
          }
 }
 ralmo(
-	perturb, 2
+	perturb, 3
 	rpa, true
 	longrange, false
 	mu, 0.5
 	rpax, 2
 	df, true
+	xcorrect, false
 )

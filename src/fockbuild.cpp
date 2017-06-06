@@ -771,7 +771,6 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 		Matrix I(ndf, ndf);
 		I.setIdentity(); 
 		Linv = L.solve(I).transpose().sparseView(1e-12);
-		start = end; 
 		Linv2 = Linv * Linv.transpose();
 		end = log.getGlobalTime(); 
 		std::cout << "LLT: " << end -start << " seconds, ";
