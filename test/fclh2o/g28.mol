@@ -15,11 +15,17 @@ H,  1.441647525,    0.835195446,   -5.423511387
 	 basis = {
 	       default, avdz
 	 } 
+	 jkbasis = {
+	 	 default, avdzjkfit
+	 }
+	 ribasis = {
+	 	 default, avdzmp2fit
+	 }
 }
 ralmo(
-	perturb, 2
+	rpax, 2
 	rpa, true
-	longrange, true
-	mu, 0.5
-	sosex, false
+	df, true
+	xcorrect, false
+	perturb, 2
 )
