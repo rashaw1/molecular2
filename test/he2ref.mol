@@ -3,10 +3,16 @@ direct, true
 molecule = {
 	 geometry = {
 	 	  he, 0.0, 0.0, 0.0
-		  he, 6.5, 0.0, 0.0
+		  he, 5.5, 0.0, 0.0
 	 }
 	 basis = {
 	       he, avdz
+	 }
+	 jkbasis = {
+	  	 he, def2qzvppjkfit
+	 }
+	 ribasis = {
+	 	 he, avdzmp2fit
 	 }
 	 fragments = {
 	 	   1, 1, 0, 1
@@ -14,9 +20,10 @@ molecule = {
 	 }	 	   
 }	 
 ralmo(
-	perturb, 0
+	perturb, 3
+	xcorrect, false
 	rpa, true
-	longrange, true
-	mu, 0.52
-	sosex, false
+	rpax, 2
+	df, true
+	longrange, false
 )
