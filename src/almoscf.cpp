@@ -194,7 +194,6 @@ void ALMOSCF::rcompute() {
 	int nocc = focker.getMolecule()->getNel() / 2;
 	
 	//Build T matrix
-	double starttime = log.getGlobalTime(); 
 	int nbfs = S.rows();
 	int i_offset = 0; int mu_offset = 0; 
 	sigma = Matrix::Zero(nocc, nocc);
@@ -229,11 +228,8 @@ void ALMOSCF::rcompute() {
 	auto L = llt.matrixL(); 
 	auto Linv = L.solve(I).transpose(); 
 	sigma.noalias() = Linv * Linv.transpose(); 
-	double endtime = log.getGlobalTime();
-	std::cout << "Sigma: " << endtime - starttime << " seconds, "; 
 	
 	i_offset = 0; mu_offset = 0;
-	starttime = log.getGlobalTime(); 
 	for (int i = 0; i < fragments.size(); i++) {
 		auto& f1 = fragments[i];
 		f1_nocc = f1.getMolecule()->getNel()/2;
@@ -255,8 +251,6 @@ void ALMOSCF::rcompute() {
 		i_offset += f1_nocc; 
 	}
 	P = P.selfadjointView<Eigen::Lower>();
-	endtime = log.getGlobalTime(); 
-	std::cout << "Density: " << endtime - starttime << " seconds, ";
 	delta_d = (P - P_old).norm(); 
 	
 	// Build Fock matrix
@@ -274,7 +268,6 @@ void ALMOSCF::rcompute() {
 	
 	Matrix& F = focker.getFockAO(); 
 	
-	starttime = log.getGlobalTime(); 
 	// Calculate errors
 	Matrix Q = - S * P; 
 	for (int i = 0; i < nbfs; i++) Q(i, i) += 1.0; 
@@ -287,11 +280,8 @@ void ALMOSCF::rcompute() {
 	Matrix QFQ = QFP * Q.transpose();
 	QFP = QFP * P; 
 	Matrix PFP = P * F * P; 
-	endtime = log.getGlobalTime(); 
-	std::cout << "QFQ: " << endtime - starttime << " seconds, "; 
-	
+
 	std::vector<Vector> errs;
-	starttime = log.getGlobalTime(); 
 	for (int i = 0; i < fragments.size(); i++)
 		errs.push_back(fragments[i].buildFock(QFQ, QFP, PFP));
 	
@@ -303,8 +293,6 @@ void ALMOSCF::rcompute() {
 	
 	for (int i = 0; i < fragments.size(); i++)
 		fragments[i].gensolve(); 
-	endtime = log.getGlobalTime(); 
-	std::cout << "Frags.: " << endtime - starttime << " seconds" << std::endl;
 }
 
 void ALMOSCF::ucompute() {

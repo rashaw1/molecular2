@@ -420,7 +420,7 @@ void ProgramController::call_ralmo(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("iterative")) c.set_option<bool>("iterative", true);
 	if(!c.is_option_set("pairwise")) c.set_option<bool>("pairwise", true); 
 	if(!c.is_option_set("local")) c.set_option<bool>("local", true);
-	if(!c.is_option_set("xcorrect")) c.set_option<bool>("xcorrect", true); 
+	if(!c.is_option_set("xcorrect")) c.set_option<bool>("xcorrect", false); 
 	if(!c.is_option_set("rcutoff")) c.set_option<double>("rcutoff", 15.0);
 	if(!c.is_option_set("mothresh")) c.set_option<double>("mothresh", 1e-6);
 	if(!c.is_option_set("fitthresh")) c.set_option<double>("fitthresh", 0.05);

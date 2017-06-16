@@ -1,21 +1,38 @@
 # Project name
 PROJECT = molecular.x
+
 # Compiler
 CXX = mpicxx
+C11_FLAG = -std=c++11
+OPENMP_FLAG = -omp
 
 # Run Options
 COMMANDLINE_OPTIONS = 
 
 # Compiler options
-DEBUG = -g -Wall -O0 -Wno-unused-variable -Wno-sign-compare -Wno-format -Wno-overloaded-virtual -std=c++11 -D_GLIBCXX_DEBUG -omp -DLIBINT2_MAX_DERIV_ORDER=2 
-OPTIM = -O3 -Wall -Wno-unused-variable -Wno-sign-compare -Wno-format -Wno-overloaded-virtual -std=c++11 -omp -DLIBINT2_MAX_DERIV_ORDER=2
+DEBUG = -g -Wall -O0 -Wno-unused-variable -Wno-sign-compare -Wno-format -Wno-overloaded-virtual $(C11_FLAG) -D_GLIBCXX_DEBUG $(OPENMP_FLAG) -DLIBINT2_MAX_DERIV_ORDER=2 
+OPTIM = -O3 -Wall -Wno-unused-variable -Wno-sign-compare -Wno-format -Wno-overloaded-virtual $(C11_FLAG) $(OPENMP_FLAG) -DLIBINT2_MAX_DERIV_ORDER=2
 COMPILE_OPTIONS = $(OPTIM)
 
+# Headers
+CTF_INCLUDE = ../ctf/include
+EIGEN_INCLUDE = /usr/local/Cellar/eigen/3.3.3/include/eigen3
+LIBINT_INCLUDE = /usr/local/libint/2.3.0-beta.3/include
+LIBINT2_INCLUDE = /usr/local/libint/2.3.0-beta.3/include/libint2
+
+# Libraries
+CTF_LIB = ../ctf/lib
+LIBINT_LIB = /usr/local/libint/2.3.0-beta.3/lib
+
+
+
+#-------------- DO NOT EDIT BELOW THIS LINE -----------------------------------
+
 # Header include directories
-HEADERS = -I./inc -I./extern -I../ctf/include -I/usr/local/Cellar/eigen/3.3.3/include/eigen3 -I/usr/local/libint/2.3.0-beta.3/include -I/usr/local/libint/2.3.0-beta.3/include/libint2
+HEADERS = -I./inc -I./extern -I$(CTF_INCLUDE) -I$(EIGEN_INCLUDE) -I$(LIBINT_INCLUDE) -I$(LIBINT2_INCLUDE)
 
 # Libraries for linking
-LIBS = -L/usr/local/libint/2.3.0-beta.3/lib -L../ctf/lib -lint2 -lctf -lblas -std=c++11 
+LIBS = -L$(LIBINT_LIB) -L$(CTF_LIB) -lint2 -lctf -lblas $(C11_FLAG)
 
 # Dependency options
 DEPENDENCY_OPTIONS = -MM
