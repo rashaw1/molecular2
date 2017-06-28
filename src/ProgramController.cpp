@@ -389,8 +389,8 @@ void ProgramController::call_ccsd(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("triples")) c.set_option<bool>("triples", false);
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 5);
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 30); 
-	if(!c.is_option_set("enconverge")) c.set_option<double>("converge", 1e-7); 
-	if(!c.is_option_set("densconverge")) c.set_option<double>("converge", 1e-4); 
+	if(!c.is_option_set("enconverge")) c.set_option<double>("enconverge", 1e-7); 
+	if(!c.is_option_set("densconverge")) c.set_option<double>("densconverge", 1e-4); 
 	
 	if (done_hf) {
 		if(!done_transform) {
