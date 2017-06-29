@@ -1,5 +1,6 @@
 direct, true
 memory, 500
+thrint, 1e-4
 molecule = {
 	 angstrom, true
 	 geometry =  {

@@ -8,7 +8,7 @@ molecule = {
   H,                 -1.73845733,   -0.79756845,    0.18511400
 	 }
 	 basis = {
-	       default, avdz
+	       default, cc-pvtz
 	 } 
 }
 rhf()

@@ -1,0 +1,31 @@
+memory, 1000
+direct, true
+thrint, 1e-15
+molecule = {
+	 geometry = {
+	 	  he, 0.0, 0.0, 0.0
+		  he, 6.0, 0.0, 0.0
+	 }
+	 basis = {
+	       he, avdz
+	 }
+	 jkbasis = {
+	  	 he, def2qzvppjkfit
+	 }
+	 ribasis = {
+	 	 he, avdzmp2fit
+	 }
+	 fragments = {
+	 	   1, 1, 0, 1
+		   2, 2, 0, 1
+	 }	 	   
+}	 
+ralmo(
+	local, false
+	perturb, 1
+	xcorrect, false
+	rpa, true
+	rpax, 1
+	df, true
+	longrange, false
+)

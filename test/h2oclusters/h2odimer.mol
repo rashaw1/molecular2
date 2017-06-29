@@ -27,8 +27,9 @@ molecule = {
 ralmo (
       df, true
       rpa, true
-      sosex, true
+      rpax, 2
       longrange, false
       xcorrect, false
-      perturb, 2
+      perturb, 3
+      dprint, true
 )

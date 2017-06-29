@@ -45,11 +45,12 @@ H,    0.027601834,   2.269563165,   3.055770232
 ralmo (
       df, true
       rpa, true
-      rpax, 3
+      rpax, 2
       longrange, false
       xcorrect, false
-      perturb, 1
-      local, true
+      perturb, 3
+      mothresh, 1e-15
+      fitthresh, 1e-15
       enconverge, 5e-5
       densconverge, 1e-4
 )

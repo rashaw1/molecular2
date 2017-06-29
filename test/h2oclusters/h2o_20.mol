@@ -97,6 +97,7 @@ H,       99.216500000,   103.453000000,   101.693000000
 	 }
 }
 ralmo (
+      dprint, true
       df, true
       perturb, 3
       rpa, true
