@@ -12,15 +12,16 @@ molecule = {
 	       he, avdz
 	       o, avdz
 	       h, avdz
-	       x, s3p1
+	       x, s1
 	 }
 }	 
-!optx(
-!	active, 1, 2, 3, 4
-!	trust, 5.0
-!	gradconverge, 2e-5
-!	mp2, true
-!)
+optx(
+	guess, hcore
+	active, 1
+	trust, 5.0
+	gradconverge, 2e-5
+	mp2, true
+)
 rhf(
 	guess, hcore
 )

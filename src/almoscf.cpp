@@ -728,7 +728,8 @@ void ALMOSCF::rscf()
 			molecule->control->log.initIteration(); 
 		}
 		molecule->control->log.iteration(iter++, dimer_energy, delta_e, delta_d);
-		converged = (fabs(delta_e) < E_CONVERGE) && (fabs(delta_d) < D_CONVERGE);
+		converged = (fabs(delta_d) < D_CONVERGE) || (fabs(delta_e / delta_d) < E_CONVERGE);
+		
 	}
 	
 	if (converged) {
@@ -788,7 +789,8 @@ void ALMOSCF::rscf()
 			molecule->control->log.result("E(Inf.)", e_inf * Logger::TOKCAL, "kcal /mol");*/
 			
 			double e_inf = e_pert_2;
-	
+			bool withcore = molecule->control->get_option<bool>("withcore"); 
+			
 			if (cmd.get_option<bool>("pairwise")) {
 				
 				double rcut = cmd.get_option<double>("rcutoff"); 
@@ -798,7 +800,7 @@ void ALMOSCF::rscf()
 				molecule->control->log.initALMOTable(); 
 				
 				int mu_offset = 0; 
-				int f1_nocc, f2_nocc, f1_nbfs, f2_nbfs, f1_nvirt, f2_nvirt; 
+				int f1_nocc, f2_nocc, f1_ncore, f2_ncore, f1_nbfs, f2_nbfs, f1_nvirt, f2_nvirt; 
 				double sep, edisp, edispexch, eionic, ebsse, eintra;
 				Vector com1, com2;  
 				for (int n1 = 0; n1 < nfrags; n1++) {
@@ -806,6 +808,7 @@ void ALMOSCF::rscf()
 					f1_nocc = f1.getMolecule()->getNel()/2; 
 					f1_nbfs = f1.getHCore().rows(); 
 					f1_nvirt = f1_nbfs - f1_nocc; 
+					f1_ncore = f1_nocc - f1.getMolecule()->getNValence() / 2; 
 					 
 					com1 = f1.getMolecule()->com(); 
 					std::vector<libint2::Shell>& f1obs = f1.getMolecule()->getBasis().getIntShells();
@@ -817,6 +820,7 @@ void ALMOSCF::rscf()
 						f2_nocc = f2.getMolecule()->getNel()/2; 
 						f2_nbfs = f2.getHCore().rows(); 
 						f2_nvirt = f2_nbfs - f2_nocc; 
+						f2_ncore = f2_nocc - f2.getMolecule()->getNValence() / 2; 
 						
 						std::vector<libint2::Shell>& f2obs = f2.getMolecule()->getBasis().getIntShells();
 						std::vector<libint2::Shell>& f2auxbs = f2.getMolecule()->getBasis().getRIShells();
@@ -842,6 +846,14 @@ void ALMOSCF::rscf()
 							info.nocc.push_back(f2_nocc);
 							info.nvirt.push_back(f1_nvirt);
 							info.nvirt.push_back(f2_nvirt);
+							
+							if (withcore) {
+								info.ncore.push_back(0);
+								info.ncore.push_back(0);
+							} else {
+								info.ncore.push_back(f1_ncore);
+								info.ncore.push_back(f2_ncore);
+							} 
 							
 							info.T = Matrix::Zero(nbfs, nocc);
 							info.V = Matrix::Zero(nbfs, nvirt);
@@ -898,10 +910,13 @@ void ALMOSCF::rscf()
 					int f_nocc = f.getMolecule()->getNel() / 2;
 					int f_nbfs = f.getHCore().rows(); 
 					int f_nvirt = f_nbfs - f_nocc; 
+					int f_ncore = f_nocc - f.getMolecule()->getNValence() / 2; 
 				
 					info.nocc.push_back(f_nocc);
 					info.nvirt.push_back(f_nvirt); 
-		
+					if (withcore) info.ncore.push_back(0);
+					else info.ncore.push_back(f_ncore); 
+					
 					info.T.block(row_offset, occ_col_offset, f_nbfs, f_nocc) = f_cp.block(0, 0, f_nbfs, f_nocc); 
 					info.V.block(row_offset, virt_col_offset, f_nbfs, f_nvirt) = f_cp.block(0, f_nocc, f_nbfs, f_nvirt);
 		
