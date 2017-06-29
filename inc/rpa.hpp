@@ -9,7 +9,7 @@
 
 struct fInfo {
 
-	std::vector<int> nocc, nvirt;
+	std::vector<int> nocc, nvirt, ncore;
 	Matrix F, S, T, V; 
 	std::vector<libint2::Shell>& shells;
 	std::vector<libint2::Shell>& df_shells; 

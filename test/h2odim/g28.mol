@@ -1,4 +1,5 @@
 direct, true
+withcore, true
 memory, 500
 molecule = {
 	 angstrom, true

@@ -1,5 +1,6 @@
 memory, 500
 direct, true
+thrint, 1e-15
 molecule = {
 	 angstrom, true
 	 geometry =  {
@@ -45,7 +46,7 @@ H,    0.209847252,   2.267853226,   3.577122668
 ralmo (
       df, true
       rpa, true
-      rpax, 2
+      rpax, 1
       longrange, false
       xcorrect, false
       perturb, 3

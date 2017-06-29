@@ -329,6 +329,17 @@ void RPA::fcompute(fInfo& info, bool print) {
 	sigma = Matrix::Identity(N, N) - P * info.S; 
 	info.V = sigma * info.V; 
 	
+	int offset = 0; 
+	if(!focker.getMolecule()->control->get_option<bool>("withcore")) {
+		for (int i = 0; i < nfrags; i++) 
+			offset += info.ncore[i];  
+		nocc -= offset; 
+		N = nocc + nvirt; 
+	}
+
+	int offnocc = nocc + offset; 
+	int offN = N + offset; 
+	
 	int dim = nvirt*nocc; 
 	int nvnono = nocc*dim;
 	
@@ -347,11 +358,11 @@ void RPA::fcompute(fInfo& info, bool print) {
 	bvals = B.get_raw_data(&bsz); 
 	kvals = K.get_raw_data(&ksz); 
 	
-	Matrix F = Matrix::Zero(N, N); 
-	F.block(0, 0, nocc, nocc) = info.T.transpose() * info.F * info.T; 
-	F.block(0, nocc, nocc, nvirt) = info.T.transpose() * info.F * info.V; 
-	F.block(nocc, 0, nvirt, nocc) = F.block(0, nocc, nocc, nvirt).transpose();
-	F.block(nocc, nocc, nvirt, nvirt) = info.V.transpose() * info.F * info.V; 
+	Matrix F = Matrix::Zero(offN, offN); 
+	F.block(0, 0, offnocc, offnocc) = info.T.transpose() * info.F * info.T; 
+	F.block(0, offnocc, offnocc, nvirt) = info.T.transpose() * info.F * info.V; 
+	F.block(offnocc, 0, nvirt, offnocc) = F.block(0, offnocc, offnocc, nvirt).transpose();
+	F.block(offnocc, offnocc, nvirt, nvirt) = info.V.transpose() * info.F * info.V; 
 	
 	// Compute and transform eris
 	auto &shells = info.shells;
@@ -384,20 +395,21 @@ void RPA::fcompute(fInfo& info, bool print) {
 			
 				for (int j = 0; j < nocc; j++) {
 					for (int b = 0; b < nvirt; b++) {
-						ix2 = j*nvirt + b;
+						ix2 = j*nvirt + b; 
 						if (ix2 > ix1) continue; 
 						ix2 = i + a*nocc + j*dim + b*nvnono; 
-						avals[ix2] = bvals[ix2] = kvals[ix2] = 2.0 * viajb[ix2]; 
+						int offix2 = ix2 + offset*(1+dim); 
+						avals[ix2] = bvals[ix2] = kvals[ix2] = 2.0 * viajb[offix2]; 
 						if (sosex) {
-							double xc = viajb[j + a*nocc + i*dim + b*nvnono]; 
+							double xc = viajb[j + a*nocc + i*dim + b*nvnono + offset*(1 + dim)]; 
 							bvals[ix2] -= xc; 
 							if (rpax) {
 								avals[ix2] -= xc;
 								kvals[ix2] -= xc; 
 							}
 						}
-						if (i==j) avals[ix2] += F(a+nocc, b+nocc); 
-						if (a==b) avals[ix2] -= F(i, j); 
+						if (i==j) avals[ix2] += F(a+offnocc, b+offnocc); 
+						if (a==b) avals[ix2] -= F(i+offset, j+offset); 
 						
 						ix3 = j + b*nocc + i*dim + a*nvnono; 
 						kvals[ix3] = kvals[ix2]; 
@@ -411,7 +423,11 @@ void RPA::fcompute(fInfo& info, bool print) {
 		}
 	} else {
 		Matrix L; 
+		nocc += offset;
+		N += offset; 
 		df_eris(shells, info.df_shells, info.T, info.V, L); 
+		nocc -= offset; 
+		N -= offset; 
 		Matrix K = L * L.transpose(); 
 		L.resize(0, 0); 
 		
@@ -420,6 +436,7 @@ void RPA::fcompute(fInfo& info, bool print) {
 			log.print("\nForming excitation matrices"); 
 		} 
 		
+		int ov = offset * nvirt; 
 		for (int i = 0; i < nocc; i++) {
 			for (int a = 0; a < nvirt; a++) {
 				ix1 = i*nvirt+a;
@@ -429,20 +446,20 @@ void RPA::fcompute(fInfo& info, bool print) {
 						ix2 = j*nvirt + b;
 						if (ix2 > ix1) continue;
 					
-						double viajb = K(ix1, ix2); 
+						double viajb = K(ix1+ov, ix2+ov); 
 						
 						ix2 = i + a*nocc + j*dim + b*nvnono; 
 						avals[ix2] = bvals[ix2] = kvals[ix2] = 2.0 * viajb; 
 						if (sosex) {
-							double vjaib = K(j*nvirt+a, i*nvirt+b); 
+							double vjaib = K(j*nvirt+a+ov, i*nvirt+b+ov); 
 							bvals[ix2] -= vjaib;
 							if (rpax) {
 								avals[ix2] -= vjaib; 
 								kvals[ix2] -= vjaib; 
 							}
 						}
-						if (i==j) avals[ix2] += F(a+nocc, b+nocc); 
-						if (a==b) avals[ix2] -= F(i, j); 
+						if (i==j) avals[ix2] += F(a+offnocc, b+offnocc); 
+						if (a==b) avals[ix2] -= F(i+offset, j+offset); 
 						
 						ix3 = j + b*nocc + i*dim + a*nvnono; 
 						kvals[ix3] = kvals[ix2]; 
@@ -501,7 +518,7 @@ void RPA::fcompute(fInfo& info, bool print) {
 	std::vector<int> cum_occ, cum_virt; 
 	int currnocc = 0; int currvirt = 0;
 	for (int i = 0; i < nfrags; i++) {
-		currnocc += info.nocc[i]; 
+		currnocc += info.nocc[i] - info.ncore[i]; 
 		currvirt += info.nvirt[i];
 		cum_occ.push_back(currnocc);
 		cum_virt.push_back(currvirt); 
@@ -594,7 +611,6 @@ void RPA::df_eris(const std::vector<libint2::Shell>& obs, const std::vector<libi
 	IntegralEngine& integrals = focker.getIntegrals(); 
 	
 	// Calculate (P|Q) and (P|mn) eris
-	
 	Matrix JPQ = integrals.compute_eris_2index(auxbs);  
 	Matrix KmnP;
 	integrals.compute_eris_3index(obs, auxbs, KmnP);

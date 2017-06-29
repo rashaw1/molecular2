@@ -754,32 +754,18 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 	// using first time? compute 3-center ints and transform to inv sqrt
 	// representation
 	if (xyK.rows() == 0) {
-		  
-		double start = log.getGlobalTime(); 
+		 
 		Matrix V = integrals.compute_eris_2index(dfbs);
-		double end = log.getGlobalTime();
-		std::cout << "ERI2: " << end - start << " seconds, "; 
-		
-		start = log.getGlobalTime();
 		build_blocked_eris(finfo, V, Pt); 
-		end = log.getGlobalTime();
-		std::cout << "ERI3: " << end - start << " seconds, ";
 	
-		start = log.getGlobalTime(); 
 		auto llt = V.selfadjointView<Eigen::Lower>().llt();
 		auto& L = llt.matrixL(); 
 		Matrix I(ndf, ndf);
 		I.setIdentity(); 
 		Linv = L.solve(I).transpose().sparseView(1e-12);
 		Linv2 = Linv * Linv.transpose();
-		end = log.getGlobalTime(); 
-		std::cout << "LLT: " << end -start << " seconds, ";
 		
-		start = log.getGlobalTime();
 		build_domains(Cocc, V, finfo);
-		end = log.getGlobalTime();
-		std::cout << "Domains: " << end -start << " seconds." << std::endl;  
-		
 		xyK.resize(1, 1); 
 		
 	}  // if (xyK.size() == 0) 
@@ -789,7 +775,6 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 	// compute exchange
 	int nfrags = finfo.size(); 
 
-	double start = log.getGlobalTime(); 
 	for (int i = 0; i < nocc; i++) {
 		auto& lmo_d = lmo_domains[i]; 
 		auto& ao_d = ao_domains[i];
@@ -870,12 +855,8 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 		}
 	
 	}
-	double end = log.getGlobalTime(); 
-	std::cout << "Exchange: " << end - start << " seconds,";
-	 
+
 	// compute Coulomb
-	
-	start = log.getGlobalTime(); 
 	
 	Vector Pk = Vector::Zero(ndf); 
 	int nao1, nao2, naux, f1start, f2start, fkstart; 
@@ -946,11 +927,6 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 		}
 	}
  
-	end = log.getGlobalTime(); 	
-	std::cout << "Coulomb: " << end - start << " seconds" << std::endl << std::flush; 
-	
-	std::cout << std::endl << std::flush; 
-	
 	return G; 
 }
 
@@ -1005,7 +981,7 @@ void Fock::build_blocked_eris(std::vector<FragmentInfo>& finfo, Matrix& JPQ, Mat
 		nobs1 += info1.nshells;
 	}
 	
-	int nzero = 0; int ntotal = 0; 
+	/*int nzero = 0; int ntotal = 0; 
 	for (int f1 = 0; f1 < finfo.size(); f1++) {
 		for (int f2 = 0; f2 <= f1; f2++) {
 			for (int fk = 0; fk < finfo.size(); fk++) {
@@ -1013,8 +989,8 @@ void Fock::build_blocked_eris(std::vector<FragmentInfo>& finfo, Matrix& JPQ, Mat
 				ntotal++; 
 			}
 		}
-	}
-	std::cout << nzero << " " << ntotal << std::endl; 
+	}*/
+	//std::cout << nzero << " " << ntotal << std::endl; 
 	
 }
 
@@ -1171,7 +1147,7 @@ Matrix Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmai
 		}
 	}
 	double end = molecule->control->log.getGlobalTime(); 
-	std::cout << "Exchange: " << end - start << " seconds,";
+	//std::cout << "Exchange: " << end - start << " seconds,";
 	 
 	// compute Coulomb
 	
@@ -1216,9 +1192,9 @@ Matrix Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmai
 		G(y, x) = G(x, y); 
 	}
 	end = molecule->control->log.getGlobalTime(); 	
-	std::cout << "Coulomb: " << end - start << " seconds" << std::endl << std::flush; 
+	//std::cout << "Coulomb: " << end - start << " seconds" << std::endl << std::flush; 
 	
-	std::cout << std::endl << std::flush; 
+	//std::cout << std::endl << std::flush; 
 	
 	return G; 
 }

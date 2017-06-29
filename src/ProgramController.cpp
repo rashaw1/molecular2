@@ -389,8 +389,8 @@ void ProgramController::call_ccsd(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("triples")) c.set_option<bool>("triples", false);
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 5);
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 30); 
-	if(!c.is_option_set("enconverge")) c.set_option<double>("converge", 1e-7); 
-	if(!c.is_option_set("densconverge")) c.set_option<double>("converge", 1e-4); 
+	if(!c.is_option_set("enconverge")) c.set_option<double>("enconverge", 1e-7); 
+	if(!c.is_option_set("densconverge")) c.set_option<double>("densconverge", 1e-4); 
 	
 	if (done_hf) {
 		if(!done_transform) {
@@ -408,7 +408,7 @@ void ProgramController::call_ccsd(Command& c, SharedMolecule m) {
 void ProgramController::call_ralmo(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true);
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 6);
-	if(!c.is_option_set("enconverge")) c.set_option<double>("enconverge", 1e-7); 
+	if(!c.is_option_set("enconverge")) c.set_option<double>("enconverge", 1e-6); 
 	if(!c.is_option_set("densconverge")) c.set_option<double>("densconverge", 1e-4);  
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
 	if(!c.is_option_set("perturb")) c.set_option<int>("perturb", 1);
@@ -420,7 +420,7 @@ void ProgramController::call_ralmo(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("iterative")) c.set_option<bool>("iterative", true);
 	if(!c.is_option_set("pairwise")) c.set_option<bool>("pairwise", true); 
 	if(!c.is_option_set("local")) c.set_option<bool>("local", true);
-	if(!c.is_option_set("xcorrect")) c.set_option<bool>("xcorrect", true); 
+	if(!c.is_option_set("xcorrect")) c.set_option<bool>("xcorrect", false); 
 	if(!c.is_option_set("rcutoff")) c.set_option<double>("rcutoff", 15.0);
 	if(!c.is_option_set("mothresh")) c.set_option<double>("mothresh", 1e-6);
 	if(!c.is_option_set("fitthresh")) c.set_option<double>("fitthresh", 0.05);
@@ -437,7 +437,7 @@ void ProgramController::call_ralmo(Command& c, SharedMolecule m) {
 void ProgramController::call_ualmo(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true);
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 6);
-	if(!c.is_option_set("enconverge")) c.set_option<double>("enconverge", 1e-7); 
+	if(!c.is_option_set("enconverge")) c.set_option<double>("enconverge", 1e-6); 
 	if(!c.is_option_set("densconverge")) c.set_option<double>("densconverge", 1e-4); 
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
 	if(!c.is_option_set("perturb")) c.set_option<int>("perturb", 0);
@@ -461,6 +461,7 @@ void ProgramController::call_optg(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("trust")) c.set_option<double>("trust", 0.1); 
 	if(!c.is_option_set("freq")) c.set_option<bool>("freq", false); 
 	if(!c.is_option_set("modes")) c.set_option<bool>("modes", false); 
+	if(!c.is_option_set("guess")) c.set_option<std::string>("guess", "soad"); 
 	
 	RHFOptimiser optim(c, m);
 	optim.optimise();  
@@ -481,6 +482,7 @@ void ProgramController::call_optx(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("fineness")) c.set_option<int>("fineness", 50); 
 	if(!c.is_option_set("orbital")) c.set_option<int>("orbital", 0);
 	if(!c.is_option_set("mp2")) c.set_option<bool>("mp2", false); 
+	if(!c.is_option_set("guess")) c.set_option<std::string>("guess", "hcore"); 
 	 
 	RHFOptimiser optim(c, m); 
 	optim.exponents(); 
