@@ -16,7 +16,7 @@ molecule = {
 		   5, 6, 0, 1
 	 }
 	 basis = {
-	       default, avtz
+	       default, avdz
 	 } 
 	 jkbasis = {
 	 	 default, avdzjkfit
@@ -33,5 +33,4 @@ ralmo(
 	mu, 0.5
 	rpax, 2
 	df, true
-	local, false
 )

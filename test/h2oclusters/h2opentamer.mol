@@ -27,16 +27,17 @@ molecule = {
 		   13, 15, 0, 1
 	 }
 	 basis = {
-	       default, avdz
+	       default, cc-pvdz
 	 } 
 	 jkbasis = {
-	       default, avdzjkfit
+	       default, vdzjkfit
 	 }
 	 ribasis = {
-	 	 default, avdzmp2fit
+	 	 default, vdzmp2fit
          }
 }
 ralmo (
+      dprint, true
       df, true
       perturb, 3
       rpa, true

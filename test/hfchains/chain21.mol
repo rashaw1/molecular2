@@ -70,13 +70,13 @@ molecule = {
 		   41, 42, 0, 1
 	 }
 	 basis = {
-	       default, cc-pvdz
+	       default, avdz
 	 } 
 	 jkbasis = {
-	 	 default, vdzjkfit
+	 	 default, avdzjkfit
 	 }
 	 ribasis = {
-	 	 default, vdzmp2fit
+	 	 default, avdzmp2fit
 	 }
 }
 ralmo(
