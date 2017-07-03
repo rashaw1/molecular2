@@ -865,14 +865,19 @@ void ALMOSCF::rscf()
 							info.T.block(f1_nbfs, f1_nocc, f2_nbfs, f2_nocc) = f2.getCP().block(0, 0, f2_nbfs, f2_nocc);
 							info.V.block(f1_nbfs, f1_nvirt, f2_nbfs, f2_nvirt) = f2.getCP().block(0, f2_nocc, f2_nbfs, f2_nvirt); 
 							
-							Matrix C = Matrix::Zero(nbfs, nbfs); 
-							C.block(0, 0, nbfs, nocc) = info.T; 
-							C.block(0, nocc, nbfs, nvirt) = info.V; 
-							focker.getIntegrals().buildTransMat(); 
-							Matrix trans = focker.getIntegrals().getTransMat();
-							Matrix Cp = trans.solve(C); 
-							for (int col = 0; col < Cp.cols(); col++)
-								std::cout << "ORBITAL " << col+1 << std::endl << Cp.col(col) << std::endl; 
+							Matrix C = Matrix::Zero(nbfs+4, nbfs); 
+							C.block(0, 0, 18, nocc) = info.T.block(0, 0, 18, nocc);
+							C.block(19, 0, 5, nocc) = info.T.block(18, 0, 5, nocc);
+							C.block(25, 0, 36, nocc) = info.T.block(23, 0, 36, nocc); 
+							C.block(62, 0, 5, nocc) = info.T.block(59, 0, 5, nocc); 
+							C.block(68, 0, 18, nocc) = info.T.block(64, 0, 18, nocc); 
+							C.block(0, nocc, 18, nvirt) = info.V.block(0, 0, 18, nvirt);
+							C.block(19, nocc, 5, nvirt) = info.V.block(18, 0, 5, nvirt);
+							C.block(25, nocc, 36, nvirt) = info.V.block(23, 0, 36, nvirt); 
+							C.block(62, nocc, 5, nvirt) = info.V.block(59, 0, 5, nvirt); 
+							C.block(68, nocc, 18, nvirt) = info.V.block(64, 0, 18, nvirt); 
+							for (int col = 0; col < C.cols(); col++)
+								std::cout << "ORBITAL " << col+1 << std::endl << C.col(col) << std::endl; 
 							
 							info.S.block(0, 0, f1_nbfs, f1_nbfs) = focker.getS().block(mu_offset, mu_offset, f1_nbfs, f1_nbfs); 
 							info.S.block(f1_nbfs, f1_nbfs, f2_nbfs, f2_nbfs) = focker.getS().block(nu_offset, nu_offset, f2_nbfs, f2_nbfs); 
