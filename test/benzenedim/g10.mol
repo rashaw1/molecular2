@@ -1,5 +1,6 @@
 memory, 500
 direct, true
+thrint, 1e-15
 molecule = {
 	 angstrom, true
 	 geometry =  {
@@ -50,6 +51,8 @@ ralmo (
       xcorrect, false
       perturb, 1
       local, true
+      mothresh, 1e-15
+      fitthresh, 1e-15
       enconverge, 5e-5
       densconverge, 1e-4
 )

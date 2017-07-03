@@ -536,10 +536,9 @@ void ALMOSCF::rinf() {
 		int joffset = 0; int boffset = 0;
 		for (int f2 = 0; f2 < fragments.size(); f2++) {
 			int f2_nocc = fragments[f2].getMolecule()->getNel()/2;
-			int f2_nvirt = fragments[f2].getHCore().rows() - f1_nocc; 
+			int f2_nvirt = fragments[f2].getHCore().rows() - f2_nocc; 
 			
 			if ((finfo[f1].com - finfo[f2].com).norm() < rcut) {
-			
 				double ef1f2 = (Fov.block(ioffset, boffset, f1_nocc, f2_nvirt) * Xvo.block(boffset, ioffset, f2_nvirt, f1_nocc)).trace(); 
 				molecule->control->log.CTRow(f1+1, f2+1, 2.0*ef1f2);
 				e_pert_2 += ef1f2;  
@@ -865,7 +864,7 @@ void ALMOSCF::rscf()
 							info.T.block(f1_nbfs, f1_nocc, f2_nbfs, f2_nocc) = f2.getCP().block(0, 0, f2_nbfs, f2_nocc);
 							info.V.block(f1_nbfs, f1_nvirt, f2_nbfs, f2_nvirt) = f2.getCP().block(0, f2_nocc, f2_nbfs, f2_nvirt); 
 							
-							Matrix C = Matrix::Zero(nbfs+4, nbfs); 
+							/*Matrix C = Matrix::Zero(nbfs+4, nbfs); 
 							C.block(0, 0, 18, nocc) = info.T.block(0, 0, 18, nocc);
 							C.block(19, 0, 5, nocc) = info.T.block(18, 0, 5, nocc);
 							C.block(25, 0, 36, nocc) = info.T.block(23, 0, 36, nocc); 
@@ -876,8 +875,12 @@ void ALMOSCF::rscf()
 							C.block(25, nocc, 36, nvirt) = info.V.block(23, 0, 36, nvirt); 
 							C.block(62, nocc, 5, nvirt) = info.V.block(59, 0, 5, nvirt); 
 							C.block(68, nocc, 18, nvirt) = info.V.block(64, 0, 18, nvirt); 
-							for (int col = 0; col < C.cols(); col++)
-								std::cout << "ORBITAL " << col+1 << std::endl << C.col(col) << std::endl; 
+							for (int col = 0; col < C.cols(); col++) {
+								std::cout << "ORBITAL " << col+1 << std::endl;
+								for (int row = 0; row < C.rows(); row++)
+									std::cout << row+1 << " " << C(row, col) << std::endl;
+								std::cout << std::endl; 
+							}*/
 							
 							info.S.block(0, 0, f1_nbfs, f1_nbfs) = focker.getS().block(mu_offset, mu_offset, f1_nbfs, f1_nbfs); 
 							info.S.block(f1_nbfs, f1_nbfs, f2_nbfs, f2_nbfs) = focker.getS().block(nu_offset, nu_offset, f2_nbfs, f2_nbfs); 
