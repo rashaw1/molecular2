@@ -1,0 +1,18 @@
+<root name="lanl2dz">
+  <ar nshells="4">
+    <Shell lval="s" nexp="2">
+      <xc c=" -0.5110463" x=" 2.613000"/>
+      <xc c=" 1.2701236" x=" 0.5736000"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0" x=" 0.2014000"/>
+    </Shell>
+    <Shell lval="p" nexp="2">
+      <xc c=" -0.0555167" x=" 7.860000"/>
+      <xc c=" 1.0115982" x=" 0.738700"/>
+    </Shell>
+    <Shell lval="p" nexp="1">
+      <xc c=" 1.0" x=" 0.2081000"/>
+    </Shell>
+  </ar>
+</root>

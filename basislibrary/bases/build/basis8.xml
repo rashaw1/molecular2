@@ -1,0 +1,64 @@
+<root name="even">
+  <he nshells="20">
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0000000" x=" 0.07255"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0000000" x=" 0.30489138"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0000000" x=" 1.281306"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0000000" x=" 5.38468848"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0000000" x=" 22.6291533"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0000000" x=" 95.0990169"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0000000" x=" 399.653618"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0000000" x=" 7.5e2"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0000000" x=" 1.679544e3"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0000000" x=" 7.0582851e3"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0000000" x=" 2.966244e4"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0000000" x=" 1.24656e5"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0000000" x=" 5.238686e5"/>
+    </Shell>
+    <Shell lval="p" nexp="1">
+      <xc c=" 1.0000000" x=" 0.2473"/>
+    </Shell>
+    <Shell lval="p" nexp="1">
+      <xc c=" 1.0000000" x=" 1.03928"/>
+    </Shell>
+    <Shell lval="p" nexp="1">
+      <xc c=" 1.0000000" x=" 4.367567"/>
+    </Shell>
+    <Shell lval="p" nexp="1">
+      <xc c=" 1.0000000" x=" 18.3547"/>
+    </Shell>
+    <Shell lval="p" nexp="1">
+      <xc c=" 1.0000000" x=" 77.1356"/>
+    </Shell>
+    <Shell lval="p" nexp="1">
+      <xc c=" 1.0000000" x=" 3.241625e2"/>
+    </Shell>
+    <Shell lval="p" nexp="1">
+      <xc c=" 1.0000000" x=" 1.36229e3"/>
+    </Shell>
+  </he>
+</root>

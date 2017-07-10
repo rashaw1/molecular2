@@ -43,12 +43,8 @@ IntegralEngine::IntegralEngine(SharedMolecule m, bool print) : molecule(m)
 {
 	// Calculate sizes
 	int natoms = molecule->getNAtoms();
-	int N = 0; // No. of cartesian basis functions
-	int M = 0; // No. of spherical basis functions
-	for (int i = 0; i < natoms; i++){
-		N += m->getAtom(i).getNbfs();
-		M += m->getAtom(i).getNSpherical();
-	}
+	int M = nbasis(molecule->getBasis().getIntShells()); 
+	int N = ncart(molecule->getBasis().getIntShells());
 	// Cartesian is easy - there are (N^2+N)/2
 	// unique 1e integrals and ([(N^2+N)/2]^2 + (N^2+N)/2)/2
 	// unique 2e integrals
@@ -270,10 +266,7 @@ void IntegralEngine::buildTransMat()
 	
 	int natoms = molecule->getNAtoms();
 	int ncar = ncart(shells); // No. of cartesian basis functions
-	int nspher = 0; // No. of spherical basis functions
-	for (int i = 0; i < natoms; i++){
-		nspher += molecule->getAtom(i).getNSpherical();
-	}
+	int nspher = nbasis(shells); // No. of spherical basis functions
 	
 	transmat = Matrix::Zero(nspher, ncar);
 	int row = 0; int col_offset = 0; 

@@ -3,14 +3,12 @@
 
 #include <vector>
 
-class GaussianShell {
-private:
+struct GaussianShell {
 	std::vector<double> exps;
 	std::vector<double> coeffs;
 	double* centerVec;
 	int l;
 	
-public:
 	GaussianShell(double* A, int l);
 	void addPrim(double exp, double c);
 	

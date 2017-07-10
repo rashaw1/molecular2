@@ -52,7 +52,6 @@
 #include <string>
 #include <map>
 #include <vector>
-#include "bf.hpp"
 #include "ecp.hpp"
 #include "eigen_wrapper.hpp"
 
@@ -108,7 +107,6 @@ public:
   double getEnuc() const { return enuc; }
   Atom& getAtom(int i) { return atoms[i]; } // Return atom i
   std::vector<int> getActiveList() const; 
-  BF& getBF(int q, int i) { return bfset.getBF(q, i); } // Return basis func. i of atom q
   Basis& getBasis() { return bfset; }
   ECPBasis& getECPBasis() { return ecpset; }
   ECP& getECP(int i) { return ecpset.getECP(i); }

@@ -23,7 +23,7 @@ REFERENCES:
 
 //namespace psi {
 
-class GaussianShell;
+struct GaussianShell;
 
 /** 
 * Calculates real spherical harmonics S_lm(theta, phi) for all l, m up to lmax

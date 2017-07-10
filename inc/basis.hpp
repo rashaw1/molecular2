@@ -47,6 +47,7 @@
 #include <libint2.hpp>
 #include <vector>
 #include <map>
+#include "gshell.hpp"
 
 // Forward declarations
 class BF;
@@ -56,15 +57,12 @@ class BF;
 class Basis
 {
 private:
-  BF* bfs;
-  std::string name;
   std::map<int, std::string> names;
-  std::vector<std::vector <libint2::Shell::Contraction>> raw_contractions; 
-  iVector charges;
-  iVector shells;
-  iVector lnums;
-  int maxl, nexps;
-  bool ecps; 
+  std::string name;  
+  int maxl, nexps; 
+  bool ecps;
+  
+  std::vector<std::vector <libint2::Shell::Contraction>> raw_contractions;  
   std::vector<libint2::Shell> intShells;
   std::vector<libint2::Shell> jkShells;
   std::vector<libint2::Shell> riShells;  
@@ -78,36 +76,31 @@ public:
   // Need to specify the name of the basis, n, and a list of the 
   // distinct atoms that are needed (as a vector of atomic numbers)
   Basis() : name("Undefined"), nexps(-1) { } // Default constructor
-  Basis(std::map<int, std::string> ns, iVector& atoms, bool _ecps = false);
-  ~Basis(); // Destructor
+  Basis(std::map<int, std::string> ns, bool _ecps = false);
+  
   // Accessors
-  int getNBFs() const { return charges.size(); }
-  std::string getName() const { return name; }
-  std::string getName(int q) const;
-  iVector getCharges() const { return charges; }
-  int findPosition(int q) const;
-  int findShellPosition(int q) const;
+
   bool hasECPS() const { return ecps; }
-  BF& getBF(int i);
-  BF& getBF(int q, int i);
-  int getSize(int q) const;
-  int getMaxL() const { return maxl; }
-  int getShellSize(int q) const;
-  iVector getShells(int q) const;
+  std::string getName(int q) const; 
+  std::string getName() const { return name; }
+  std::map<int, std::string>& getNames() { return names; }
   int getShellAtom(int i) const { return shellAtomList[i]; }
   int getJKShellAtom(int i) const { return jkShellAtomList[i]; }
   int getRIShellAtom(int i) const { return riShellAtomList[i]; }
   std::vector<libint2::Shell>& getIntShells() { return intShells; }
   std::vector<libint2::Shell>& getJKShells() { return jkShells; }
   std::vector<libint2::Shell>& getRIShells() { return riShells; }
-  iVector getLnums(int q) const;
+  std::vector<int>& getShellAtomList() { return shellAtomList; }
+  std::vector<int>& getJKShellAtomList() { return jkShellAtomList; }
+  std::vector<int>& getRIShellAtomList() { return riShellAtomList; }
   
   int getNExps(); 
+  int getMaxL() const { return maxl; }
   double getExp(int i) const; 
   void setExp(int i, double value); 
   double extent() const; 
   
-  void addShell(int l, std::vector<libint2::real_t> &exps, std::vector<std::vector <libint2::real_t>> &coeffs, double *pos, int atom, int type = 0);
+  void addShell(GaussianShell& g, int atom, int type = 0);
   
   // Overloaded operators
   Basis& operator=(const Basis& other);

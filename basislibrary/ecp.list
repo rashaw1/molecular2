@@ -1,0 +1,5 @@
+<root name="ecp">
+  <Item key="ecp10mdf" value="0"/>
+  <Item key="ecp28mdf" value="1"/>
+  <Item key="lanl2" value="2"/>
+</root>

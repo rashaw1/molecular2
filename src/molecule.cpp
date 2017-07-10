@@ -228,24 +228,7 @@ void Molecule::init(Construct& c)
 
 	// Get the basis set     
 	if (basis_found && geom_found) {
-		
-		iVector tempqs = qs;
-		std::sort(qs.data(), qs.data()+qs.size(), [](int lhs, int rhs){ return rhs > lhs; });
-		qs[0] = tempqs(0);
-		int k = 1;
-		for (int i = 1; i < natoms; i++){
-			if (tempqs(i) != qs(k-1)){
-				qs[k] = tempqs[i];
-				k++;
-			}
-		}
-		// k is now the number of unique qs, and all these unique qs are stored in qs
-		// resize to get rid of extra weight
-		qs.conservativeResize(k);
-		
-		bfset = Basis(bnames, qs, has_ecps); 
-		
-		for (int i = 0; i < natoms; i++) atoms[i].setBasis(bfset);
+		bfset = Basis(bnames, has_ecps); 
 		
 		if (fragmented) {
 			for(auto& f : frags) 

@@ -29,6 +29,8 @@
 #include <fstream>
 #include <map>
 #include "eigen_wrapper.hpp"
+#include "gshell.hpp"
+#include "pugixml.hpp"
 
 // Declare forward dependencies
 class BF;
@@ -40,19 +42,17 @@ class BasisReader
 {
 private:
   std::map<int, std::string> names;
-  std::ifstream input;
-  void openFile(int q);
-  void closeFile();
+  std::map<std::string, int> obs_list, jk_list, mp2_list, ecp_list; 
+  
+  std::map<std::string, int> read_basis_list(std::string name); 
+  std::vector<GaussianShell> read_basis(std::string atom, double* pos,
+  	 									std::string basis, std::string name, 
+  										std::map<std::string, int>& basis_list); 
+
 public:
-  BasisReader(std::map<int, std::string> ns) : names(ns) {} // Constructor
-  int readNbfs(int q);
-  BF readBF(int q, int i);
-  ECP readECP(int q, ECPBasis& ecpset, double *pos);
-  iVector readShells(int q);
-  iVector readLnums(int q);
-  iVector readShells(iVector& qs);
-  iVector readLnums(iVector& qs);
- 
+  BasisReader(std::map<int, std::string> ns); // Constructor
+
+  ECP readECP(int q, ECPBasis& ecpset, double *pos); 
   void readShellBasis(Basis& b, int q, double *pos, int atom, int type = 0);
 };
 

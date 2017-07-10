@@ -16,13 +16,9 @@
 #include <map>
 #include "logger.hpp"
 #include "ProgramController.hpp"
-#include "molecule.hpp"
-#include "bf.hpp"
 #include "fock.hpp"
-#include "pbf.hpp"
 #include "error.hpp"
 #include "ioutil.hpp"
-#include <libint2.hpp>
 #include "ecpint.hpp"
 
 // Define static constants
@@ -125,143 +121,122 @@ void Logger::print(const Matrix& m, int digits) const
 	}
 }
 
-// Print out the basis set specification in the format:
-// (example is C atom in 3-21G basis set)
-// BASIS: 6-31G
-// Total no. of cgbfs: 9
-// Total no. of primitives: 9
-// ===============
-//  Specification
-// ===============
-// Atom      Shell     #CGBFs    #Prims
-// ......................................
-// C         s          3         6
-//           p          6         3
-// (if full = true, then continue with this)
-// ===============
-// Basis Functions
-// ===============
-// Atom      Shell     BF    Coeff        Exponent
-// .................................................
-// C         s         1     0.0617669    172.2560
-//                           0.358794     25.91090
-//                           0.700713     5.533350
+// Print out the basis set specification
 // etc...
-void Logger::print(Basis& b, bool full) const
+void Logger::print(Basis& b, SharedMolecule m, bool full) const
 {
-	// Collect the data needed for printing
-	int nbfs = b.getNBFs(); // Store number of cgbfs and prims
+	std::map<int, std::string>& names = b.getNames();
+	
+	title("Basis Set"); 
+	
+	outfile << "DEFAULT: " << b.getName() << std::endl; 
+	for (auto const& x : names)
+		if (x.first > 0) outfile << getAtomName(x.first) << " " << x.second << std::endl; 
+	
+	outfile << std::endl << "ORBITAL BASIS" << std::endl; 
+	print(b.getIntShells(), b.getShellAtomList(), m, full); 
+	
+	if (b.getJKShells().size() > 0) {
+		outfile << std::endl << "JKFIT BASIS" << std::endl; 
+		print(b.getJKShells(), b.getJKShellAtomList(), m, full);
+	} 
+	
+	if (b.getJKShells().size() > 0) {
+		outfile << std::endl << "MP2FIT BASIS" << std::endl; 
+		print(b.getRIShells(), b.getRIShellAtomList(), m, full);
+	} 
+	
+}      
+
+void Logger::print(std::vector<libint2::Shell>& basis, std::vector<int>& shellAtomList, 
+					SharedMolecule m, bool full) const 
+{
+
+	int nbasis = 0;
 	int nprims = 0;
-
-	iVector qs = b.getCharges();
-	// Sort the qs and get rid of duplicates
-	std::sort(qs.data(), qs.data()+qs.size(), [](int lhs, int rhs){ return rhs > lhs; });
-	iVector qtemp(qs.size());
-	qtemp[0] = qs(0);
-	int k = 1;
-	for (int i = 1; i < qs.size(); i++){
-		if (qs(i) != qtemp[k-1]){
-			qtemp[k] = qs(i);
-			k++;
+	int maxl = 0;
+	int natoms = m->getNAtoms(); 
+	
+	std::vector<int> shell_list = {0, 0, 0, 0, 0, 0, 0, 0}; 
+	std::vector<std::vector<int>> shells;  
+	std::vector<std::vector<int>> atom_shells(natoms); 
+	for (int a = 0; a < natoms; a++)
+		shells.push_back(shell_list);
+	
+	for (int s = 0; s < basis.size(); s++) {
+		const auto& shell = basis[s]; 
+		
+		int shell_atom = shellAtomList[s];
+		atom_shells[shell_atom].push_back(s); 
+		nbasis += shell.size();
+		nprims += shell.nprim();
+		
+		for (const auto& c : shell.contr) {
+			maxl = c.l > maxl ? c.l : maxl; 
+			shells[shell_atom][c.l]++; 
 		}
 	}
-	qs = qtemp;
-	qs.conservativeResize(k);
-
-	// Now sum over all basis functions to get the number of prims
-	for (int i = 0; i < nbfs; i++)
-		nprims += b.getBF(i).getNPrims();
-
-
-	// Start printing
-	title("Basis Set");
-	outfile << "DEFAULT: " << b.getName() << "\n";
-	for (int i = 0; i < qs.size(); i++)
-		outfile << getAtomName(qs[i]) << " " << b.getName(qs[i]) << "\n";
-	outfile << "Total no. of cgbfs: " << nbfs << "\n";
-	outfile << "Total no. of prims: " << nprims << "\n";
-	title("Specification");
-	outfile << std::setw(8) << "Atom";
-	outfile << std::setw(8) << "Shell";
-	outfile << std::setw(8) << "#CGBFs";
-	outfile << std::setw(8) << "#Prims\n";
-	outfile << std::string(35, '.') << "\n";
-  
-	// loop over the atom types
-	outfile << std::setprecision(2);
-	iVector subshells; iVector sublnums; 
-	for (int i = 0; i < k; i++){
-		int nc = 0; int np = 0;
-		outfile << std::setw(8) << getAtomName(qs(i));
-		subshells = b.getShells(qs[i]);
-
-		sublnums = b.getLnums(qs[i]);
-		outfile << std::setw(8) << getShellName(sublnums[0]);
-		outfile << std::setw(8) << subshells[0];
-
-		for (int j = 0; j < subshells[0]; j++){
-			np += b.getBF(qs[i], j).getNPrims();
-		}
-
-		nc += subshells[0];
-		outfile << std::setw(8) << np << "\n";
-		for (int j = 1; j < subshells.size(); j++){
-			outfile << std::setw(8) << "";
-			outfile << std::setw(8) << getShellName(sublnums[j]);
-			outfile << std::setw(8) << subshells[j];
-			np = 0;
-			for (int l = 0; l < subshells[j]; l++){
-				np += b.getBF(qs[i], nc + l).getNPrims();	
-			}
-			nc += subshells[j];
-			outfile << std::setw(8) << np << "\n";
-		}
-
+	
+	outfile << "Total no. of SHG basis functions: " << nbasis << std::endl; 
+	outfile << "Total no. of primitives: " << nprims << std::endl; 
+	outfile << "Specification: " << std::endl; ; 
+	for (int atom = 0; atom < natoms; atom++) {
+		std::string spec = ""; 
+		for (int l = 0; l < 8; l++)
+			if (shells[atom][l] > 0)
+				spec += std::to_string(shells[atom][l]) + getShellName(l); 
+		
+		outfile << getAtomName(m->getAtom(atom).getCharge()) << ": " << spec << std::endl; 
 	}
-	outfile << std::setprecision(8);
-	// Now print out basis functions if required
+	
 	if (full) {
-		title("Basis Functions");
 		outfile << std::setw(8) << "Atom";
 		outfile << std::setw(8) << "Shell";
-		outfile << std::setw(5) << "BF";
-		outfile << std::setw(18) << "Coeff";
-		outfile << std::setw(18) << "Exponent\n";
-		outfile << std::string(58, '.') << "\n";
-		// Loop over all the basis functions
-		iVector subshell; iVector sublnums; 
-		Vector coeffs; Vector exps;
-		std::string filler = "";
-		for (int i = 0; i < k; i++){
-			subshell = b.getShells(qs(i));
-			sublnums = b.getLnums(qs(i));
-
-			// Loop over shells
-			int sum = 0;
-			for (int r = 0; r < subshell.size(); r++){ 
-				// Loop over bfs
-				for (int s = 0; s < subshell[r]; s++){
-					BF& bftemp = b.getBF(qs(i), s+sum);
-					coeffs = bftemp.getCoeffs();
-					exps = bftemp.getExps();
-
-					// Loop over coeffs/exps
-					for (int t = 0; t < coeffs.size(); t++){
-						filler = ((r == 0 && s==0 && t==0) ? getAtomName(qs[i]) : "");
-						outfile << std::setw(8) << filler;
-						filler = ((s == 0 && t == 0) ? getShellName(sublnums[r]) : "");
-						outfile << std::setw(8) << filler;
-						filler = (t == 0 ? std::to_string(s+1) : "");
-						outfile << std::setw(5) << filler;
-						outfile << std::setw(18) << std::setprecision(8) << coeffs(t);
-						outfile << std::setw(18) << std::setprecision(8) << exps(t) << "\n";
+		outfile << std::setw(18) << "Exp.";
+		outfile << std::setw(18) << "Coeff." << std::endl; 
+		outfile << std::string(55, '.') << std::endl; 
+		
+		for (int atom = 0; atom < natoms; atom++) {
+			bool atom_printed = false; 
+			for (int s : atom_shells[atom]) {
+				const auto& shell = basis[s]; 
+				 
+				for (const auto& c : shell.contr) {
+					bool shell_printed = false; 
+					
+					for (int i = 0; i < c.coeff.size(); i++) {
+						if (!atom_printed) {
+							outfile << std::setw(8) << getAtomName(m->getAtom(atom).getCharge());
+							atom_printed = true;  
+						} else 
+							outfile << std::setw(8) << ""; 
+					
+						if (!shell_printed) {
+							outfile << std::setw(8) << getShellName(c.l); 
+							shell_printed = true;
+						} else
+							outfile << std::setw(8) << "";
+						
+						outfile << std::setw(18) << std::setprecision(8) << shell.alpha[i]; 
+						outfile << std::setw(18) << std::setprecision(8) << c.coeff[i] << std::endl; 
 					}
 				}
-				sum += subshell[r];
-			}
+			} 	
 		}
+		outfile << std::endl; 
 	}
-}      
+		
+}
+
+void Logger::print(ECPBasis& b, bool full) const
+{
+	
+}
+
+void Logger::print(ECP& ecp, bool full) const
+{
+	
+}
 
 // Print out the details of an atom, taking the form:
 // Atom Type   Atomic Number    Atomic Mass(amu)  #CGBFS   x    y    z
@@ -273,7 +248,6 @@ void Logger::print(const Atom& a) const
 	outfile << std::setw(10) << getAtomName(q);
 	outfile << std::setw(10) << a.getEffectiveCharge();
 	outfile << std::setw(10) << a.getMass();
-	outfile << std::setw(10) << a.getNbfs();
 	outfile << std::setw(4) << "(" << std::setw(8) << c(0);
 	outfile << ", " << std::setw(8) << c(1);
 	outfile << ", " << std::setw(8) << c(2) << ")\n";
@@ -350,88 +324,10 @@ void Logger::print(Molecule& mol, bool inertia) const
 	// Finally, print out all the atoms
 	title("Atoms");
 	outfile << std::setw(10) << "Atom" << std::setw(10) << "z";
-	outfile << std::setw(10) << "Mass" << std::setw(10) << "#CGBFs"; 
-	outfile << std::setw(30) << "Coordinates" << "\n";
+	outfile << std::setw(10) << "Mass" << std::setw(30) << "Coordinates" << "\n";
 	outfile << std::string(70, '.') << "\n";
 	for (int i = 0; i < mol.getNAtoms(); i++)
 		print(mol.getAtom(i));
-}
-
-// Print out a contracted gaussian basis function, in the form:
-// #Prims = ..., s/px/py/pz/dxy/... type orbital
-// Coefficients: ......
-// Exponents: ......
-void Logger::print(BF& bf) const
-{
-	// Get information
-	Vector coef = bf.getCoeffs();
-	Vector exp = bf.getExps();
-	int lx = bf.getLx(); int ly = bf.getLy(); int lz = bf.getLz();
-  
-	// Work out the orbital type
-	std::string temp;
-	switch(lx + ly + lz){
-		case 0: { temp = "s"; break; }
-		case 1: { 
-			if (lx == 1){
-				temp = "px";
-			} else if (ly == 1){
-				temp = "py";
-			} else {
-				temp = "pz";
-			}
-			break;
-		}
-		case 2: { 
-			if (lx == 1 && ly == 1){
-				temp = "dxy";
-			} else if (lx == 1 && lz == 1){
-				temp = "dxz";
-			} else if (ly == 1 && lz == 1){
-				temp = "dyz";
-			} else if (lz == 2) {
-				temp = "dz2";
-			} else {
-				temp = "d(x2 - y2)";
-			}
-			break;
-		}
-		case 3: { temp = "f"; break; } 
-		case 4: { temp = "g"; break; }
-		case 5: { temp = "h"; break; }
-		case 6: { temp = "Very angular"; break; }
-	}
-
-	// Print it out
-	outfile << "#Primitives = " << coef.size();
-	outfile << ",  " << temp << " type basis function\n";
-	outfile << std::setw(15) << "Coefficients: ";
-	for (int i = 0; i < coef.size(); i++){
-		outfile << std::setw(12) << std::setprecision(9) << coef(i);
-		if ((i % 4) == 0 && i != 0){ // Print 4 per line
-			outfile << "\n" << std::setw(15) << "";
-		}
-	}
-	outfile << "\n";
-	outfile << std::setw(15) <<  "Exponents: ";
-	for (int i = 0; i < exp.size(); i++){
-		outfile << std::setw(12) << std::setprecision(9) << exp(i);
-		if ( (i%4) == 0 && i!=0) {
-			outfile << "\n" << std::setw(15) << "";
-		}
-	}
-}
-
-// Print out a primitive gaussian basis function in the form:
-// Lx = ..., Ly = ..., Lz = ...
-// norm = ..., exponent = ...
-void Logger::print(const PBF& pbf) const
-{
-	outfile << "Lx = " << pbf.getLx();
-	outfile << ",  Ly = " << pbf.getLy();
-	outfile << ",  Lz = " << pbf.getLz() << "\n";
-	outfile << "Norm = " << pbf.getNorm();
-	outfile << ",  Exponent = " << pbf.getExponent() << "\n";
 }
  
 

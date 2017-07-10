@@ -255,7 +255,7 @@ void ProgramController::run() {
 			m->calcEnuc();
 			log.print(*m, true); 
 			m->updateBasisPositions(); 
-			log.print(m->getBasis(), get_option<bool>("bprint")); 
+			log.print(m->getBasis(), m, get_option<bool>("bprint")); 
 			log.localTime(); 
 			log.flush(); 
 			

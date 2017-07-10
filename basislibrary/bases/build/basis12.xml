@@ -1,0 +1,19 @@
+<root name="test">
+  <he nshells="5">
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0" x=" 0.25"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0" x=" 0.5"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0" x=" 1.0"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0" x=" 2.0"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0" x=" 4.0"/>
+    </Shell>
+  </he>
+</root>

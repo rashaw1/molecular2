@@ -65,12 +65,12 @@
 #include "atom.hpp"
 #include "molecule.hpp"
 #include "eigen_wrapper.hpp"
+#include "ecp.hpp"
 #include <vector>
 #include <chrono>
+#include <libint2.hpp>
 
 // Declare forward dependencies
-class BF;
-class PBF;
 class Error;
 class Fock; 
 
@@ -114,12 +114,15 @@ public:
   // Print out a vector with precision digits, either horizontally or vertically
   void print(const Vector& v, int digits = 6, bool vertical = false) const; 
   void print(const Matrix& m, int digits = 6) const; // Matrix with precision digits
-  void print(Basis& b, bool full = false) const; // Basis set - spec., no. of bfs, etc.
+  void print(Basis& b, SharedMolecule m, bool full = false) const; // Basis set - spec., no. of bfs, etc.
+  void print(ECPBasis& b, bool full = false) const; // ECP Basis set - spec., no. of bfs, etc.
+  void print(ECP& ecp, bool full = false) const; 
+  void print(std::vector<libint2::Shell>& basis, std::vector<int>& shellAtomList, 
+					SharedMolecule m, bool full = false) const; 
   void print(const Atom& a) const; // Atom - i.e coords, etc.
   // Print out the details of the molecule, including inertial data if wanted.
   void print(Molecule& mol, bool inertia = false) const; 
-  void print(BF& bf) const; // Basis function - coeffs and each pbf
-  void print(const PBF& pbf) const; // Primitive gaussian - exponent, norm, ang. momenta
+
   // Print out an iteration
   void iteration(int iter, double energy, double delta, double dd);
   void iterationCC(int iter, double energy, double delta_e, double delta_s, double delta_d, double t_interm, double t_amps, double t_iter);

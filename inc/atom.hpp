@@ -39,49 +39,36 @@
 
 // Includes
 #include "eigen_wrapper.hpp"
-#include "bf.hpp"
 #include "basis.hpp"
 
 // Declare forward dependencies
-class PBF;
 class ECPBasis;
 
 // Begin class definition
 class Atom
 {
 private:
-  BF* bfs;
-  int charge, core, nbfs, nshells;
-  iVector shells, lnums;
+  int charge, core;
   double x, y, z, mass;
   double *pos; 
 public:
   // Constructors
-  Atom() : charge(-1), core(0),  nbfs(0) { } // Default
+  Atom() : charge(-1), core(0) { } // Default
   Atom(const Vector& coords, int q, double m); // q = charge, m = mass
   Atom(const Atom& other); // Copy constructor
-  ~Atom(); // Destructor - gets rid of array bfs
+
   // Accessors
   int getCharge() const { return charge; }
   int getEffectiveCharge() const { return charge - core; }
   void setCore(ECPBasis& ecpset); 
   double getMass() const { return mass; }
-  int getNbfs() const { return nbfs; }
-  int getNshells() const { return nshells; }
-  int getNShellPrims(int shell) const;
+
   Vector getCoords() const; 
   double* getPos() const { return pos; }
   double getX() const { return x; }
   double getY() const { return y; }
   double getZ() const { return z; }
-  iVector getShells() const { return shells; }
-  iVector getLnums() const { return lnums; }
-  BF& getBF(int i) { return bfs[i]; } // Return bf i - no bounds check
-  BF& getShellBF(int shell, int i);
-  PBF& getShellPrim(int shell, int i);
-  void setBasis(Basis& bs); // Set the basis functions using basis set bs
-  int getNSpherical() const;
-  int getNSpherShellBF(int shell) const;
+
   // Routines
   void rotate(const Matrix& U); 
   void translate(double dx, double dy, double dz);

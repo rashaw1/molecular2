@@ -1,0 +1,24 @@
+<root name="onefunc">
+  <h nshells="3">
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0" x=" 0.3070"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0" x=" 0.6947"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.0" x=" 1.5718"/>
+    </Shell>
+  </h>
+  <he nshells="3">
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.000000" x=" 0.1"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.000000" x=" 1.0"/>
+    </Shell>
+    <Shell lval="s" nexp="1">
+      <xc c=" 1.000000" x=" 10.0"/>
+    </Shell>
+  </he>
+</root>
