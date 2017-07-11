@@ -18,7 +18,7 @@
  
 // Implement class BasisReader
 BasisReader::BasisReader(std::map<int, std::string> ns) : names(ns) {
-	obs_list = read_basis_list("basis");
+	obs_list = read_basis_list("basis");	
 	jk_list =  read_basis_list("jkfit");
 	mp2_list = read_basis_list("mp2fit"); 
 	ecp_list = read_basis_list("ecp"); 
@@ -28,7 +28,7 @@ std::map<std::string, int> BasisReader::read_basis_list(std::string name) {
 	
 	std::map<std::string, int> basis_list; 
 	
-	std::string filename = name + ".list"; 
+	std::string filename = "./basislibrary/" + name + ".list"; 
 	pugi::xml_document doc; 
 	pugi::xml_parse_result result = doc.load_file(filename.c_str()); 
 	pugi::xml_node root = doc.child("root"); 
@@ -54,7 +54,7 @@ std::vector<GaussianShell> BasisReader::read_basis(std::string atom, double* pos
 	if (it != basis_list.end()) {
 		value = it->second; 
 		std::string filename = 	"./basislibrary/bases/build/" + name + std::to_string(value) + ".xml"; 
-	
+
 		pugi::xml_document doc;
 		pugi::xml_parse_result result = doc.load_file(filename.c_str());
 		pugi::xml_node atom_node = doc.child("root").child(atom.c_str()); 
@@ -94,16 +94,16 @@ void BasisReader::readShellBasis(Basis& b, int q, double *pos, int atom, int typ
 	std::string basis_type, atom_name, basis_name;
 	std::vector<GaussianShell> basis_set;
 	
-	atom_name = getAtomName(atom);  
+	atom_name = getAtomName(q);  
 	
-	auto it = names.find(atom); 
+	auto it = names.find(q);
 	if (it != names.end()) basis_name = it->second; 
 	else {
 		it = names.find(0);
 		if (it != names.end()) basis_name = it->second;
 		else basis_name = "sto-3g";
 	}
-	std::transform(basis_name.begin(), basis_name.end(), basis_name.begin(), ::toupper);
+	std::transform(basis_name.begin(), basis_name.end(), basis_name.begin(), ::tolower);
 	
 	switch(type) {
 		case 1: {
@@ -166,7 +166,9 @@ ECP BasisReader::readECP(int q, ECPBasis& ecpset, double* center) {
 				newECP.addPrimitive(n, l, x, c, true); 
 			}
 		}
-	} 
+	} else {
+		throw(Error("ECPLIB", "Could not read ECP " + basis_name + " for atom " + atom_name)); 
+	}
 			
 	return newECP; 
 }

@@ -1,5 +1,6 @@
 memory, 500
 direct, true
+bprint, true
 molecule = {
 	 angstrom, true
 	 geometry = {
@@ -10,13 +11,17 @@ molecule = {
 	 basis = {
 	       default, avdz
 	 }
-	 dfbasis = {
-	       default, vdzmp2fit
+	 jkbasis = {
+	       default, avdz
+	 }
+	 ribasis = {
+	       default, avdz
 	 }
 }
 rhf(
-	df, false
+	df, true
 	guess, soad
 )
 dfmp2()
+
 

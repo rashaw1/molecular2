@@ -188,6 +188,7 @@ void Logger::print(std::vector<libint2::Shell>& basis, std::vector<int>& shellAt
 		
 		outfile << getAtomName(m->getAtom(atom).getCharge()) << ": " << spec << std::endl; 
 	}
+	outfile << std::endl; 
 	
 	if (full) {
 		outfile << std::setw(8) << "Atom";

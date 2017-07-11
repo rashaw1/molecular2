@@ -12,17 +12,17 @@
 #include "ioutil.hpp"
 #include <algorithm>	
 	
-std::string names[109] = {"H", "HE", "LI", "BE", "B", "C", "N",
-	"O", "F", "NE", "NA", "MG", "AL", "SI", "P", "S", "CL", "AR",
-	"K", "CA", "SC", "TI", "V", "CR", "MN", "FE", "CO", "NI", "CU",
-	"ZN", "GA", "GE", "AS", "SE", "BR", "KR", "RB", "SR", "Y", "ZR",
-	"NB", "MO", "TC", "RU", "RH", "PD", "AG", "CD", "IN", "SN", "SB",
-	"TE", "I", "XE", "CS", "BA", "LA", "CE", "PR", "ND", "PM", "SM",
-	"EU", "GD", "TB", "DY", "HO", "ER", "TM", "YB", "LU", "HF", "TA",
-	"W", "RE", "OS", "IR", "PT", "AU", "HG", "TL", "PB", "BI", "PO",
-	"AT", "RN", "FR", "RA", "AC", "TH", "PA", "U", "NP", "PU", "AM",
-	"CM", "BK", "CF", "ES", "FM", "MD", "NO", "LR", "RF", "DB", "SG",
-	"BH", "HS", "MT" };
+std::string names[109] = {"h", "he", "li", "be", "b", "c", "n",
+	"o", "f", "ne", "na", "mg", "al", "si", "p", "s", "cl", "ar",
+	"k", "ca", "sc", "ti", "v", "cr", "mn", "fe", "co", "ni", "cu",
+	"zn", "ga", "ge", "as", "se", "br", "kr", "rb", "sr", "y", "zr",
+	"nb", "mo", "tc", "ru", "rh", "pd", "ag", "cd", "in", "sn", "sb",
+	"te", "i", "xe", "cs", "ba", "la", "ce", "pr", "nd", "pm", "sm",
+	"eu", "gd", "tb", "dy", "ho", "er", "tm", "yb", "lu", "hf", "ta",
+	"w", "re", "os", "ir", "pt", "au", "hg", "tl", "pb", "bi", "po",
+	"at", "rn", "fr", "ra", "ac", "th", "pa", "u", "np", "pu", "am",
+	"cm", "bk", "cf", "es", "fm", "md", "no", "lr", "rf", "db", "sg",
+	"bh", "hs", "mt" };
 	
 const int valences[109] = { 1, 2, 1, 2, 3, 4, 5, 6, 7, 8,
 		1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8, 
@@ -86,7 +86,7 @@ int getAtomCharge(const std::string& n)
 {
 	// Make it upper case
 	std::string name = n;
-	std::transform(name.begin(), name.end(), name.begin(), ::toupper);
+	std::transform(name.begin(), name.end(), name.begin(), ::tolower);
 	
 	int q = 1; 
 	if (name != "X") { 
