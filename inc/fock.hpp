@@ -172,9 +172,10 @@ public:
   virtual void diagonalise();
   virtual void makeJK(Matrix& P, double multiplier = 1.0);
   void formJK(Matrix& P, double multiplier = 1.0);
+  void formJKlocal(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo, bool from_file = false); 
   void formJKdirect(const Matrix& Schwarz, Matrix& P1, double multiplier = 1.0);
+  void formJKdf(Matrix& Cocc, double multiplier = 1.0); 
   virtual void formJKfile();
-  virtual void formJKdf(Matrix& Cocc, double multiplier = 1.0); 
   virtual void makeFock(); 
   virtual void makeFock(Matrix& P, double multiplier = 1.0 );
   virtual void makeDens();
@@ -194,9 +195,9 @@ public:
   double precision = std::numeric_limits<double>::epsilon()  // discard contributions smaller than this
   		); 
 
-  Matrix compute_2body_fock_df(const Matrix& Cocc);
-  Matrix compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo); 
-  Matrix compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo);
+  void compute_2body_fock_df(const Matrix& Cocc, Matrix& j, Matrix& k);
+  void compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo, Matrix& j, Matrix& k); 
+  void compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo, Matrix& j, Matrix& k);
   void build_domains(Matrix& Cocc, Matrix& V, std::vector<FragmentInfo>& finfo);  
   void build_blocked_eris(std::vector<FragmentInfo>& finfo, Matrix& JPQ, Matrix& Pt); 
   
@@ -216,7 +217,8 @@ protected:
 	Matrix dens_alpha, dens_beta; 
 	Matrix kints_alpha, kints_beta, jints_alpha, jints_beta; 
 	Matrix CP_alpha, CP_beta;
-	Vector eps_alpha, eps_beta; 
+	Vector eps_alpha, eps_beta;
+	std::vector<Domain> lmo_alpha, ao_alpha, fit_alpha, lmo_beta, ao_beta, fit_beta; 
 	std::vector<Matrix> alpha_focks, beta_focks;
 	int nalpha, nbeta; 
 public:
@@ -243,7 +245,9 @@ public:
     virtual void makeJK();
    	void formJK(Matrix& P1, Matrix& P2, double multiplier = 1.0);
     void formJKdirect(const Matrix& Schwarz, Matrix& P1, Matrix& P2, double multiplier = 1.0);
-	void formJKdf(Matrix& ca, Matrix& cb, double multiplier = 1.0); 
+	void formJKdf(Matrix& ca, Matrix& cb, double multiplier = 1.0);
+	void formJKlocal(Matrix& ca, Matrix& cb, const Matrix& sa, const Matrix& sb, Matrix& Pa, Matrix& Pb,
+		 std::vector<FragmentInfo>& finfoa, std::vector<FragmentInfo>& finfob);   
     virtual void formJKfile();
     virtual void makeFock();
     virtual void makeDens();

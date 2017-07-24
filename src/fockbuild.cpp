@@ -50,6 +50,16 @@ void Fock::formJK(Matrix& P, double multiplier)
 	jkints = jints - 0.5*kints;
 }
 
+void Fock::formJKlocal(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo, bool from_file) {
+	
+	if (from_file)
+		compute_2body_fock_df_local_file(Cocc, sigmainv, Pt, finfo, jints, kints);
+	else
+		compute_2body_fock_df_local(Cocc, sigmainv, Pt, finfo, jints, kints); 
+	jkints = jints - kints; 
+
+}
+
 // Form JK using integral direct methods
 void Fock::formJKdirect(const Matrix& Schwarz, Matrix& D, double multiplier)
 {
@@ -159,7 +169,8 @@ void Fock::formJKfile()
 }
 	
 void Fock::formJKdf(Matrix& Cocc, double multiplier) {
-	jkints = multiplier * compute_2body_fock_df(Cocc); 
+	 compute_2body_fock_df(Cocc, jints, kints);
+	 jkints = multiplier * (2.0 * jints - kints);  
 }	
 
 void Fock::makeFock(Matrix& P, double multiplier)
@@ -352,9 +363,18 @@ void UnrestrictedFock::formJKdirect(const Matrix& Schwarz, Matrix& Da, Matrix& D
 	jints_beta = 0.25 * (jints_beta + jints_beta.transpose()).eval();
 }
 
-void UnrestrictedFock::formJKdf(Matrix& ca_occ, Matrix& cb_occ, double multiplier) {
-	/*jkints_alpha = multiplier * compute_2body_fock_df(ca_occ); 
-	jkints_beta = multiplier * compute_2body_fock_df(cb_occ); */
+void UnrestrictedFock::formJKdf(Matrix& ca_occ, Matrix& cb_occ, double multiplier) { 
+	compute_2body_fock_df(ca_occ, jints_alpha, kints_alpha);
+	compute_2body_fock_df(cb_occ, jints_beta, kints_beta); 
+	jints_alpha *= multiplier;
+	jints_beta  *= multiplier;
+	kints_alpha *= multiplier;
+	kints_beta  *= multiplier; 
+}
+
+void UnrestrictedFock::formJKlocal(Matrix& ca, Matrix& cb, const Matrix& sa, const Matrix& sb, Matrix& Pa, Matrix& Pb, std::vector<FragmentInfo>& finfoa, std::vector<FragmentInfo>& finfob) {
+	compute_2body_fock_df_local(ca, sa, Pa, finfoa, jints_alpha, kints_alpha); 
+	compute_2body_fock_df_local(cb, sb, Pb, finfob, jints_beta, kints_beta); 
 }
 
 // Make the JK matrix, depending on how two electron integrals are stored/needed
@@ -531,13 +551,14 @@ bool D_is_shelldiagonal, double precision)
 	return 0.5 * (G + G.transpose());		
 }
 
-Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
+void Fock::compute_2body_fock_df(const Matrix& Cocc, Matrix& j, Matrix& k) {
 
 	BasisSet& obs = molecule->getBasis().getIntShells(); 
 	BasisSet& dfbs = molecule->getBasis().getJKShells(); 
   
 	const auto n = integrals.nbasis(obs); 
 	const auto ndf = integrals.nbasis(dfbs); 
+	const int ncocc = Cocc.cols(); 
 	
 	Logger& log = molecule->control->log; 
 
@@ -566,25 +587,26 @@ Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 		} 
 	}  // if (xyK.size() == 0)
 
-	Matrix xiK = Matrix::Zero(n*nocc, ndf); 
+	Matrix xiK = Matrix::Zero(n*ncocc, ndf); 
 	for (int x = 0; x < n; x++) {
-		for (int i = 0; i < nocc; i++) {
+		for (int i = 0; i < ncocc; i++) {
 			for (int K = 0; K < ndf; K++) {
 				for (int y = 0; y < n; y++) {
 					int X = std::max(x, y);
 					int Y = std::min(x, y);
-					xiK(x*nocc+i, K) += xyK((X*(X+1))/2+Y, K) * Cocc(y, i); 
+					xiK(x*ncocc+i, K) += xyK((X*(X+1))/2+Y, K) * Cocc(y, i); 
 				}
 			}
 		}
 	}
 
-	Matrix G = Matrix::Zero(n, n); 
+	k = Matrix::Zero(n, n); 
 	for (int x = 0; x < n; x++) {
 		for (int y = 0; y <= x; y++) {
-			for (int i = 0; i < nocc; i++)
+			for (int i = 0; i < ncocc; i++)
 				for (int K = 0; K < ndf; K++)
-					G(x, y) -= xiK(x*nocc+i, K) * xiK(y*nocc+i, K); 
+					k(x, y) += xiK(x*ncocc+i, K) * xiK(y*ncocc+i, K); 
+			k(y, x) = k(x, y); 
 		}
 	}
 
@@ -592,19 +614,18 @@ Matrix Fock::compute_2body_fock_df(const Matrix& Cocc) {
 	Vector Jtmp = Vector::Zero(ndf); 
 	for (int K = 0; K < ndf; K++) 
 		for (int x = 0; x < n; x++)
-			for (int i = 0; i < nocc; i++)
-				Jtmp[K] += xiK(x*nocc+i, K) * Cocc(x, i); 
+			for (int i = 0; i < ncocc; i++)
+				Jtmp[K] += xiK(x*ncocc+i, K) * Cocc(x, i); 
 	xiK.resize(0, 0); 
   
+  	j = Matrix::Zero(n, n);
 	for (int x = 0; x < n; x++) {
 		for (int y = 0; y <= x; y++) { 
 			for (int K = 0; K < ndf; K++)  
-				G(x, y) += 2.0 * xyK((x*(x+1))/2+y, K) * Jtmp[K]; 
-			G(y, x) = G(x, y); 
+				j(x, y) += xyK((x*(x+1))/2+y, K) * Jtmp[K]; 
+			j(y, x) = j(x, y); 
 		}
 	}
-
-	return G; 
 }
 
 void Fock::build_domains(Matrix& Cocc, Matrix& V, std::vector<FragmentInfo>& finfo) {
@@ -738,7 +759,7 @@ void Fock::build_domains(Matrix& Cocc, Matrix& V, std::vector<FragmentInfo>& fin
 	}
 }
 
-Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo) {
+void Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo, Matrix& j, Matrix& k) {
 
 	BasisSet& obs = molecule->getBasis().getIntShells(); 
 	BasisSet& dfbs = molecule->getBasis().getJKShells(); 
@@ -770,8 +791,8 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 		
 	}  // if (xyK.size() == 0) 
 	
-	Matrix G = Matrix::Zero(n, n); 
-	
+	j = Matrix::Zero(n, n); 
+	k = Matrix::Zero(n, n);
 	// compute exchange
 	int nfrags = finfo.size(); 
 
@@ -844,8 +865,7 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 					ao2size = ao_d.sizes[ao2]; 
 					 
 					for (int nu = ao2start; nu < ao2start + ao2size; nu++) {
-
-						G(mu, nu) -= uA(u, v); 
+						k(mu, nu) += uA(u, v); 
 						
 						v++; 
 					}
@@ -918,16 +938,15 @@ Matrix Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, M
 					for (int x = 0; x < nao1; x++) { 
 						for (int y = 0; y < nao2; y++) {
 						
-							G(x+f1start, y+f2start) += Pvf[x * nao2 + y]; 
-							G(y+f2start, x+f1start) = G(x+f1start, y+f2start); 
+							j(x+f1start, y+f2start) += Pvf[x * nao2 + y]; 
+							j(y+f2start, x+f1start) = j(x+f1start, y+f2start);
+							
 						}
 					}
 				}
 			}
 		}
 	}
- 
-	return G; 
 }
 
 void Fock::build_blocked_eris(std::vector<FragmentInfo>& finfo, Matrix& JPQ, Matrix& Pt) {
@@ -1000,7 +1019,7 @@ void read_intfile(int K, Matrix& xyf) {
 	eigenutil::read_binary(filename.c_str(), xyf); 
 }
 
-Matrix Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo) {
+void Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo, Matrix& j, Matrix& k) {
 
 	BasisSet& obs = molecule->getBasis().getIntShells(); 
 	BasisSet& dfbs = molecule->getBasis().getJKShells(); 
@@ -1046,7 +1065,8 @@ Matrix Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmai
 		
 	}  // if (xyK.size() == 0) 
 	
-	Matrix G = Matrix::Zero(n, n); 
+	j = Matrix::Zero(n, n); 
+	k = Matrix::Zero(n, n); 
 	
 	std::vector<Matrix> xyf(fit_domains[0].centres.size()); 
 	for (int f = 0; f < xyf.size(); f++)
@@ -1131,7 +1151,7 @@ Matrix Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmai
 					 
 					for (int nu = ao2start; nu < ao2start + ao2size; nu++) {
 
-						G(mu, nu) -= uA(u, v); 
+						k(mu, nu) += uA(u, v); 
 						
 						v++; 
 					}
@@ -1188,13 +1208,11 @@ Matrix Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmai
 	
 	for (int x = 0; x < n; x++)
 	for (int y = 0; y <=x; y++) {
-		G(x, y) += Pv[(x*(x+1))/2+y];
-		G(y, x) = G(x, y); 
+		j(x, y) += Pv[(x*(x+1))/2+y];
+		j(y, x) = j(x, y); 
 	}
 	end = molecule->control->log.getGlobalTime(); 	
 	//std::cout << "Coulomb: " << end - start << " seconds" << std::endl << std::flush; 
 	
 	//std::cout << std::endl << std::flush; 
-	
-	return G; 
 }

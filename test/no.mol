@@ -1,4 +1,4 @@
-direct, false
+direct, true
 memory, 1000
 nthreads, 4
 molecule = {
@@ -9,7 +9,12 @@ molecule = {
 		  O, 0.0, 0.0, 1.15
          }
 	 basis = {
-	       default, avtz
+	       default, avdz
+	 }
+	 jkbasis = {
+	       default, avdz
 	 }
 }
-uhf()
+uhf(
+	df, true
+)
