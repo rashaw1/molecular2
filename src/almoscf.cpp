@@ -1029,9 +1029,15 @@ double ALMOSCF::r_energy_df() {
 	EigenSolver es(sigma); 
 	T *= es.operatorInverseSqrt(); 
 	
+	std::vector<libint2::Shell>& obs = molecule->getBasis().getIntShells(); 
+	std::vector<libint2::Shell>& dfbs = molecule->getBasis().getJKShells(); 
+	int ndf = focker.getIntegrals().nbasis(dfbs); 
+	
 	Matrix& xyK = focker.getXYK(); 
+	if (xyK.cols() != ndf)
+		focker.getIntegrals().compute_eris_3index(obs, dfbs, xyK);
+	
 	SparseMatrix& Linv = focker.getLinv(); 
-	int ndf = xyK.cols(); 
 	
 	Matrix xiK = Matrix::Zero(nbfs * nocc, ndf); 
 	for (int x = 0; x < nbfs; x++) {
