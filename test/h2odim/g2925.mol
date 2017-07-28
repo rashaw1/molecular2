@@ -18,18 +18,18 @@ molecule = {
 	       default, avdz
 	 } 
 	 jkbasis = {
-                 default, avdzjkfit
+                 default, avdz
          }
          ribasis = {
-                 default, avdzmp2fit
+                 default, avdz
          }
 }
 ralmo(
 	perturb, 3
 	rpa, true
-	longrange, true
+	longrange, false
 	mu, 0.5
 	rpax, 2
-	df, false
-	xcorrect, false
+	df, true
+	xcorrect, true
 )

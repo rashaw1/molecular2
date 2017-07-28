@@ -438,12 +438,25 @@ void ProgramController::call_ualmo(Command& c, SharedMolecule m) {
 	if(!c.is_option_set("diis")) c.set_option<bool>("diis", true);
 	if(!c.is_option_set("maxdiis")) c.set_option<int>("maxdiis", 6);
 	if(!c.is_option_set("enconverge")) c.set_option<double>("enconverge", 1e-6); 
-	if(!c.is_option_set("densconverge")) c.set_option<double>("densconverge", 1e-4); 
+	if(!c.is_option_set("densconverge")) c.set_option<double>("densconverge", 1e-4);  
 	if(!c.is_option_set("maxiter")) c.set_option<int>("maxiter", 40);
-	if(!c.is_option_set("perturb")) c.set_option<int>("perturb", 0);
-	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12); 
+	if(!c.is_option_set("perturb")) c.set_option<int>("perturb", 1);
+	if(!c.is_option_set("precision")) c.set_option<double>("precision", 1e-12);
+	if(!c.is_option_set("rpa")) c.set_option<bool>("rpa", false);  
+	if(!c.is_option_set("rpax")) c.set_option<int>("rpax", 2); 
+	if(!c.is_option_set("longrange")) c.set_option<bool>("longrange", false); 
+	if(!c.is_option_set("mu")) c.set_option<double>("mu", 0.5); 
+	if(!c.is_option_set("iterative")) c.set_option<bool>("iterative", true);
+	if(!c.is_option_set("pairwise")) c.set_option<bool>("pairwise", true); 
+	if(!c.is_option_set("local")) c.set_option<bool>("local", true);
+	if(!c.is_option_set("xcorrect")) c.set_option<bool>("xcorrect", false); 
+	if(!c.is_option_set("rcutoff")) c.set_option<double>("rcutoff", 15.0);
+	if(!c.is_option_set("mothresh")) c.set_option<double>("mothresh", 1e-6);
+	if(!c.is_option_set("fitthresh")) c.set_option<double>("fitthresh", 0.05);
+	if(!c.is_option_set("rthresh")) c.set_option<double>("rthresh", 7.0);
 	if(!c.is_option_set("df")) c.set_option<bool>("df", false); 
 	if(!c.is_option_set("guess")) c.set_option<std::string>("guess", "soad"); 
+	if(!c.is_option_set("dprint")) c.set_option<bool>("dprint", false);
 
 	focker = std::make_shared<UnrestrictedFock>(c, *ints, m);
 	ALMOSCF almo(c, m, *focker); 

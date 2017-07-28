@@ -17,10 +17,10 @@ typedef std::vector<libint2::Shell> BasisSet;
 void Fock::makeJK(Matrix& P, double multiplier)
 {
 	
-	if (twoints){
-		formJK(P, multiplier); 
-	} else if (density_fitted) {
+	if (density_fitted){
 		formJKdf(P, multiplier); 
+	} else if (twoints) {
+		formJK(P, multiplier); 
 	} else if (direct) {
 		formJKdirect(integrals.getPrescreen(), P, multiplier);
 	} else {
@@ -53,9 +53,9 @@ void Fock::formJK(Matrix& P, double multiplier)
 void Fock::formJKlocal(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo, bool from_file) {
 	
 	if (from_file)
-		compute_2body_fock_df_local_file(Cocc, sigmainv, Pt, finfo, jints, kints);
+		compute_2body_fock_df_local_file(Cocc, sigmainv, Pt, finfo, jints, kints, lmo_domains, ao_domains, fit_domains);
 	else
-		compute_2body_fock_df_local(Cocc, sigmainv, Pt, finfo, jints, kints); 
+		compute_2body_fock_df_local(Cocc, sigmainv, Pt, finfo, jints, kints, lmo_domains, ao_domains, fit_domains); 
 	jkints = jints - kints; 
 
 }
@@ -373,8 +373,39 @@ void UnrestrictedFock::formJKdf(Matrix& ca_occ, Matrix& cb_occ, double multiplie
 }
 
 void UnrestrictedFock::formJKlocal(Matrix& ca, Matrix& cb, const Matrix& sa, const Matrix& sb, Matrix& Pa, Matrix& Pb, std::vector<FragmentInfo>& finfoa, std::vector<FragmentInfo>& finfob) {
-	compute_2body_fock_df_local(ca, sa, Pa, finfoa, jints_alpha, kints_alpha); 
-	compute_2body_fock_df_local(cb, sb, Pb, finfob, jints_beta, kints_beta); 
+	
+	if (xyK.rows() == 0) {
+		BasisSet& dfbs = molecule->getBasis().getJKShells();
+		int ndf = integrals.nbasis(dfbs); 
+		
+		Matrix V = integrals.compute_eris_2index(dfbs);
+		
+		EigenSolver esa(sa);
+		Matrix cat = ca * esa.operatorSqrt(); 
+		build_domains(cat, V, finfoa, lmo_alpha, ao_alpha, fit_alpha); 
+		
+		EigenSolver esb(sb);
+		Matrix cbt = cb * esb.operatorSqrt(); 
+		build_domains(cbt, V, finfob, lmo_beta, ao_beta, fit_beta);	
+	
+		Matrix Pt = Pa + Pb; 
+		build_blocked_eris(finfoa, V, Pt); 
+			
+		auto llt = V.selfadjointView<Eigen::Lower>().llt();
+		auto& L = llt.matrixL(); 
+		Matrix I(ndf, ndf);
+		I.setIdentity(); 
+		Linv = L.solve(I).transpose().sparseView(1e-12);
+		Linv2 = Linv * Linv.transpose();
+		
+		xyK.resize(1, 1);	
+	}
+	
+	compute_2body_fock_df_local(ca, sa, Pa, finfoa, jints_alpha, kints_alpha, lmo_alpha, ao_alpha, fit_alpha); 
+	compute_2body_fock_df_local(cb, sb, Pb, finfob, jints_beta, kints_beta, lmo_beta, ao_beta, fit_beta); 
+	
+	jints_alpha *= 0.5;
+	jints_beta *= 0.5;
 }
 
 // Make the JK matrix, depending on how two electron integrals are stored/needed
@@ -628,7 +659,8 @@ void Fock::compute_2body_fock_df(const Matrix& Cocc, Matrix& j, Matrix& k) {
 	}
 }
 
-void Fock::build_domains(Matrix& Cocc, Matrix& V, std::vector<FragmentInfo>& finfo) {
+void Fock::build_domains(Matrix& Cocc, Matrix& V, std::vector<FragmentInfo>& finfo,
+		std::vector<Domain>& lmod, std::vector<Domain>& aod, std::vector<Domain>& fitd) {
 	int i_offset = 0; 
 	for (int B = 0; B < finfo.size(); B++) {
 		for (int i = i_offset; i < i_offset+finfo[B].occ; i++) {
@@ -678,13 +710,13 @@ void Fock::build_domains(Matrix& Cocc, Matrix& V, std::vector<FragmentInfo>& fin
 		
 			d.sumsizes();
 			dao.sumsizes(); 
-			lmo_domains.push_back(d); 
-			ao_domains.push_back(dao); 
+			lmod.push_back(d); 
+			aod.push_back(dao); 
 		}
 		i_offset += finfo[B].occ; 
 	}
 	
-	Kblocks.resize(finfo.size()); 
+	//Kblocks.resize(finfo.size()); 
 	
 	EigenSolver es2(integrals.getOverlap()); 
 	Matrix SC = es2.operatorSqrt() * Cocc; 
@@ -709,7 +741,7 @@ void Fock::build_domains(Matrix& Cocc, Matrix& V, std::vector<FragmentInfo>& fin
 					d.sizes.push_back(f2.naux); 
 					d.starts.push_back(f2.auxstart); 
 					
-					Kblocks[center].push_back(i); 
+					//Kblocks[center].push_back(i); 
 				}
 			
 				center++; 
@@ -717,21 +749,21 @@ void Fock::build_domains(Matrix& Cocc, Matrix& V, std::vector<FragmentInfo>& fin
 			}
 			
 			d.sumsizes();
-			fit_domains.push_back(d); 
+			fitd.push_back(d); 
 		}
 		
 		i_offset += f1.occ; 
 	}
 	
-	for (auto& klist : Kblocks) {
+	/*for (auto& klist : Kblocks) {
 		std::sort(klist.begin(), klist.end());
 		klist.erase(std::unique(klist.begin(), klist.end()), klist.end());
-	}
+	}*/
 	
 	for (int i = 0; i < nocc; i++) {
 		
-		auto& lmo_d = lmo_domains[i]; 
-		auto& fit_d = fit_domains[i];
+		auto& lmo_d = lmod[i]; 
+		auto& fit_d = fitd[i];
 		int fitsize = fit_d.centres.size();  
 		
 		Matrix GAB = Matrix::Zero(fit_d.totalsize, fit_d.totalsize); 
@@ -759,7 +791,8 @@ void Fock::build_domains(Matrix& Cocc, Matrix& V, std::vector<FragmentInfo>& fin
 	}
 }
 
-void Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo, Matrix& j, Matrix& k) {
+void Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo, Matrix& j, Matrix& k,
+		std::vector<Domain>& lmod, std::vector<Domain>& aod, std::vector<Domain>& fitd) {
 
 	BasisSet& obs = molecule->getBasis().getIntShells(); 
 	BasisSet& dfbs = molecule->getBasis().getJKShells(); 
@@ -786,7 +819,7 @@ void Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, Mat
 		Linv = L.solve(I).transpose().sparseView(1e-12);
 		Linv2 = Linv * Linv.transpose();
 		
-		build_domains(Cocc, V, finfo);
+		build_domains(Cocc, V, finfo, lmod, aod, fitd);
 		xyK.resize(1, 1); 
 		
 	}  // if (xyK.size() == 0) 
@@ -797,9 +830,9 @@ void Fock::compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, Mat
 	int nfrags = finfo.size(); 
 
 	for (int i = 0; i < nocc; i++) {
-		auto& lmo_d = lmo_domains[i]; 
-		auto& ao_d = ao_domains[i];
-		auto& fit_d = fit_domains[i]; 
+		auto& lmo_d = lmod[i]; 
+		auto& ao_d = aod[i];
+		auto& fit_d = fitd[i]; 
 		
 		int nmo = lmo_d.centres.size();
 		int nao = ao_d.centres.size();
@@ -1019,7 +1052,8 @@ void read_intfile(int K, Matrix& xyf) {
 	eigenutil::read_binary(filename.c_str(), xyf); 
 }
 
-void Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo, Matrix& j, Matrix& k) {
+void Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo, Matrix& j, Matrix& k,
+		std::vector<Domain>& lmod, std::vector<Domain>& aod, std::vector<Domain>& fitd) {
 
 	BasisSet& obs = molecule->getBasis().getIntShells(); 
 	BasisSet& dfbs = molecule->getBasis().getJKShells(); 
@@ -1044,7 +1078,7 @@ void Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmainv
 		Linv = L.solve(I).transpose().sparseView(1e-12);
 		Linv2 = Linv * Linv.transpose();   
 		
-		build_domains(Cocc, V, finfo); 
+		build_domains(Cocc, V, finfo, lmod, aod, fitd); 
 		
 		int aux = 0; 
 		int fn = 0; 
@@ -1068,18 +1102,18 @@ void Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmainv
 	j = Matrix::Zero(n, n); 
 	k = Matrix::Zero(n, n); 
 	
-	std::vector<Matrix> xyf(fit_domains[0].centres.size()); 
+	std::vector<Matrix> xyf(fitd[0].centres.size()); 
 	for (int f = 0; f < xyf.size(); f++)
-		read_intfile(fit_domains[0].centres[f], xyf[f]); 
+		read_intfile(fitd[0].centres[f], xyf[f]); 
 	
 	// compute exchange
 	int nfrags = finfo.size(); 
 	double start = molecule->control->log.getGlobalTime(); 
 	for (int i = 0; i < nocc; i++) {
 	
-		auto& lmo_d = lmo_domains[i]; 
-		auto& ao_d = ao_domains[i];
-		auto& fit_d = fit_domains[i]; 
+		auto& lmo_d = lmod[i]; 
+		auto& ao_d = aod[i];
+		auto& fit_d = fitd[i]; 
 		
 		int nmo = lmo_d.centres.size();
 		int nao = ao_d.centres.size();
@@ -1089,10 +1123,10 @@ void Fock::compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmainv
 		std::vector<std::future<void>> futures; 
 		std::vector<Matrix> xyf_next;
 		if (i < nocc-1) { 
-			int nextnfit = fit_domains[i+1].centres.size();
+			int nextnfit = fitd[i+1].centres.size();
 			xyf_next.resize(nextnfit); 
 			for (int f = 0; f < nextnfit; f++)
-				futures.push_back(std::async(read_intfile, fit_domains[i+1].centres[f], std::ref(xyf_next[f])));
+				futures.push_back(std::async(read_intfile, fitd[i+1].centres[f], std::ref(xyf_next[f])));
 		} 
 		
 		Matrix uA = Matrix::Zero(ao_d.totalsize, fit_d.totalsize); 

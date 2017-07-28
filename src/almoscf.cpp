@@ -34,7 +34,6 @@ void ALMOSCF::setFragments(bool unrestricted)
 	int start = 0; int auxstart = 0;
 	int nf = 0;
 	for (int i = 0; i < frags.size(); i++) {
-		
 		frags[i]->buildShellBasis();
 		frags[i]->calcEnuc();
 		std::vector<libint2::Shell>& shells = frags[i]->getBasis().getIntShells();
@@ -42,14 +41,31 @@ void ALMOSCF::setFragments(bool unrestricted)
 		int f_nbfs = ints[nf].nbasis(shells);
 		IntegralEngine new_engine(frags[i]->shared_from_this(), focker.getIntegrals(), start, start+f_nbfs);
 		ints.push_back(new_engine);
+
 		if (unrestricted) {
 			ufragments.push_back(UnrestrictedFockFragment(cmd, ints[nf], frags[i], start, start+f_nbfs)); 
 			SCF hf(cmd, frags[i], ufragments[ufragments.size()-1]);
 			hf.uhf_internal(false, ufragments[ufragments.size()-1]);
 			molecule->control->log.print("Monomer " + std::to_string(nf) + " energy = " + std::to_string(hf.getEnergy()) + " Hartree");
+			
 			molecule->control->log.flush();   
 			monomer_energies.push_back(hf.getEnergy()); 
 			ufragments[ufragments.size()-1].clearDiis(); 
+			FragmentInfo fa, fb; 
+			fa.occ = frags[i]->nalpha(); 
+			fa.nbfs = f_nbfs; 
+			fa.naux = new_engine.nbasis(frags[i]->getBasis().getJKShells()); 
+			fa.nshells = frags[i]->getBasis().getIntShells().size(); 
+			fa.ndfshells = frags[i]->getBasis().getJKShells().size(); 
+			fa.auxstart = auxstart; 
+			fa.start = start;
+			fa.radius = frags[i]->getBasis().extent();
+			fa.com = frags[i]->com(); 
+			fb = fa;
+			fb.occ = frags[i]->nbeta();
+			finfo_alpha.push_back(fa);
+			finfo_beta.push_back(fb);  
+			auxstart += fa.naux; 
 		} else {
 			fragments.push_back(FockFragment(cmd, ints[nf], frags[i], start, start+f_nbfs));
 			SCF hf(cmd, frags[i], fragments[fragments.size()-1]);
@@ -70,19 +86,26 @@ void ALMOSCF::setFragments(bool unrestricted)
 			f.start = start;
 			f.radius = frags[i]->getBasis().extent();
 			f.com = frags[i]->com(); 
-			finfo.push_back(f); 
+			finfo.push_back(f);
+			auxstart += f.naux;  
 		}
 		start += f_nbfs;
-		auxstart += finfo[i].naux; 
 
 		nf++;
 	}
 	molecule->control->log.print("Monomer calculations completed.");
 	molecule->control->log.localTime();
+	molecule->control->log.flush();
 	
-	finfo[0].mo_thresh = cmd.get_option<double>("mothresh"); 
-	finfo[0].fit_thresh = cmd.get_option<double>("fitthresh");
-	finfo[0].r_thresh = cmd.get_option<double>("rthresh"); 
+	if (unrestricted) {
+		finfo_alpha[0].mo_thresh = finfo_beta[0].mo_thresh = cmd.get_option<double>("mothresh"); 
+		finfo_alpha[0].fit_thresh = finfo_beta[0].fit_thresh = cmd.get_option<double>("fitthresh");
+		finfo_alpha[0].r_thresh = finfo_beta[0].r_thresh = cmd.get_option<double>("rthresh");
+	} else {
+		finfo[0].mo_thresh = cmd.get_option<double>("mothresh"); 
+		finfo[0].fit_thresh = cmd.get_option<double>("fitthresh");
+		finfo[0].r_thresh = cmd.get_option<double>("rthresh"); 
+	}
 }
 
 double ALMOSCF::makeDens(bool alpha) {
@@ -308,6 +331,7 @@ void ALMOSCF::ucompute() {
 	
 	// Build Fock matrix
 	if (cmd.get_option<bool>("df")) {
+		
 		Matrix ca_occ = Matrix::Zero(nbfs, focker.getMolecule()->nalpha()); 
 		Matrix cb_occ = Matrix::Zero(nbfs, focker.getMolecule()->nbeta()); 
 		
@@ -327,12 +351,17 @@ void ALMOSCF::ucompute() {
 			ib_offset += f1_nbeta; 
 		}
 		
-		EigenSolver esa(sigma_alpha); 
-		ca_occ = ca_occ * esa.operatorSqrt(); 
-		EigenSolver esb(sigma_beta);
-		cb_occ = cb_occ * esb.operatorSqrt(); 
+		if (cmd.get_option<bool>("local")) {
+			ufocker.formJKlocal(ca_occ, cb_occ, sigma_alpha, sigma_beta, 
+					P_alpha, P_beta, finfo_alpha, finfo_beta);
+		} else {
+			EigenSolver esa(sigma_alpha); 
+			ca_occ = ca_occ * esa.operatorSqrt(); 
+			EigenSolver esb(sigma_beta);
+			cb_occ = cb_occ * esb.operatorSqrt(); 
 		
-		ufocker.formJKdf(ca_occ, cb_occ, 1.0); 
+			ufocker.formJKdf(ca_occ, cb_occ, 1.0);
+		} 
 	} else if (ufocker.getMolecule()->control->get_option<bool>("direct"))
 		ufocker.formJKdirect(focker.getIntegrals().getPrescreen(), P_alpha, P_beta, 2.0);
 	else 

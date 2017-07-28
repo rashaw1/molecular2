@@ -196,9 +196,12 @@ public:
   		); 
 
   void compute_2body_fock_df(const Matrix& Cocc, Matrix& j, Matrix& k);
-  void compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo, Matrix& j, Matrix& k); 
-  void compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo, Matrix& j, Matrix& k);
-  void build_domains(Matrix& Cocc, Matrix& V, std::vector<FragmentInfo>& finfo);  
+  void compute_2body_fock_df_local(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo, Matrix& j, Matrix& k,
+  		std::vector<Domain>& lmod, std::vector<Domain>& aod, std::vector<Domain>& fitd); 
+  void compute_2body_fock_df_local_file(Matrix& Cocc, const Matrix& sigmainv, Matrix& Pt, std::vector<FragmentInfo>& finfo, Matrix& j, Matrix& k,
+  	    std::vector<Domain>& lmod, std::vector<Domain>& aod, std::vector<Domain>& fitd);
+  void build_domains(Matrix& Cocc, Matrix& V, std::vector<FragmentInfo>& finfo, 
+  	std::vector<Domain>& lmod, std::vector<Domain>& aod, std::vector<Domain>& fitd);  
   void build_blocked_eris(std::vector<FragmentInfo>& finfo, Matrix& JPQ, Matrix& Pt); 
   
   void compute_soad_guess(); 

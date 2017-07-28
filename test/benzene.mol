@@ -21,10 +21,10 @@ H,   -1.086900697,   2.281000204,  -0.132886135
 	       default, avdz
 	 }
 	 jkbasis = {
-	 	 default, avdzjkfit
+	 	 default, avdz
 	 }
 	 ribasis = {
-	 	 default, avdzmp2fit
+	 	 default, avdz
 	 }
 }
 hf(

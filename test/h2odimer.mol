@@ -23,11 +23,13 @@ molecule = {
 	 	 default, avdz
   	 }
 }
-ralmo (
+ualmo (
+      local, true
+      dprint, true
       df, true
-      rpa, true
+      rpa, false
       rpax, 2
       longrange, false
       xcorrect, true
-      perturb, 3
+      perturb, 1
 )
